@@ -16,7 +16,7 @@ set (CMAKE_MODULE_PATH
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(safeguards)
-include(agmg)
+#include(agmg)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-std=c++14 -g -fpermissive")
 set(CMAKE_CXX_FLAGS_RELEASE "-std=c++14 -O3 -mavx -g -fpermissive -DNDEBUG")
