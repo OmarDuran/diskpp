@@ -1,19 +1,18 @@
 //
-//  one_field_assembler.hpp
+//  two_fields_assembler.hpp
 //  acoustics
 //
 //  Created by Omar Durán on 4/10/20.
 //
 
-#pragma once
-#ifndef one_field_assembler_hpp
-#define one_field_assembler_hpp
+#ifndef two_fields_assembler_hpp
+#define two_fields_assembler_hpp
 
 #include "bases/bases.hpp"
 #include "methods/hho"
 
 template<typename Mesh>
-class one_field_assembler
+class two_fields_assembler
 {
     
     
@@ -66,7 +65,7 @@ public:
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
 
-    one_field_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd)
+    two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd)
         : m_hho_di(hho_di), m_bnd(bnd), m_hho_stabilization_Q(true)
     {
             
@@ -94,7 +93,9 @@ public:
             }
         }
 
-        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_cbs = n_scal_cbs + n_vec_cbs;
         size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
 
         size_t system_size = n_cbs * msh.cells_size() + n_fbs * (m_n_edges - m_n_essential_edges);
@@ -108,7 +109,9 @@ public:
              const Matrix<T, Dynamic, 1>& rhs)
     {
         auto fcs = faces(msh, cl);
-        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_cbs = n_scal_cbs + n_vec_cbs;
         size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
         std::vector<assembly_index> asm_map;
         asm_map.reserve(n_cbs + n_fbs*fcs.size());
@@ -155,7 +158,7 @@ public:
             {
                 if ( asm_map[j].assemble() )
                     m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], lhs(i,j)) );
-                else 
+                else
                     RHS(asm_map[i]) -= lhs(i,j) * dirichlet_data(j);
             }
         }
@@ -167,31 +170,35 @@ public:
             RHS(asm_map[i]) += rhs(i);
         }
 
-    } //
+    }
 
     void assemble(const Mesh& msh, std::function<double(const typename Mesh::point_type& )> rhs_fun){
         
         for (auto& cell : msh)
         {
-            auto reconstruction_operator   = make_scalar_hho_laplacian(msh, cell, m_hho_di);
+            auto reconstruction_operator   = mixed_scalar_reconstruction(msh, cell);
             Matrix<T, Dynamic, Dynamic> R_operator = reconstruction_operator.second;
-            
+            auto n_rows = reconstruction_operator.second.rows();
+            auto n_cols = reconstruction_operator.second.cols();
 
-            Matrix<T, Dynamic, Dynamic> S_operator;
+            Matrix<T, Dynamic, Dynamic> S_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
             if(m_hho_stabilization_Q)
             {
                 auto stabilization_operator    = make_scalar_hho_stabilization(msh, cell, reconstruction_operator.first, m_hho_di);
-                S_operator = stabilization_operator;
+                auto n_s_rows = stabilization_operator.rows();
+                auto n_s_cols = stabilization_operator.cols();
+                S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
             }else{
                 auto stabilization_operator    = make_scalar_hdg_stabilization(msh, cell, m_hho_di);
-                S_operator = stabilization_operator;
+                auto n_s_rows = stabilization_operator.rows();
+                auto n_s_cols = stabilization_operator.cols();
+                S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
             }
+    
+            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = R_operator + S_operator;
+            Matrix<T, Dynamic, 1> f_loc = mixed_rhs(msh, cell, rhs_fun);
             
-            Matrix<T, Dynamic, Dynamic> laplacian_operator_loc = R_operator + S_operator;
-            auto cell_basis   = make_scalar_monomial_basis(msh, cell, m_hho_di.cell_degree());
-            Matrix<T, Dynamic, 1> f_loc = make_rhs(msh, cell, cell_basis, rhs_fun);
-            
-            scatter_data(msh, cell, laplacian_operator_loc, f_loc);
+            scatter_data(msh, cell, mixed_operator_loc, f_loc);
         }
         finalize();
     }
@@ -239,6 +246,94 @@ public:
         return x_el;
     }
             
+    std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
+                 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
+    mixed_scalar_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell)
+    {
+        using T = typename Mesh::coordinate_type;
+        typedef Matrix<T, Dynamic, Dynamic> matrix_type;
+        typedef Matrix<T, Dynamic, 1>       vector_type;
+
+        const size_t DIM = Mesh::dimension;
+
+        const auto recdeg = m_hho_di.reconstruction_degree();
+        const auto celdeg = m_hho_di.cell_degree();
+        const auto facdeg = m_hho_di.face_degree();
+
+        auto cb = make_scalar_monomial_basis(msh, cell, recdeg);
+
+        const auto rbs = disk::scalar_basis_size(recdeg, Mesh::dimension);
+        const auto cbs = disk::scalar_basis_size(celdeg, Mesh::dimension);
+        const auto fbs = disk::scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+        const auto num_faces = howmany_faces(msh, cell);
+
+        const matrix_type stiff  = make_stiffness_matrix(msh, cell, cb);
+        matrix_type gr_lhs = matrix_type::Zero(rbs-1, rbs-1);
+        matrix_type gr_rhs = matrix_type::Zero(rbs-1, cbs + num_faces*fbs);
+
+        gr_lhs = stiff.block(1, 1, rbs-1, rbs-1);
+        gr_rhs.block(0, 0, rbs-1, cbs) = stiff.block(1, 0, rbs-1, cbs);
+
+        const auto fcs = faces(msh, cell);
+        for (size_t i = 0; i < fcs.size(); i++)
+        {
+            const auto fc = fcs[i];
+            const auto n  = normal(msh, cell, fc);
+            auto fb = make_scalar_monomial_basis(msh, fc, facdeg);
+
+            auto qps_f = integrate(msh, fc, recdeg - 1 + std::max(facdeg,celdeg));
+            for (auto& qp : qps_f)
+            {
+                vector_type c_phi_tmp = cb.eval_functions(qp.point());
+                vector_type c_phi = c_phi_tmp.head(cbs);
+                Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(qp.point());
+                Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
+                vector_type f_phi = fb.eval_functions(qp.point());
+                gr_rhs.block(0, cbs+i*fbs, rbs-1, fbs) += qp.weight() * (c_dphi * n) * f_phi.transpose();
+                gr_rhs.block(0, 0, rbs-1, cbs) -= qp.weight() * (c_dphi * n) * c_phi.transpose();
+            }
+        }
+
+        auto vec_cell_size = gr_lhs.cols();
+        auto nrows = gr_rhs.cols()+vec_cell_size;
+        auto ncols = gr_rhs.cols()+vec_cell_size;
+        
+        // Shrinking data
+        matrix_type data_mixed = matrix_type::Zero(nrows,ncols);
+        data_mixed.block(0, 0, vec_cell_size, vec_cell_size) = gr_lhs;
+        data_mixed.block(0, vec_cell_size, vec_cell_size, ncols-vec_cell_size) = gr_rhs;
+        data_mixed.block(vec_cell_size, 0, nrows-vec_cell_size, vec_cell_size) = -gr_rhs.transpose();
+        
+        matrix_type oper = gr_lhs.llt().solve(gr_rhs);
+        return std::make_pair(oper, data_mixed);
+    }
+            
+    Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+    mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<double(const typename Mesh::point_type& )> rhs_fun, size_t di = 0)
+    {
+        const auto recdeg = m_hho_di.reconstruction_degree();
+        const auto celdeg = m_hho_di.cell_degree();
+        const auto rbs = disk::scalar_basis_size(recdeg, Mesh::dimension) - 1;
+        const auto cbs = disk::scalar_basis_size(celdeg, Mesh::dimension) + rbs;
+        auto cell_basis = make_scalar_monomial_basis(msh, cell, celdeg);
+        using T = typename Mesh::coordinate_type;
+
+        Matrix<T, Dynamic, 1> ret_loc = Matrix<T, Dynamic, 1>::Zero(cell_basis.size());
+        Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(cbs);
+
+        const auto qps = integrate(msh, cell, 2 * (celdeg + di));
+
+        for (auto& qp : qps)
+        {
+            const auto phi  = cell_basis.eval_functions(qp.point());
+            const auto qp_f = disk::priv::inner_product(qp.weight(), rhs_fun(qp.point()));
+            ret_loc += disk::priv::outer_product(phi, qp_f);
+        }
+        ret.block(rbs,0,cell_basis.size(),1) = ret_loc;
+        return ret;
+    }
+            
     void set_hdg_stabilization(){
         if(m_hho_di.cell_degree() > m_hho_di.face_degree())
         {
@@ -257,4 +352,4 @@ public:
     }
 };
 
-#endif /* one_field_assembler_hpp */
+#endif /* two_fields_assembler_hpp */
