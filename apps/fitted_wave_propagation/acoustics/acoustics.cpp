@@ -613,10 +613,8 @@ class TDIRKHHOAnalyses
 //void IHHOSecondOrder(int argc, char **argv);
 //
 
-void HHOSecondOrderExample(int argc, char **argv);
 
 
-//void HHOFirstOrderExample(int argc, char **argv);
 //
 //void IHHOFirstOrder(int argc, char **argv);
 //
@@ -628,12 +626,14 @@ void HHOSecondOrderExample(int argc, char **argv);
 //
 //void HeterogeneousIHHOSecondOrder(int argc, char **argv);
 
-#define quadratic_space_solution_Q
+void HHOSecondOrderExample(int argc, char **argv);
+
+void HHOFirstOrderExample(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
 
-//    HHOFirstOrderExample(argc, argv);
+    HHOFirstOrderExample(argc, argv);
 //    HHOSecondOrderExample(argc, argv);
     
     
@@ -644,127 +644,6 @@ int main(int argc, char **argv)
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
-    
-    using RealType = double;
-    simulation_data sim_data = preprocessor::process_args(argc, argv);
-    sim_data.print_simulation_data();
-    
-//    RealType lx = 1.0;
-//    RealType ly = 1.0;
-//    size_t nx = 1;
-//    size_t ny = 1;
-//    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-//    mesh_builder.refine_mesh(n_divs);
-//    mesh_builder.build_mesh();
-//    mesh_builder.print_log_file();
-//    mesh_type msh = mesh_builder.get_mesh();
-    
-    // Building the cartesian mesh
-    timecounter tc;
-    tc.tic();
-    std::string filename = "mesh.txt";
-    typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-    mesh_type msh;
-    disk::cartesian_mesh_loader<RealType, 2> loader;
-    if (!loader.read_mesh(filename))
-    {
-        std::cout << "Problem loading mesh." << std::endl;
-        return;
-    }
-    loader.populate_mesh(msh);
-    tc.toc();
-    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    // Manufactured solution
-#ifdef quadratic_space_solution_Q
-
-    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
-    };
-
-    auto exact_flux_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        std::vector<RealType> flux(2);
-        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
-        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
-        flux[0] *=-1.0;
-        flux[1] *=-1.0;
-        return flux;
-    };
-
-    auto rhs_fun = [](const typename mesh_type::point_type& pt) -> RealType {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        return -2.0*((x - 1)*x + (y - 1)*y);
-    };
-
-#else
-
-    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-    };
-
-    auto exact_flux_fun = [](const mesh_type::point_type& pt) -> std::vector<RealType> {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        std::vector<RealType> flux(2);
-        flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
-        flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
-        flux[0] *=-1.0;
-        flux[1] *=-1.0;
-        return flux;
-    };
-
-    auto rhs_fun = [](const mesh_type::point_type& pt) -> RealType {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-    };
-
-#endif
-
-    // Creating HHO approximation spaces and corresponding linear operator
-    size_t cell_k_degree = sim_data.m_k_degree;
-    if(sim_data.m_hdg_stabilization_Q){
-        cell_k_degree++;
-    }
-    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
-
-
-    // Solving a primal HHO mixed problem
-    boundary_type bnd(msh);
-    bnd.addDirichletEverywhere(exact_scal_fun);
-    tc.tic();
-    auto assembler = two_fields_assembler<mesh_type>(msh, hho_di, bnd);
-    if(sim_data.m_hdg_stabilization_Q){
-        assembler.set_hdg_stabilization();
-    }
-    assembler.assemble(msh, rhs_fun);
-    tc.toc();
-    std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    tc.tic();
-    SparseLU<SparseMatrix<RealType>> analysis_t;
-    analysis_t.analyzePattern(assembler.LHS);
-    analysis_t.factorize(assembler.LHS);
-    Matrix<RealType, Dynamic, 1> x_dof = analysis_t.solve(assembler.RHS); // new state
-    tc.toc();
-    std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-    std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    // Computing errors
-    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun);
-    
-    size_t it = 0;
-    std::string silo_file_name = "scalar_mixed_";
-    postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
     
     return 0;
 }
@@ -2375,7 +2254,7 @@ int main(int argc, char **argv)
 //    tc.toc();
 //}
 
-void HHOSecondOrderExample(int argc, char **argv){
+void HHOFirstOrderExample(int argc, char **argv){
 
     using RealType = double;
     simulation_data sim_data = preprocessor::process_args(argc, argv);
@@ -2392,7 +2271,120 @@ void HHOSecondOrderExample(int argc, char **argv){
 //    mesh_builder.print_log_file();
 //    mesh_type msh = mesh_builder.get_mesh();
     
-    // Building the cartesian mesh
+    // Building a cartesian mesh
+    timecounter tc;
+    tc.tic();
+    std::string filename = "mesh.txt";
+    typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    mesh_type msh;
+    disk::cartesian_mesh_loader<RealType, 2> loader;
+    if (!loader.read_mesh(filename))
+    {
+        std::cout << "Problem loading mesh." << std::endl;
+        return;
+    }
+    loader.populate_mesh(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    // Manufactured solution
+#ifdef quadratic_space_solution_Q
+
+    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
+        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+    };
+
+    auto exact_flux_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        std::vector<RealType> flux(2);
+        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
+        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
+        flux[0] *=-1.0;
+        flux[1] *=-1.0;
+        return flux;
+    };
+
+    auto rhs_fun = [](const typename mesh_type::point_type& pt) -> RealType {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        return -2.0*((x - 1)*x + (y - 1)*y);
+    };
+
+#else
+
+    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
+        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+    };
+
+    auto exact_flux_fun = [](const mesh_type::point_type& pt) -> std::vector<RealType> {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        std::vector<RealType> flux(2);
+        flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
+        flux[0] *=-1.0;
+        flux[1] *=-1.0;
+        return flux;
+    };
+
+    auto rhs_fun = [](const mesh_type::point_type& pt) -> RealType {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+    };
+
+#endif
+
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t cell_k_degree = sim_data.m_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+
+
+    // Solving a primal HHO mixed problem
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(exact_scal_fun);
+    tc.tic();
+    auto assembler = two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    assembler.assemble(msh, rhs_fun);
+    tc.toc();
+    std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    SparseLU<SparseMatrix<RealType>> analysis_t;
+    analysis_t.analyzePattern(assembler.LHS);
+    analysis_t.factorize(assembler.LHS);
+    Matrix<RealType, Dynamic, 1> x_dof = analysis_t.solve(assembler.RHS); // new state
+    tc.toc();
+    std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
+    std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    // Computing errors
+    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun);
+    
+    size_t it = 0;
+    std::string silo_file_name = "scalar_mixed_";
+    postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
+}
+
+void HHOSecondOrderExample(int argc, char **argv){
+
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+    
+    // Building a cartesian mesh
     timecounter tc;
     tc.tic();
     std::string filename = "mesh.txt";
@@ -2500,160 +2492,6 @@ void HHOSecondOrderExample(int argc, char **argv){
 }
 
 
-//void HHOFirstOrderExample(int argc, char **argv){
-//
-//    using RealType = double;
-//    size_t k_degree = 0;
-//    size_t n_divs   = 0;
-//
-//    int opt;
-//    while ( (opt = getopt(argc, argv, "k:l:n")) != -1 )
-//    {
-//        switch(opt)
-//        {
-//            case 'k':
-//            {
-//                k_degree = atoi(optarg);
-//            }
-//                break;
-//            case 'l':
-//            {
-//                n_divs = atoi(optarg);
-//            }
-//                break;
-//            case '?':
-//            default:
-//                std::cout << "wrong arguments" << std::endl;
-//                exit(1);
-//        }
-//    }
-//
-//    std::cout << bold << red << "k : " << k_degree << reset << std::endl;
-//    std::cout << bold << red << "l : " << n_divs << reset << std::endl;
-//
-//    // The mesh in ProtoN seems like is always 2D
-//     mesh_init_params<RealType> mip;
-//     mip.Nx = 1;
-//     mip.Ny = 1;
-//
-//    for (size_t i = 0; i < n_divs; i++) {
-//        mip.Nx *= 2;
-//        mip.Ny *= 2;
-//    }
-//
-//    timecounter tc;
-//
-//    // Building the cartesian mesh
-//    tc.tic();
-//    poly_mesh<RealType> msh(mip);
-//    tc.toc();
-//
-//    std::cout << bold << cyan << "Mesh generation: " << tc << " seconds" << reset << std::endl;
-//
-//
-//    // Creating HHO approximation spaces and corresponding linear operator
-//    disk::hho_degree_info hho_di(k_degree,k_degree);
-//
-//    // Solving a HDG/HHO mixed problem
-//    auto assembler = make_assembler(msh, hho_di, true); // another assemble version
-//    tc.tic();
-//
-//    // Manufactured solution
-//#ifdef quadratic_space_solution_Q
-//
-//    auto exact_scal_sol_fun = [](const typename poly_mesh<RealType>::point_type& pt) -> RealType {
-//        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
-//    };
-//
-//    auto exact_flux_sol_fun = [](const typename poly_mesh<RealType>::point_type& pt) -> std::vector<RealType> {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        std::vector<RealType> flux(2);
-//        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
-//        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
-//        flux[0] *=-1.0;
-//        flux[1] *=-1.0;
-//        return flux;
-//    };
-//
-//    auto rhs_fun = [](const typename poly_mesh<RealType>::point_type& pt) -> RealType {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        return -2.0*((x - 1)*x + (y - 1)*y);
-//    };
-//
-//#else
-//
-//    auto exact_scal_sol_fun = [](const typename poly_mesh<RealType>::point_type& pt) -> RealType {
-//        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-//    };
-//
-//    auto exact_flux_sol_fun = [](const typename poly_mesh<RealType>::point_type& pt) -> std::vector<RealType> {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        std::vector<RealType> flux(2);
-//        flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
-//        flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
-//        flux[0] *=-1.0;
-//        flux[1] *=-1.0;
-//        return flux;
-//    };
-//
-//    auto rhs_fun = [](const typename poly_mesh<RealType>::point_type& pt) -> RealType {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-//    };
-//
-//#endif
-//
-//    for (auto& cell : msh.cells)
-//    {
-//            auto reconstruction_operator = make_hho_mixed_laplacian(msh, cell, hho_di);
-//#ifdef fancy_stabilization_Q
-//            auto stabilization_operator = make_hho_fancy_stabilization(msh, cell, reconstruction_operator.first, hho_di);
-//#else
-//            auto stabilization_operator = make_hho_naive_stabilization(msh, cell, hho_di);
-//#endif
-//
-//        auto n_rows = reconstruction_operator.second.rows();
-//        auto n_cols = reconstruction_operator.second.cols();
-//
-//        auto n_s_rows = stabilization_operator.rows();
-//        auto n_s_cols = stabilization_operator.cols();
-//
-//        Matrix<RealType, Dynamic, Dynamic> R_operator = reconstruction_operator.second;
-//        Matrix<RealType, Dynamic, Dynamic> S_operator = Matrix<RealType, Dynamic, Dynamic>::Zero(n_rows, n_cols);
-//        S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
-//
-//        // Compossing objects
-//        Matrix<RealType, Dynamic, Dynamic> mixed_operator_loc = R_operator - S_operator;
-//        Matrix<RealType, Dynamic, 1> f_loc = make_mixed_rhs(msh, cell, hho_di.cell_degree(), rhs_fun);
-//        assembler.assemble_mixed(msh, cell, mixed_operator_loc, f_loc, exact_scal_sol_fun);
-//    }
-//    assembler.finalize();
-//
-//    tc.tic();
-//    SparseLU<SparseMatrix<RealType>> analysis_t;
-//    analysis_t.analyzePattern(assembler.LHS);
-//    analysis_t.factorize(assembler.LHS);
-//    Matrix<RealType, Dynamic, 1> x_dof = analysis_t.solve(assembler.RHS); // new state
-//    tc.toc();
-//
-//    // Computing errors
-//    ComputeL2ErrorTwoFields(msh, hho_di, x_dof, exact_scal_sol_fun, exact_flux_sol_fun);
-//
-//    size_t it = 0;
-//    std::string silo_file_name = "scalar_mixed_";
-//    RenderSiloFileTwoFields(silo_file_name, it, msh, hho_di, x_dof, exact_scal_sol_fun, exact_flux_sol_fun);
-//    return;
-//
-//}
-//
 //void HeterogeneousIHHOSecondOrder(int argc, char **argv){
 //
 //    bool render_silo_files_Q = true;
