@@ -413,6 +413,121 @@ public:
         std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
     }
 
+    // Write a silo file for one field approximation
+    static void write_silo_one_field_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,
+    std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, bool cell_centered_Q){
+
+        timecounter tc;
+        tc.tic();
+        
+        auto dim = Mesh::dimension;
+        auto num_cells = msh.cells_size();
+        auto num_points = msh.points_size();
+        using RealType = double;
+        std::vector<RealType> exact_ux, exact_uy, approx_ux, approx_uy;
+        size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+        
+        if (cell_centered_Q) {
+            exact_ux.reserve( num_cells );
+            exact_uy.reserve( num_cells );
+            approx_ux.reserve( num_cells );
+            approx_uy.reserve( num_cells );
+
+            size_t cell_i = 0;
+            for (auto& cell : msh)
+            {
+                auto bar = barycenter(msh, cell);
+                exact_ux.push_back( vec_fun(bar)(0,0) );
+                exact_uy.push_back( vec_fun(bar)(1,0) );
+                
+                // vector evaluation
+                {
+                    auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, cell_dof, 1);
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    assert(t_phi.rows() == cell_basis.size());
+                    auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                    approx_ux.push_back(uh(0,0));
+                    approx_uy.push_back(uh(1,0));
+                }
+                cell_i++;
+            }
+
+        }else{
+
+            exact_ux.reserve( num_points );
+            exact_uy.reserve( num_points );
+            approx_ux.reserve( num_points );
+            approx_uy.reserve( num_points );
+            
+            // scan for selected cells, common cells are discardable
+            std::map<size_t, size_t> point_to_cell;
+            size_t cell_i = 0;
+            for (auto& cell : msh)
+            {
+                auto points = cell.point_ids();
+                size_t n_p = points.size();
+                for (size_t l = 0; l < n_p; l++)
+                {
+                    auto pt_id = points[l];
+                    point_to_cell[pt_id] = cell_i;
+                }
+                cell_i++;
+            }
+
+            for (auto& pt_id : point_to_cell)
+            {
+                auto bar = *std::next(msh.points_begin(), pt_id.first);
+                cell_i = pt_id.second;
+                auto cell = *std::next(msh.cells_begin(), cell_i);
+                
+                exact_ux.push_back( vec_fun(bar)(0,0) );
+                exact_uy.push_back( vec_fun(bar)(1,0) );
+                
+                // vector evaluation
+                {
+                    auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, cell_dof, 1);
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    assert(t_phi.rows() == cell_basis.size());
+                    auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                    approx_ux.push_back(uh(0,0));
+                    approx_uy.push_back(uh(1,0));
+                }
+            }
+
+        }
+
+        disk::silo_database silo;
+        silo_file_name += std::to_string(it) + ".silo";
+        silo.create(silo_file_name.c_str());
+        silo.add_mesh(msh, "mesh");
+        if (cell_centered_Q) {
+            disk::silo_zonal_variable<double> vx_silo("vx", exact_ux);
+            disk::silo_zonal_variable<double> vy_silo("vy", exact_uy);
+            disk::silo_zonal_variable<double> vhx_silo("vhx", approx_ux);
+            disk::silo_zonal_variable<double> vhy_silo("vhy", approx_uy);
+            silo.add_variable("mesh", vx_silo);
+            silo.add_variable("mesh", vy_silo);
+            silo.add_variable("mesh", vhx_silo);
+            silo.add_variable("mesh", vhy_silo);
+        }else{
+            disk::silo_nodal_variable<double> vx_silo("vx", exact_ux);
+            disk::silo_nodal_variable<double> vy_silo("vy", exact_uy);
+            disk::silo_nodal_variable<double> vhx_silo("vhx", approx_ux);
+            disk::silo_nodal_variable<double> vhy_silo("vhy", approx_uy);
+            silo.add_variable("mesh", vx_silo);
+            silo.add_variable("mesh", vy_silo);
+            silo.add_variable("mesh", vhx_silo);
+            silo.add_variable("mesh", vhy_silo);
+        }
+
+        silo.close();
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
+    
 };
 
 

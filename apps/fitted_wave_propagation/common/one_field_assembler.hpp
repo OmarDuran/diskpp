@@ -17,7 +17,7 @@ class one_field_assembler
 {
     
     
-    typedef disk::BoundaryConditions<Mesh>    boundary_type;
+    typedef disk::BoundaryConditions<Mesh, true>    boundary_type;
     using T = typename Mesh::coordinate_type;
 
     std::vector<size_t>                 m_compress_indexes;

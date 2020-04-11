@@ -1,20 +1,9 @@
-/*
- *       /\        Omar Duran 2019
- *      /__\       omar.duran@enpc.fr
- *     /_\/_\      École Nationale des Ponts et Chaussées - CERMICS
- *    /\    /\
- *   /__\  /__\    This is ProtoN, a library for fast Prototyping of
- *  /_\/_\/_\/_\   Numerical methods.
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- *
- * If you use this code or parts of it for scientific publications, you
- * are required to cite it as following:
- *
- * Explicit and implicit hybrid high-order methods for the acoustic wave equation
- */
+//
+//  acoustics.cpp
+//  acoustics
+//
+//  Created by Omar Durán on 4/8/20.
+//
 
 #include <iostream>
 #include <fstream>
