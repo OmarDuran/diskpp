@@ -47,6 +47,7 @@ void HHOSecondOrderExample(int argc, char **argv);
 
 void HHOFirstOrderExample(int argc, char **argv);
 
+#define quadratic_space_solution_Q
 int main(int argc, char **argv)
 {
 
@@ -77,61 +78,70 @@ int main(int argc, char **argv)
     // Manufactured solution
 #ifdef quadratic_space_solution_Q
 
-    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+    auto exact_vec_fun = [](const point<RealType, 2>& p) -> static_vector<RealType, 2> {
+        RealType x,y;
+        x = p.x();
+        y = p.y();
+        RealType ux = (1 - x)*x*(1 - y)*y;
+        RealType uy = (1 - x)*x*(1 - y)*y;
+        return static_vector<RealType, 2>{ux, uy};
     };
-
-    auto exact_flux_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        std::vector<RealType> flux(2);
-        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
-        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
-        flux[0] *=-1.0;
-        flux[1] *=-1.0;
-        return flux;
+    
+    auto exact_flux_fun = [](const mesh_type::point_type& p) -> static_matrix<RealType,2,2> {
+        RealType x,y;
+        x = p.x();
+        y = p.y();
+        static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
+        RealType sxx = 2*(1 - x)*(1 - y)*y - 2*x*(1 - y)*y + (2*(1 - x)*x*(1 - y) - 2*(1 - x)*x*y)/2. + (2*(1 - x)*(1 - y)*y - 2*x*(1 - y)*y)/2.;
+        RealType sxy = (1 - x)*x*(1 - y) - (1 - x)*x*y + (1 - x)*(1 - y)*y - x*(1 - y)*y;
+        RealType syy = 2*(1 - x)*x*(1 - y) - 2*(1 - x)*x*y + (2*(1 - x)*x*(1 - y) - 2*(1 - x)*x*y)/2. + (2*(1 - x)*(1 - y)*y - 2*x*(1 - y)*y)/2.;
+        sigma(0,0) = sxx;
+        sigma(0,1) = sxy;
+        sigma(1,0) = sxy;
+        sigma(1,1) = syy;
+        return sigma;
     };
-
-    auto rhs_fun = [](const typename mesh_type::point_type& pt) -> RealType {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        return -2.0*((x - 1)*x + (y - 1)*y);
+    
+    auto rhs_fun = [](const mesh_type::point_type& p) -> static_vector<RealType, 2> {
+        RealType x,y;
+        x = p.x();
+        y = p.y();
+        RealType fx = 2*(1 + x*x + y*(-5 + 3*y) + x*(-3 + 4*y));
+        RealType fy = 2*(1 + 3*x*x + (-3 + y)*y + x*(-5 + 4*y));
+        return static_vector<RealType, 2>{-fx, -fy};
     };
 
 #else
 
     auto exact_vec_fun = [](const point<RealType, 2>& p) -> static_vector<RealType, 2> {
-        const RealType lambda = 1.0;
-        const RealType mu     = 1.0;
-        
-        RealType fx = sin(2 * M_PI * p.y()) * (cos(2 * M_PI * p.x()) - 1) +
-               1.0 / (1 + lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
-        RealType fy = -sin(2 * M_PI * p.x()) * (cos(2 * M_PI * p.y()) - 1) +
-               1.0 / (1 + lambda) * sin(M_PI * p.x()) * sin(M_PI * p.y());
-
-        return static_vector<RealType, 2>{fx, fy};
+        RealType ux = std::sin(2.0 * M_PI * p.x()) * std::sin(2.0 * M_PI * p.y());
+        RealType uy = std::sin(3.0 * M_PI * p.x()) * std::sin(3.0 * M_PI * p.y());
+        return static_vector<RealType, 2>{ux, uy};
+    };
+    
+    auto exact_flux_fun = [](const mesh_type::point_type& p) -> static_matrix<RealType,2,2> {
+        static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
+        RealType sxx = 3.0 * M_PI * std::sin(3.0 * M_PI * p.x()) * std::cos(3.0 * M_PI * p.y())
+                     + 6.0 * M_PI * std::cos(2.0 * M_PI * p.x()) * std::sin(2.0 * M_PI * p.y());
+        RealType sxy = 2.0 * M_PI * std::sin(2.0 * M_PI * p.x()) * std::cos(2.0 * M_PI * p.y())
+                     + 3.0 * M_PI * std::cos(3.0 * M_PI * p.x()) * std::sin(3.0 * M_PI * p.y());
+        RealType syy = 9.0 * M_PI * std::sin(3.0 * M_PI * p.x()) * std::cos(3.0 * M_PI * p.y())
+                     + 2.0 * M_PI * std::cos(2.0 * M_PI * p.x()) * std::sin(2.0 * M_PI * p.y());
+        sigma(0,0) = sxx;
+        sigma(0,1) = sxy;
+        sigma(1,0) = sxy;
+        sigma(1,1) = syy;
+        return sigma;
     };
     
     auto rhs_fun = [](const mesh_type::point_type& p) -> static_vector<RealType, 2> {
-        const RealType lambda = 1.0;
-        const RealType mu     = 1.0;
-
-        RealType fx =
-          lambda * cos(M_PI * (p.x() + p.y())) -
-          2.0 * mu *
-            ((4 * lambda + 4) * sin(2 * M_PI * p.y()) * cos(2 * M_PI * p.x()) + sin(M_PI * p.x()) * sin(M_PI * p.y())) +
-          2.0 * mu *
-            (2.0 * lambda * sin(2 * M_PI * p.y()) + 2.0 * sin(2 * M_PI * p.y()) + 0.5 * cos(M_PI * (p.x() + p.y())));
-        RealType fy =
-          lambda * cos(M_PI * (p.x() + p.y())) +
-          2.0 * mu *
-            ((4 * lambda + 4) * sin(2 * M_PI * p.x()) * cos(2 * M_PI * p.y()) - sin(M_PI * p.x()) * sin(M_PI * p.y())) -
-          2.0 * mu *
-            (2.0 * lambda * sin(2 * M_PI * p.x()) + 2.0 * sin(2 * M_PI * p.x()) - 0.5 * cos(M_PI * (p.x() + p.y())));
-
-        return -M_PI * M_PI / (lambda + 1) * static_vector<RealType, 2>{fx, fy};
+        RealType fx = 2.0 * M_PI * M_PI * (
+                      9.0 * std::cos(3.0 * M_PI * p.x()) * std::cos(3.0 * M_PI * p.y())
+                    - 8.0 * std::sin(2.0 * M_PI * p.x()) * std::sin(2.0 * M_PI * p.y()));
+        RealType fy = 4.0 * M_PI * M_PI * (
+                      2.0 * std::cos(2.0 * M_PI * p.x()) * std::cos(2.0 * M_PI * p.y())
+                    - 9.0 * std::sin(3.0 * M_PI * p.x()) * std::sin(3.0 * M_PI * p.y()));
+        return static_vector<RealType, 2>{-fx, -fy};
     };
 
 #endif
@@ -166,7 +176,7 @@ int main(int argc, char **argv)
     std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Computing errors
-//    postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun);
+    postprocessor<mesh_type>::compute_errors_one_field_vectorial(msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun);
     
     size_t it = 0;
     std::string silo_file_name = "vec_";

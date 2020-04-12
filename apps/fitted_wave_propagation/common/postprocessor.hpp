@@ -412,6 +412,86 @@ public:
         std::cout << std::endl;
         std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
     }
+    
+    /// Compute L2 and H1 errors for one field vectorial approximation
+    static void compute_errors_one_field_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, one_field_vectorial_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+        
+        RealType vector_l2_error = 0.0;
+        RealType flux_l2_error = 0.0;
+        size_t cell_i = 0;
+        RealType h;
+        for (auto& cell : msh)
+        {
+            if(cell_i == 0){
+                h = diameter(msh, cell);
+            }
+
+            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_i*cell_dof, 0, cell_dof, 1);
+
+            // scalar evaluation
+            {
+                auto cell_basis = disk::make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, vec_fun);
+                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
+                Matrix<RealType, Dynamic, 1> diff = real_dofs - vec_cell_dof;
+                vector_l2_error += diff.dot(mass*diff);
+
+            }
+
+            // flux evaluation
+            {
+                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
+                Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_dof_data(msh, cell, x_dof);
+                
+                auto           sgr = make_vector_hho_symmetric_laplacian(msh, cell, hho_di);
+                dynamic_vector<RealType> GTu = sgr.first * all_dofs;
+
+                auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+                dynamic_vector<RealType> divu = dr.first * all_dofs;
+
+                auto cbas_v = disk::make_vector_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+                auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+
+                auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+                auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
+
+                // Error integrals
+                for (auto & point_pair : int_rule) {
+
+                    RealType omega = point_pair.weight();
+                    
+                    auto t_dphi = rec_basis.eval_gradients( point_pair.point() );
+                    auto gphi   = cbas_v.eval_sgradients(point_pair.point());
+                    auto epsilon = disk::eval(GTu, gphi, dim);
+                    auto divphi   = cbas_s.eval_functions(point_pair.point());
+                    auto trace_epsilon = disk::eval(divu, divphi);
+                    auto sigma = 2.0 * epsilon + trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
+                    auto flux_diff = (flux_fun(point_pair.point()) - sigma).eval();
+                    flux_l2_error += omega * flux_diff.squaredNorm();
+
+                }
+            }
+
+            cell_i++;
+        }
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
+        std::cout << green << "Characteristic h size = " << std::endl << h << std::endl;
+        std::cout << green << "L2-norm error = " << std::endl << std::sqrt(vector_l2_error) << std::endl;
+        std::cout << green << "H1-norm error = " << std::endl << std::sqrt(flux_l2_error) << std::endl;
+
+
+
+    }
 
     // Write a silo file for one field approximation
     static void write_silo_one_field_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,

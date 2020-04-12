@@ -210,8 +210,8 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto cell_ofs = disk::priv::offset(msh, cl);
-        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
-        size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+        size_t n_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         
         Matrix<T, Dynamic, 1> x_el(n_cbs + num_faces * n_fbs );
         x_el.block(0, 0, n_cbs, 1) = x_glob.block(cell_ofs * n_cbs, 0, n_cbs, 1);
@@ -225,10 +225,10 @@ public:
 
             if (m_bnd.is_dirichlet_face( face_id))
             {
-                auto fb = disk::make_scalar_monomial_basis(msh, fc, m_hho_di.face_degree());
-                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb, m_hho_di.face_degree());
-                auto velocity = m_bnd.dirichlet_boundary_func(face_id);
-                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, velocity, m_hho_di.face_degree());
+                auto fb = make_vector_monomial_basis(msh, fc, m_hho_di.face_degree());
+                auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
+                Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
+                Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
                 x_el.block(n_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
             }
             else
