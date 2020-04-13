@@ -178,8 +178,8 @@ public:
         {
             auto reconstruction_operator   = mixed_scalar_reconstruction(msh, cell);
             Matrix<T, Dynamic, Dynamic> R_operator = reconstruction_operator.second;
-            auto n_rows = reconstruction_operator.second.rows();
-            auto n_cols = reconstruction_operator.second.cols();
+            auto n_rows = R_operator.rows();
+            auto n_cols = R_operator.cols();
 
             Matrix<T, Dynamic, Dynamic> S_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
             if(m_hho_stabilization_Q)

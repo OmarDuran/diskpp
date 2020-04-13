@@ -493,7 +493,7 @@ public:
 
     }
 
-    // Write a silo file for one field approximation
+    // Write a silo file for one field vectorial approximation
     static void write_silo_one_field_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,
     std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, bool cell_centered_Q){
 
@@ -600,6 +600,243 @@ public:
             silo.add_variable("mesh", vy_silo);
             silo.add_variable("mesh", vhx_silo);
             silo.add_variable("mesh", vhy_silo);
+        }
+
+        silo.close();
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
+    
+    // Write a silo file for two fields vectorial approximation
+    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, two_fields_vectorial_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
+
+        timecounter tc;
+        tc.tic();
+        
+        auto dim = Mesh::dimension;
+        auto num_cells = msh.cells_size();
+        auto num_points = msh.points_size();
+        using RealType = double;
+        std::vector<RealType> exact_ux, exact_uy, approx_ux, approx_uy;
+        std::vector<RealType> exact_sxx, exact_sxy, exact_syy;
+        std::vector<RealType> approx_sxx, approx_sxy, approx_syy;
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
+        size_t cell_dof = n_vec_cbs + n_ten_cbs;
+        
+        if (cell_centered_Q) {
+            exact_ux.reserve( num_cells );
+            exact_uy.reserve( num_cells );
+            approx_ux.reserve( num_cells );
+            approx_uy.reserve( num_cells );
+            
+            exact_sxx.reserve( num_cells );
+            exact_sxy.reserve( num_cells );
+            exact_syy.reserve( num_cells );
+            approx_sxx.reserve( num_cells );
+            approx_sxy.reserve( num_cells );
+            approx_syy.reserve( num_cells );
+
+            size_t cell_i = 0;
+            for (auto& cell : msh)
+            {
+                auto bar = barycenter(msh, cell);
+                exact_ux.push_back( vec_fun(bar)(0,0) );
+                exact_uy.push_back( vec_fun(bar)(1,0) );
+                
+                exact_sxx.push_back( flux_fun(bar)(0,0) );
+                exact_sxy.push_back( flux_fun(bar)(0,1) );
+                exact_syy.push_back( flux_fun(bar)(1,1) );
+                
+                // vector evaluation
+                {
+                    auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof + n_ten_cbs, 0, n_vec_cbs, 1);
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    assert(t_phi.rows() == cell_basis.size());
+                    auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                    approx_ux.push_back(uh(0,0));
+                    approx_uy.push_back(uh(1,0));
+                }
+                
+                // tensor evaluation
+                {
+                    auto cell_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                    Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    assert(t_phi.size() == cell_basis.size());
+                    auto sigma_h = disk::eval(ten_x_cell_dof, t_phi);
+
+                    approx_sxx.push_back(sigma_h(0,0));
+                    approx_sxy.push_back(sigma_h(0,1));
+                    approx_syy.push_back(sigma_h(1,1));
+                }
+                
+                cell_i++;
+            }
+
+        }else{
+
+            exact_ux.reserve( num_points );
+            exact_uy.reserve( num_points );
+            approx_ux.reserve( num_points );
+            approx_uy.reserve( num_points );
+            
+            exact_sxx.reserve( num_points );
+            exact_sxy.reserve( num_points );
+            exact_syy.reserve( num_points );
+            approx_sxx.reserve( num_points );
+            approx_sxy.reserve( num_points );
+            approx_syy.reserve( num_points );
+            
+            // scan for selected cells, common cells are discardable
+            std::map<size_t, size_t> point_to_cell;
+            size_t cell_i = 0;
+            for (auto& cell : msh)
+            {
+                auto points = cell.point_ids();
+                size_t n_p = points.size();
+                for (size_t l = 0; l < n_p; l++)
+                {
+                    auto pt_id = points[l];
+                    point_to_cell[pt_id] = cell_i;
+                }
+                cell_i++;
+            }
+
+            for (auto& pt_id : point_to_cell)
+            {
+                auto bar = *std::next(msh.points_begin(), pt_id.first);
+                cell_i = pt_id.second;
+                auto cell = *std::next(msh.cells_begin(), cell_i);
+                
+                exact_ux.push_back( vec_fun(bar)(0,0) );
+                exact_uy.push_back( vec_fun(bar)(1,0) );
+                
+                exact_sxx.push_back( flux_fun(bar)(0,0) );
+                exact_sxy.push_back( flux_fun(bar)(0,1) );
+                exact_syy.push_back( flux_fun(bar)(1,1) );
+                
+                // vector evaluation
+                {
+                    auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof + n_ten_cbs, 0, n_vec_cbs, 1);
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    assert(t_phi.rows() == cell_basis.size());
+                    auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                    approx_ux.push_back(uh(0,0));
+                    approx_uy.push_back(uh(1,0));
+                }
+                
+                // tensor evaluation
+                {
+                    auto cell_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                    Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
+
+                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
+                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    assert(t_phi.size() == cell_basis.size());
+                    auto sigma_h = disk::eval(ten_x_cell_dof, t_phi);
+                    sigma_h *= 2.0; // it includes 2*mu
+                    
+                    auto divphi   = cbas_s.eval_functions(bar);
+                    auto divu_iqn = disk::eval(divu, divphi);
+                    sigma_h += divu_iqn * static_matrix<RealType, 2, 2>::Identity();
+
+                    approx_sxx.push_back(sigma_h(0,0));
+                    approx_sxy.push_back(sigma_h(0,1));
+                    approx_syy.push_back(sigma_h(1,1));
+                }
+                
+//                // tensor evaluation
+//                {
+//                    auto n_cell_fcs = faces(msh, cell);
+//                    size_t n_primal_cell_cbs = n_vec_cbs + n_fbs*n_cell_fcs.size();
+//                    auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
+//                    Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_dof_data(msh, cell, x_dof);
+//
+//                    auto           sgr = make_vector_hho_symmetric_laplacian(msh, cell, hho_di);
+//                    dynamic_vector<RealType> GTu = sgr.first * all_dofs;
+//
+//                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+//                    dynamic_vector<RealType> divu = dr.first * all_dofs;
+//
+//                    auto cbas_v = disk::make_vector_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+//                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+//
+//                    auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+//                    auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
+//
+//                    auto t_dphi = rec_basis.eval_gradients( bar );
+//                    auto gphi   = cbas_v.eval_sgradients(bar);
+//                    auto epsilon = disk::eval(GTu, gphi, dim);
+//                    auto divphi   = cbas_s.eval_functions(bar);
+//                    auto trace_epsilon = disk::eval(divu, divphi);
+//                    auto sigma_h = 2.0 * epsilon + trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
+//                    approx_sxx.push_back(sigma_h(0,0));
+//                    approx_sxy.push_back(sigma_h(0,1));
+//                    approx_syy.push_back(sigma_h(1,1));
+//                }
+            }
+
+        }
+
+        disk::silo_database silo;
+        silo_file_name += std::to_string(it) + ".silo";
+        silo.create(silo_file_name.c_str());
+        silo.add_mesh(msh, "mesh");
+        if (cell_centered_Q) {
+            disk::silo_zonal_variable<double> vx_silo("vx", exact_ux);
+            disk::silo_zonal_variable<double> vy_silo("vy", exact_uy);
+            disk::silo_zonal_variable<double> vhx_silo("vhx", approx_ux);
+            disk::silo_zonal_variable<double> vhy_silo("vhy", approx_uy);
+            
+            disk::silo_nodal_variable<double> sxx_silo("sxx", exact_sxx);
+            disk::silo_nodal_variable<double> sxy_silo("sxy", exact_sxy);
+            disk::silo_nodal_variable<double> syy_silo("syy", exact_syy);
+            disk::silo_nodal_variable<double> shxx_silo("shxx", approx_sxx);
+            disk::silo_nodal_variable<double> shxy_silo("shxy", approx_sxy);
+            disk::silo_nodal_variable<double> shyy_silo("shyy", approx_syy);
+            
+            silo.add_variable("mesh", vx_silo);
+            silo.add_variable("mesh", vy_silo);
+            silo.add_variable("mesh", vhx_silo);
+            silo.add_variable("mesh", vhy_silo);
+            silo.add_variable("mesh", sxx_silo);
+            silo.add_variable("mesh", sxy_silo);
+            silo.add_variable("mesh", syy_silo);
+            silo.add_variable("mesh", shxx_silo);
+            silo.add_variable("mesh", shxy_silo);
+            silo.add_variable("mesh", shyy_silo);
+        }else{
+            disk::silo_nodal_variable<double> vx_silo("vx", exact_ux);
+            disk::silo_nodal_variable<double> vy_silo("vy", exact_uy);
+            disk::silo_nodal_variable<double> vhx_silo("vhx", approx_ux);
+            disk::silo_nodal_variable<double> vhy_silo("vhy", approx_uy);
+            
+            disk::silo_nodal_variable<double> sxx_silo("sxx", exact_sxx);
+            disk::silo_nodal_variable<double> sxy_silo("sxy", exact_sxy);
+            disk::silo_nodal_variable<double> syy_silo("syy", exact_syy);
+            disk::silo_nodal_variable<double> shxx_silo("shxx", approx_sxx);
+            disk::silo_nodal_variable<double> shxy_silo("shxy", approx_sxy);
+            disk::silo_nodal_variable<double> shyy_silo("shyy", approx_syy);
+            
+            silo.add_variable("mesh", vx_silo);
+            silo.add_variable("mesh", vy_silo);
+            silo.add_variable("mesh", vhx_silo);
+            silo.add_variable("mesh", vhy_silo);
+            silo.add_variable("mesh", sxx_silo);
+            silo.add_variable("mesh", sxy_silo);
+            silo.add_variable("mesh", syy_silo);
+            silo.add_variable("mesh", shxx_silo);
+            silo.add_variable("mesh", shxy_silo);
+            silo.add_variable("mesh", shyy_silo);
+            
         }
 
         silo.close();
