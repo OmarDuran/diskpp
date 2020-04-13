@@ -10,6 +10,10 @@
 #define postprocessor_hpp
 
 #include <stdio.h>
+#include "../common/one_field_assembler.hpp"
+#include "../common/one_field_vectorial_assembler.hpp"
+#include "../common/two_fields_assembler.hpp"
+#include "../common/two_fields_vectorial_assembler.hpp"
 
 template<typename Mesh>
 class postprocessor {
@@ -492,6 +496,86 @@ public:
 
 
     }
+    
+    /// Compute L2 and H1 errors for two fields vectorial approximation
+    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, two_fields_vectorial_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
+        size_t cell_dof = n_vec_cbs + n_ten_cbs;
+        
+        RealType vector_l2_error = 0.0;
+        RealType flux_l2_error = 0.0;
+        size_t cell_i = 0;
+        RealType h;
+        for (auto& cell : msh)
+        {
+            if(cell_i == 0){
+                h = diameter(msh, cell);
+            }
+
+            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_vec_cbs, 1);
+
+            // vector evaluation
+            {
+                auto cell_basis = disk::make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, vec_fun);
+                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
+                Matrix<RealType, Dynamic, 1> diff = real_dofs - vec_cell_dof;
+                vector_l2_error += diff.dot(mass*diff);
+
+            }
+
+            // tensor evaluation
+            {
+                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
+                
+                auto cell_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
+
+                auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
+                auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+                dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+
+                // Error integrals
+                for (auto & point_pair : int_rule) {
+
+                    RealType omega = point_pair.weight();
+                    
+                    auto t_phi = cell_basis.eval_functions( point_pair.point() );
+                    assert(t_phi.size() == cell_basis.size());
+                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_phi);
+                    
+                    auto divphi   = cbas_s.eval_functions(point_pair.point());
+                    auto divu_iqn = disk::eval(divu, divphi);
+                    auto sigma_h  = 2.0*epsilon_h + divu_iqn * static_matrix<RealType, 2, 2>::Identity();
+                    
+                    auto flux_diff = (flux_fun(point_pair.point()) - sigma_h).eval();
+                    flux_l2_error += omega * flux_diff.squaredNorm();
+
+                }
+                
+            }
+
+            cell_i++;
+        }
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
+        std::cout << green << "Characteristic h size = " << std::endl << h << std::endl;
+        std::cout << green << "L2-norm error = " << std::endl << std::sqrt(vector_l2_error) << std::endl;
+        std::cout << green << "H1-norm error = " << std::endl << std::sqrt(flux_l2_error) << std::endl;
+
+
+
+    }
 
     // Write a silo file for one field vectorial approximation
     static void write_silo_one_field_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,
@@ -664,9 +748,19 @@ public:
                 {
                     auto cell_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
                     Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
+
+                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
+                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+
                     auto t_phi = cell_basis.eval_functions( bar );
                     assert(t_phi.size() == cell_basis.size());
-                    auto sigma_h = disk::eval(ten_x_cell_dof, t_phi);
+                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_phi);
+                    
+                    auto divphi   = cbas_s.eval_functions(bar);
+                    auto divu_iqn = disk::eval(divu, divphi);
+                    auto sigma_h  = 2.0*epsilon_h + divu_iqn * static_matrix<RealType, 2, 2>::Identity();
 
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
@@ -741,47 +835,17 @@ public:
 
                     auto t_phi = cell_basis.eval_functions( bar );
                     assert(t_phi.size() == cell_basis.size());
-                    auto sigma_h = disk::eval(ten_x_cell_dof, t_phi);
-                    sigma_h *= 2.0; // it includes 2*mu
+                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_phi);
                     
                     auto divphi   = cbas_s.eval_functions(bar);
                     auto divu_iqn = disk::eval(divu, divphi);
-                    sigma_h += divu_iqn * static_matrix<RealType, 2, 2>::Identity();
+                    auto sigma_h  = 2.0*epsilon_h + divu_iqn * static_matrix<RealType, 2, 2>::Identity();
 
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
                     approx_syy.push_back(sigma_h(1,1));
                 }
                 
-//                // tensor evaluation
-//                {
-//                    auto n_cell_fcs = faces(msh, cell);
-//                    size_t n_primal_cell_cbs = n_vec_cbs + n_fbs*n_cell_fcs.size();
-//                    auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
-//                    Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_dof_data(msh, cell, x_dof);
-//
-//                    auto           sgr = make_vector_hho_symmetric_laplacian(msh, cell, hho_di);
-//                    dynamic_vector<RealType> GTu = sgr.first * all_dofs;
-//
-//                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-//                    dynamic_vector<RealType> divu = dr.first * all_dofs;
-//
-//                    auto cbas_v = disk::make_vector_monomial_basis(msh, cell, hho_di.reconstruction_degree());
-//                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-//
-//                    auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
-//                    auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
-//
-//                    auto t_dphi = rec_basis.eval_gradients( bar );
-//                    auto gphi   = cbas_v.eval_sgradients(bar);
-//                    auto epsilon = disk::eval(GTu, gphi, dim);
-//                    auto divphi   = cbas_s.eval_functions(bar);
-//                    auto trace_epsilon = disk::eval(divu, divphi);
-//                    auto sigma_h = 2.0 * epsilon + trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
-//                    approx_sxx.push_back(sigma_h(0,0));
-//                    approx_sxy.push_back(sigma_h(0,1));
-//                    approx_syy.push_back(sigma_h(1,1));
-//                }
             }
 
         }

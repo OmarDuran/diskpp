@@ -36,10 +36,6 @@ using namespace Eigen;
 #include "../common/display_settings.hpp"
 #include "../common/fitted_geometry_builders.hpp"
 #include "../common/scal_analytic_functions.hpp"
-#include "../common/one_field_assembler.hpp" // to deletion
-#include "../common/one_field_vectorial_assembler.hpp"
-#include "../common/two_fields_assembler.hpp"  // to deletion
-#include "../common/two_fields_vectorial_assembler.hpp"
 #include "../common/preprocessor.hpp"
 #include "../common/postprocessor.hpp"
 
@@ -53,7 +49,12 @@ int main(int argc, char **argv)
 {
 
 //    HHOFirstOrderExample(argc, argv);
-//    HHOSecondOrderExample(argc, argv);
+    HHOSecondOrderExample(argc, argv);
+    
+    return 0;
+}
+
+void HHOFirstOrderExample(int argc, char **argv){
     
     using RealType = double;
     simulation_data sim_data = preprocessor::process_args(argc, argv);
@@ -176,14 +177,13 @@ int main(int argc, char **argv)
     std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
     std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-//    // Computing errors
-//    postprocessor<mesh_type>::compute_errors_one_field_vectorial(msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun);
+    // Computing errors
+    postprocessor<mesh_type>::compute_errors_two_fields_vectorial(msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun);
     
     size_t it = 0;
     std::string silo_file_name = "vec_mixed_";
     postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun, false);
     
-    return 0;
 }
 
 void HHOSecondOrderExample(int argc, char **argv){

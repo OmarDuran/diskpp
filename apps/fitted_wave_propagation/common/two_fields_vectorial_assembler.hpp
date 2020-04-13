@@ -171,7 +171,7 @@ public:
             RHS(asm_map[i]) += rhs(i);
         }
 
-    } //
+    }
 
     void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
@@ -221,7 +221,7 @@ public:
         m_triplets.clear();
     }
 
-    Matrix<T, Dynamic, 1> // only primal variable data
+    Matrix<T, Dynamic, 1>
     gather_dof_data(  const Mesh& msh, const typename Mesh::cell_type& cl,
                     const Matrix<T, Dynamic, 1>& x_glob) const
     {
@@ -285,10 +285,7 @@ public:
 
         matrix_type gr_lhs = matrix_type::Zero(gbs, gbs);
         matrix_type gr_rhs = matrix_type::Zero(gbs, cbs + num_faces * fbs);
-            
-        T l = 1.0;
-        T G = 1.0;
-        T d = 2.0;
+        
         // this is very costly to build it
         const auto qps = integrate(msh, cell, 2 * graddeg);
 
