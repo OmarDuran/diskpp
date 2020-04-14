@@ -44,7 +44,7 @@ void HHOSecondOrderExample(int argc, char **argv);
 
 void HHOFirstOrderExample(int argc, char **argv);
 
-//#define quadratic_space_solution_Q
+#define quadratic_space_solution_Q
 int main(int argc, char **argv)
 {
 
