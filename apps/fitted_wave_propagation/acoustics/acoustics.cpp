@@ -35,16 +35,11 @@ using namespace Eigen;
 // application common sources
 #include "../common/display_settings.hpp"
 #include "../common/fitted_geometry_builders.hpp"
+#include "../common/acoustic_material_data.hpp"
 #include "../common/scal_analytic_functions.hpp"
-#include "../common/one_field_assembler.hpp"
-#include "../common/two_fields_assembler.hpp"
 #include "../common/preprocessor.hpp"
 #include "../common/postprocessor.hpp"
 
-
-
-
-////////////////////////// @omar::Begining:: simple fitted implementation /////////////////////////////////////////////
 
 #define fancy_stabilization_Q
 #define compute_energy_Q
@@ -599,12 +594,6 @@ class TDIRKHHOAnalyses
 //
 //void FaceDoFUpdate(SparseMatrix<double> Kg, Matrix<double, Dynamic, 1> Fg, SparseMatrix<double> & Mg,  Matrix<double, Dynamic, 1> & x_dof, size_t n_f_dof);
 //
-//void IHHOSecondOrder(int argc, char **argv);
-//
-
-
-
-//
 //void IHHOFirstOrder(int argc, char **argv);
 //
 //void EHHOFirstOrder(int argc, char **argv);
@@ -615,6 +604,8 @@ class TDIRKHHOAnalyses
 //
 //void HeterogeneousIHHOSecondOrder(int argc, char **argv);
 
+void IHHOSecondOrder(int argc, char **argv);
+
 void HHOSecondOrderExample(int argc, char **argv);
 
 void HHOFirstOrderExample(int argc, char **argv);
@@ -622,17 +613,18 @@ void HHOFirstOrderExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-    HHOFirstOrderExample(argc, argv);
-//    HHOSecondOrderExample(argc, argv);
-    
-    
 //    HeterogeneousEHHOFirstOrder(argc, argv);
 //    HeterogeneousIHHOFirstOrder(argc, argv);
 //    HeterogeneousIHHOSecondOrder(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
-//    IHHOSecondOrder(argc, argv);
+    
+    IHHOSecondOrder(argc, argv);
+
+//    // Examples solving the laplacian with optimal HHO convergence properties
+//    HHOFirstOrderExample(argc, argv);
+//    HHOSecondOrderExample(argc, argv);
     
     return 0;
 }
@@ -2729,228 +2721,135 @@ void HHOSecondOrderExample(int argc, char **argv){
 //    }
 //
 //}
-//
-//void IHHOSecondOrder(int argc, char **argv){
-//
-//    bool render_silo_files_Q = false;
-//    bool render_zonal_vars_Q = false;
-//    using RealType = double;
-//    size_t k_degree = 0;
-//    size_t n_divs   = 0;
-//
-//    // Final time value 1.0
-//    std::vector<size_t> nt_v = {10,20,40,80,160,320,640};
-//    std::vector<double> dt_v = {0.1,0.05,0.025,0.0125,0.00625,0.003125,0.0015625};
-//    int tref = 5;
-//    size_t nt       = nt_v[tref];
-//    RealType dt     = dt_v[tref];
-//    RealType ti = 0.0;
-//
-//    int opt;
-//    while ( (opt = getopt(argc, argv, "k:l:n")) != -1 )
-//    {
-//        switch(opt)
-//        {
-//            case 'k':
-//            {
-//                k_degree = atoi(optarg);
-//            }
-//                break;
-//            case 'l':
-//            {
-//                n_divs = atoi(optarg);
-//            }
-//                break;
-//            case '?':
-//            default:
-//                std::cout << "wrong arguments" << std::endl;
-//                exit(1);
-//        }
-//    }
-//
-//    std::cout << bold << red << "k : " << k_degree << reset << std::endl;
-//    std::cout << bold << red << "l : " << n_divs << reset << std::endl;
-//    std::cout << bold << red << "nt : " << nt << reset << std::endl;
-//    std::cout << bold << red << "dt : " << dt << reset << std::endl;
-//
-//     mesh_init_params<RealType> mip;
-//     mip.Nx = 1;
-//     mip.Ny = 1;
-//
-//    for (size_t i = 0; i < n_divs; i++) {
-//        mip.Nx *= 2;
-//        mip.Ny *= 2;
-//    }
-//
-//    timecounter tc;
-//
-//    // Building the cartesian mesh
-//    tc.tic();
-//    poly_mesh<RealType> msh(mip);
-//    tc.toc();
-//
-//    std::cout << bold << cyan << "Mesh generation: " << tc << " seconds" << reset << std::endl;
-//
-//    // Creating HHO approximation spaces and corresponding linear operator
-//    disk::hho_degree_info hho_di(k_degree,k_degree);
-//    // Construct Mass matrix
-//    auto mass_assembler_p = make_assembler(msh, hho_di);
-//    auto mass_assembler_v = make_assembler(msh, hho_di);
-//    auto mass_assembler_a = make_assembler(msh, hho_di);
-//    tc.tic();
-//    // Projection for acceleration
-//
-//    TAnalyticalFunction functions;
-//    functions.SetFunctionType(TAnalyticalFunction::EFunctionType::EFunctionNonPolynomial);
-//    RealType t = ti;
-//    auto exact_scal_sol_fun     = functions.Evaluate_u(t);
-//    auto exact_vel_sol_fun      = functions.Evaluate_v(t);
-//    auto exact_accel_sol_fun    = functions.Evaluate_a(t);
-//    auto exact_flux_sol_fun     = functions.Evaluate_q(t);
-//
-//    for (auto& cell : msh.cells)
-//    {
-//        auto mass_operator = make_mass_matrix(msh, cell, hho_di);
-//        auto mass_operator_a = make_cell_mass_matrix(msh, cell, hho_di);
-//
-//        Matrix<RealType, Dynamic, 1> f_p = make_rhs(msh, cell, hho_di.cell_degree(), exact_scal_sol_fun);
-//        Matrix<RealType, Dynamic, 1> f_v = make_rhs(msh, cell, hho_di.cell_degree(), exact_vel_sol_fun);
-//        Matrix<RealType, Dynamic, 1> f_a = make_rhs(msh, cell, hho_di.cell_degree(), exact_accel_sol_fun);
-//
-//        mass_assembler_p.assemble(msh, cell, mass_operator, f_p, exact_scal_sol_fun);
-//        mass_assembler_v.assemble(msh, cell, mass_operator, f_v, exact_vel_sol_fun);
-//        mass_assembler_a.assemble(msh, cell, mass_operator_a, f_a, exact_accel_sol_fun);
-//    }
-//    mass_assembler_p.finalize();
-//    mass_assembler_v.finalize();
-//    mass_assembler_a.finalize();
-//
-//    tc.toc();
-//    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
-//
-//    // Projecting initial scalar, velocity and acceleration
-//    Matrix<RealType, Dynamic, 1> p_dof_n, v_dof_n, a_dof_n;
-//
-//    tc.tic();
-//    SparseLU<SparseMatrix<RealType>> analysis;
-//    analysis.analyzePattern(mass_assembler_p.LHS);
-//    analysis.factorize(mass_assembler_p.LHS);
-//    p_dof_n = analysis.solve(mass_assembler_p.RHS); // Initial scalar
-//    v_dof_n = analysis.solve(mass_assembler_v.RHS); // Initial velocity
-//    a_dof_n = analysis.solve(mass_assembler_a.RHS); // Initial acceleration
-//
-//#ifdef compute_energy_Q
-//        Matrix<RealType, Dynamic, 2> energy_h_values(nt+1,2);
-//        energy_h_values(0,0) = 0.0;
-//        energy_h_values(0,1) = 1.0;
-//        RealType energy_h0 = ComputeEnergySecondOrder(msh, hho_di, mass_assembler_a, p_dof_n, v_dof_n);
-//        std::cout << bold << cyan << "Initial energy computed: " << tc << " seconds" << reset << std::endl;
-//#endif
-//
-//    tc.toc();
-//
-//    if(render_silo_files_Q){
-//        size_t it = 0;
-//        std::string silo_file_name = "scalar_wave_";
-//        RenderSiloFileScalarField(silo_file_name, it, msh, hho_di, v_dof_n, exact_vel_sol_fun, render_zonal_vars_Q);
-//    }
-//
-//    // Transient problem
-//    bool is_implicit_Q = true;
-//
-//    if (is_implicit_Q) {
-//
-//        Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
-//
-//        RealType beta = 0.25;
-//        RealType gamma = 0.5;
-//        for(size_t it = 1; it <= nt; it++){
-//
-//            std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
-//
-//            // Manufactured solution
-//            RealType t = dt*it+ti;
-//            auto exact_scal_sol_fun     = functions.Evaluate_u(t);
-//            auto exact_vel_sol_fun      = functions.Evaluate_v(t);
-//            auto exact_flux_sol_fun     = functions.Evaluate_q(t);
-//            auto rhs_fun      = functions.Evaluate_f(t);
-//
-//            auto assembler = make_assembler(msh, hho_di);
-//            tc.tic();
-//            for (auto& cell : msh.cells)
-//            {
-//                auto reconstruction_operator = make_hho_laplacian(msh, cell, hho_di);
-//#ifdef fancy_stabilization_Q
-//                auto stabilization_operator = make_hho_fancy_stabilization(msh, cell, reconstruction_operator.first, hho_di);
-//#else
-//                auto stabilization_operator = make_hho_naive_stabilization(msh, cell, hho_di);
-//#endif
-//                Matrix<RealType, Dynamic, Dynamic> laplacian_loc = reconstruction_operator.second + stabilization_operator;
-//                Matrix<RealType, Dynamic, 1> f_loc = make_rhs(msh, cell, hho_di.cell_degree(), rhs_fun);
-//                assembler.assemble(msh, cell, laplacian_loc, f_loc, exact_scal_sol_fun);
-//            }
-//            assembler.finalize();
-//
-//
-//            // Compute intermediate state for scalar and rate
-//            p_dof_n = p_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
-//            v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
-//            Matrix<RealType, Dynamic, 1> res = assembler.LHS*p_dof_n;
-//
-//            assembler.LHS *= beta*(dt*dt);
-//            assembler.LHS += mass_assembler_a.LHS;
-//            assembler.RHS -= res;
-//            tc.toc();
-//            std::cout << bold << cyan << "Assembly completed: " << tc << " seconds" << reset << std::endl;
-//
-//            tc.tic();
-//            SparseLU<SparseMatrix<RealType>> analysis;
-//            analysis.analyzePattern(assembler.LHS);
-//            analysis.factorize(assembler.LHS);
-//            a_dof_np = analysis.solve(assembler.RHS); // new acceleration
-//            tc.toc();
-//
-//            // update scalar and rate
-//            p_dof_n += beta*dt*dt*a_dof_np;
-//            v_dof_n += gamma*dt*a_dof_np;
-//            a_dof_n  = a_dof_np;
-//
-//            std::cout << bold << cyan << "Solution completed: " << tc << " seconds" << reset << std::endl;
-//
-//            if(render_silo_files_Q){
-//                std::string silo_file_name = "scalar_wave_";
-//                RenderSiloFileScalarField(silo_file_name, it, msh, hho_di, v_dof_n, exact_vel_sol_fun, render_zonal_vars_Q);
-//            }
-//
-//#ifdef compute_energy_Q
-//            {
-//                tc.tic();
-//                RealType energy_h = ComputeEnergySecondOrder(msh, hho_di, assembler, p_dof_n, v_dof_n);
-//                tc.toc();
-//                energy_h_values(it,0) = t;
-//                energy_h_values(it,1) = energy_h/energy_h0;
-//                std::cout << bold << cyan << "Energy computed: " << tc << " seconds" << reset << std::endl;
-//            }
-//#endif
-//
-//#ifdef spatial_errors_Q
-//            if(it == nt){
-//                ComputeL2ErrorSingleField(msh, hho_di, assembler, p_dof_n, exact_scal_sol_fun, exact_flux_sol_fun);
-//            }
-//#endif
-//
-//        }
-//
-//
-//
-//#ifdef compute_energy_Q
-//    std::cout << std::setprecision(20) << bold << cyan << "Reporting initial energy value : " << energy_h0 << reset << std::endl;
-//    std::cout << std::setprecision(20) << bold << cyan << "Reporting energy values : " << energy_h_values << reset << std::endl;
-//#endif
-//
-//    }
-//
-//}
+
+void IHHOSecondOrder(int argc, char **argv){
+
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+    
+    // Building a cartesian mesh
+    timecounter tc;
+    tc.tic();
+    std::string filename = "mesh.txt";
+    typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    mesh_type msh;
+    disk::cartesian_mesh_loader<RealType, 2> loader;
+    if (!loader.read_mesh(filename))
+    {
+        std::cout << "Problem loading mesh." << std::endl;
+        return;
+    }
+    loader.populate_mesh(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    // Final time value 1.0
+    std::vector<size_t> nt_v = {10,20,40,80,160,320,640};
+    std::vector<double> dt_v = {0.1,0.05,0.025,0.0125,0.00625,0.003125,0.0015625};
+    int tref = 3;
+    size_t nt       = nt_v[tref];
+    RealType dt     = dt_v[tref];
+    RealType ti = 0.0;
+    
+    scal_analytic_functions functions;
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
+    RealType t = ti;
+    auto exact_scal_fun     = functions.Evaluate_u(t);
+    auto exact_vel_fun      = functions.Evaluate_v(t);
+    auto exact_accel_fun    = functions.Evaluate_a(t);
+    auto exact_flux_fun     = functions.Evaluate_q(t);
+    
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t cell_k_degree = sim_data.m_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+
+    // Solving a primal HHO mixed problem
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(exact_scal_fun); // easy because boundary assumes zero every where any time.
+    tc.tic();
+    auto assembler = acoustic_one_field_assembler<mesh_type>(msh, hho_di, bnd);
+    assembler.load_material_data(msh);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    tc.toc();
+    std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    assembler.assemble_mass(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+    
+    // Projecting initial scalar, velocity and acceleration
+    Matrix<RealType, Dynamic, 1> p_dof_n, v_dof_n, a_dof_n;
+    assembler.project_over_cells(msh, p_dof_n, exact_scal_fun);
+    assembler.project_over_cells(msh, v_dof_n, exact_vel_fun);
+    assembler.project_over_cells(msh, a_dof_n, exact_accel_fun);
+    
+    size_t it = 0;
+    std::string silo_file_name = "scalar_";
+    postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+    
+    // Newmark process
+    {
+        Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
+
+        RealType beta = 0.25;
+        RealType gamma = 0.5;
+        for(size_t it = 1; it <= nt; it++){
+
+            std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+
+            // Manufactured solution
+            RealType t = dt*it+ti;
+            auto exact_scal_fun     = functions.Evaluate_u(t);
+            auto exact_vel_fun      = functions.Evaluate_v(t);
+            auto exact_flux_fun     = functions.Evaluate_q(t);
+            auto rhs_fun      = functions.Evaluate_f(t);
+
+            assembler.assemble(msh, rhs_fun);
+
+            // Compute intermediate state for scalar and rate
+            p_dof_n = p_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
+            v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
+            Matrix<RealType, Dynamic, 1> res = assembler.LHS*p_dof_n;
+
+            assembler.LHS *= beta*(dt*dt);
+            assembler.LHS += assembler.MASS;
+            assembler.RHS -= res;
+            tc.toc();
+            std::cout << bold << cyan << "Assembly completed: " << tc << " seconds" << reset << std::endl;
+
+            tc.tic();
+            SparseLU<SparseMatrix<RealType>> analysis;
+            analysis.analyzePattern(assembler.LHS);
+            analysis.factorize(assembler.LHS);
+            a_dof_np = analysis.solve(assembler.RHS); // new acceleration
+            tc.toc();
+            
+            std::cout << bold << cyan << "Solution completed: " << tc << " seconds" << reset << std::endl;
+
+            // update scalar and rate
+            p_dof_n += beta*dt*dt*a_dof_np;
+            v_dof_n += gamma*dt*a_dof_np;
+            a_dof_n  = a_dof_np;
+            
+            std::string silo_file_name = "scalar_";
+            postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+            
+            if(it == nt){
+                auto assembler_c = one_field_assembler<mesh_type>(msh, hho_di, bnd);
+                postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler_c, p_dof_n, exact_scal_fun, exact_flux_fun);
+            }
+            
+        }
+    }
+}
 //
 //void ComputeKGFGSecondOrder(disk::generic_mesh<double, 2> & msh, disk::hho_degree_info & hho_di, assembler<disk::generic_mesh<double, 2>> & assembler, double & t, TAnalyticalFunction & functions){
 //    using RealType = double;
@@ -3334,9 +3233,3 @@ void HHOSecondOrderExample(int argc, char **argv){
 //
 //}
 
-
-
-
-
-
-////////////////////////// @omar::Ending:: simple fitted implementation /////////////////////////////////////////////

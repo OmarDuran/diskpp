@@ -5,6 +5,7 @@
 //  Created by Omar Durán on 4/9/20.
 //
 
+#pragma once
 #ifndef scal_analytic_functions_hpp
 #define scal_analytic_functions_hpp
 

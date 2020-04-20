@@ -13,7 +13,11 @@
 #include "../common/one_field_assembler.hpp"
 #include "../common/one_field_vectorial_assembler.hpp"
 #include "../common/two_fields_assembler.hpp"
-#include "../common/two_fields_vectorial_assembler.hpp"
+#include "../common/three_fields_vectorial_assembler.hpp"
+
+#include "../common/acoustic_one_field_assembler.hpp"
+#include "../common/elastodynamic_one_field_assembler.hpp"
+
 
 template<typename Mesh>
 class postprocessor {
@@ -498,16 +502,17 @@ public:
     }
     
     /// Compute L2 and H1 errors for two fields vectorial approximation
-    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, two_fields_vectorial_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun){
+    static void compute_errors_three_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun){
 
         timecounter tc;
         tc.tic();
 
         using RealType = double;
         auto dim = Mesh::dimension;
-        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
-        size_t cell_dof = n_vec_cbs + n_ten_cbs;
+        size_t n_sca_cbs = disk::scalar_basis_size(hho_di.face_degree(), dim);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+        size_t cell_dof = n_ten_cbs + n_sca_cbs + n_vec_cbs;
         
         RealType vector_l2_error = 0.0;
         RealType flux_l2_error = 0.0;
@@ -519,7 +524,7 @@ public:
                 h = diameter(msh, cell);
             }
 
-            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_vec_cbs, 1);
+            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs+n_sca_cbs, 0, n_vec_cbs, 1);
 
             // vector evaluation
             {
@@ -536,26 +541,26 @@ public:
             {
                 auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
                 
-                auto cell_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                auto ten_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
                 Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
 
-                auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
-                auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-                dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+                auto sca_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                Matrix<RealType, Dynamic, 1> div_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
 
                 // Error integrals
                 for (auto & point_pair : int_rule) {
 
                     RealType omega = point_pair.weight();
                     
-                    auto t_phi = cell_basis.eval_functions( point_pair.point() );
-                    assert(t_phi.size() == cell_basis.size());
-                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_phi);
+                    auto t_ten_phi = ten_basis.eval_functions( point_pair.point() );
+                    assert(t_ten_phi.size() == ten_basis.size());
+                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_ten_phi);
                     
-                    auto divphi   = cbas_s.eval_functions(point_pair.point());
-                    auto divu_iqn = disk::eval(divu, divphi);
-                    auto sigma_h  = 2.0*epsilon_h + divu_iqn * static_matrix<RealType, 2, 2>::Identity();
+                    auto t_sca_phi = sca_basis.eval_functions( point_pair.point() );
+                    assert(t_sca_phi.size() == sca_basis.size());
+                    auto div_u = disk::eval(div_x_cell_dof, t_sca_phi);
+                    
+                    auto sigma_h  = 2.0*epsilon_h + div_u * static_matrix<RealType, 2, 2>::Identity();
                     
                     auto flux_diff = (flux_fun(point_pair.point()) - sigma_h).eval();
                     flux_l2_error += omega * flux_diff.squaredNorm();
@@ -693,7 +698,7 @@ public:
     }
     
     // Write a silo file for two fields vectorial approximation
-    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, two_fields_vectorial_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
+    static void write_silo_three_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
 
         timecounter tc;
         tc.tic();
@@ -705,9 +710,10 @@ public:
         std::vector<RealType> exact_ux, exact_uy, approx_ux, approx_uy;
         std::vector<RealType> exact_sxx, exact_sxy, exact_syy;
         std::vector<RealType> approx_sxx, approx_sxy, approx_syy;
-        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
-        size_t cell_dof = n_vec_cbs + n_ten_cbs;
+        size_t n_sca_cbs = disk::scalar_basis_size(hho_di.face_degree(), dim);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+        size_t cell_dof = n_ten_cbs + n_sca_cbs + n_vec_cbs;
         
         if (cell_centered_Q) {
             exact_ux.reserve( num_cells );
@@ -736,7 +742,7 @@ public:
                 // vector evaluation
                 {
                     auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
-                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof + n_ten_cbs, 0, n_vec_cbs, 1);
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof + n_ten_cbs + n_sca_cbs, 0, n_vec_cbs, 1);
                     auto t_phi = cell_basis.eval_functions( bar );
                     assert(t_phi.rows() == cell_basis.size());
                     auto uh = disk::eval(vec_x_cell_dof, t_phi);
@@ -746,21 +752,21 @@ public:
                 
                 // tensor evaluation
                 {
-                    auto cell_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                    auto ten_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
                     Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
 
-                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
-                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+                    auto sca_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
 
-                    auto t_phi = cell_basis.eval_functions( bar );
-                    assert(t_phi.size() == cell_basis.size());
-                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_phi);
+                    auto t_ten_phi = ten_basis.eval_functions( bar );
+                    assert(t_ten_phi.size() == ten_basis.size());
+                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_ten_phi);
                     
-                    auto divphi   = cbas_s.eval_functions(bar);
-                    auto divu_iqn = disk::eval(divu, divphi);
-                    auto sigma_h  = 2.0*epsilon_h + divu_iqn * static_matrix<RealType, 2, 2>::Identity();
+                    auto t_sca_phi = sca_basis.eval_functions( bar );
+                    assert(t_sca_phi.size() == sca_basis.size());
+                    auto div_u = disk::eval(div_x_cell_dof, t_sca_phi);
+                
+                    auto sigma_h  = 2.0*epsilon_h + div_u * static_matrix<RealType, 2, 2>::Identity();
 
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
@@ -815,7 +821,7 @@ public:
                 // vector evaluation
                 {
                     auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
-                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof + n_ten_cbs, 0, n_vec_cbs, 1);
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof + n_ten_cbs + n_sca_cbs, 0, n_vec_cbs, 1);
                     auto t_phi = cell_basis.eval_functions( bar );
                     assert(t_phi.rows() == cell_basis.size());
                     auto uh = disk::eval(vec_x_cell_dof, t_phi);
@@ -825,21 +831,21 @@ public:
                 
                 // tensor evaluation
                 {
-                    auto cell_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                    auto ten_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
                     Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
 
-                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
-                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+                    auto sca_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
 
-                    auto t_phi = cell_basis.eval_functions( bar );
-                    assert(t_phi.size() == cell_basis.size());
-                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_phi);
+                    auto t_ten_phi = ten_basis.eval_functions( bar );
+                    assert(t_ten_phi.size() == ten_basis.size());
+                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_ten_phi);
                     
-                    auto divphi   = cbas_s.eval_functions(bar);
-                    auto divu_iqn = disk::eval(divu, divphi);
-                    auto sigma_h  = 2.0*epsilon_h + divu_iqn * static_matrix<RealType, 2, 2>::Identity();
+                    auto t_sca_phi = sca_basis.eval_functions( bar );
+                    assert(t_sca_phi.size() == sca_basis.size());
+                    auto div_u = disk::eval(div_x_cell_dof, t_sca_phi);
+                
+                    auto sigma_h  = 2.0*epsilon_h + div_u * static_matrix<RealType, 2, 2>::Identity();
 
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
