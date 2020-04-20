@@ -2811,6 +2811,7 @@ void IHHOSecondOrder(int argc, char **argv){
             auto exact_flux_fun     = functions.Evaluate_q(t);
             auto rhs_fun            = functions.Evaluate_f(t);
 
+            assembler.get_bc_conditions().updateDirichletFunction(exact_scal_fun, 0);
             assembler.assemble(msh, rhs_fun);
 
             // Compute intermediate state for scalar and rate

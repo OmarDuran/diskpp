@@ -277,6 +277,33 @@ class BoundaryConditions
 
     template<typename Function>
     void
+    updateDirichletFunction(const Function& bcf, size_t bcf_index)
+    {
+        const size_t bcf_id = m_dirichlet_func.size();
+        assert( 0 <= bcf_index && bcf_index < bcf_id );
+        m_dirichlet_func[bcf_index] = bcf;
+    }
+    
+    template<typename Function>
+    void
+    updateNeumannFunction(const Function& bcf, size_t bcf_index)
+    {
+        const size_t bcf_id = m_dirichlet_func.size();
+        assert( 0 <= bcf_index && bcf_index < bcf_id );
+        m_neumann_func[bcf_index] = bcf;
+    }
+    
+    template<typename Function>
+    void
+    updateRobinFunction(const Function& bcf, size_t bcf_index)
+    {
+        const size_t bcf_id = m_dirichlet_func.size();
+        assert( 0 <= bcf_index && bcf_index < bcf_id );
+        m_robin_func[bcf_index] = bcf;
+    }
+    
+    template<typename Function>
+    void
     addRobinBC(const size_t& btype, const size_t& b_id, const Function& bcf)
     {
 

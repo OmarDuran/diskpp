@@ -350,6 +350,10 @@ public:
     void set_hho_stabilization(){
         m_hho_stabilization_Q = true;
     }
+            
+    boundary_type get_bc_conditions(){
+             return m_bnd;
+    }
 };
 
 #endif /* acoustic_one_field_assembler_hpp */

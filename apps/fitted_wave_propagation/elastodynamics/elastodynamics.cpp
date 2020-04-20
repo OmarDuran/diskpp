@@ -49,6 +49,17 @@ void HHOFirstOrderExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
+    IHHOSecondOrder(argc, argv);
+    
+    // Examples solving the vector laplacian with optimal HHO convergence properties
+//    HHOFirstOrderExample(argc, argv);
+//    HHOSecondOrderExample(argc, argv);
+    
+    return 0;
+}
+
+void IHHOSecondOrder(int argc, char **argv){
+    
     using RealType = double;
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
@@ -73,7 +84,7 @@ int main(int argc, char **argv)
     // Final time value 1.0
     std::vector<size_t> nt_v = {10,20,40,80,160,320,640};
     std::vector<double> dt_v = {0.1,0.05,0.025,0.0125,0.00625,0.003125,0.0015625};
-    int tref = 6;
+    int tref = 3;
     size_t nt       = nt_v[tref];
     RealType dt     = dt_v[tref];
     RealType ti     = 0.0;
@@ -135,7 +146,6 @@ int main(int argc, char **argv)
 
         RealType beta = 0.25;
         RealType gamma = 0.5;
-        nt = 10;
         for(size_t it = 1; it <= nt; it++){
 
             std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
@@ -185,17 +195,7 @@ int main(int argc, char **argv)
         std::cout << green << "Step size =  " << dt << reset << std::endl;
     }
     
-    
-    // Examples solving the vector laplacian with optimal HHO convergence properties
-//    HHOFirstOrderExample(argc, argv);
-//    HHOSecondOrderExample(argc, argv);
-    
-    return 0;
 }
-
-//void IHHOSecondOrder(int argc, char **argv){
-//
-//}
 #define quadratic_space_solution_Q
 void HHOFirstOrderExample(int argc, char **argv){
     
