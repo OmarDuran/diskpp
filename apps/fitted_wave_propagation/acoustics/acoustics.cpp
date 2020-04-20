@@ -2808,9 +2808,8 @@ void IHHOSecondOrder(int argc, char **argv){
             // Manufactured solution
             RealType t = dt*it+ti;
             auto exact_scal_fun     = functions.Evaluate_u(t);
-            auto exact_vel_fun      = functions.Evaluate_v(t);
             auto exact_flux_fun     = functions.Evaluate_q(t);
-            auto rhs_fun      = functions.Evaluate_f(t);
+            auto rhs_fun            = functions.Evaluate_f(t);
 
             assembler.assemble(msh, rhs_fun);
 

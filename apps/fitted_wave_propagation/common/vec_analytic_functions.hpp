@@ -210,10 +210,10 @@ class vec_analytic_functions
                             y = pt.y();
                             fx = -2.0*(1.0 + (-3.0 + x)*x - 5.0*y + (4.0 - M_PI*M_PI*(-1.0 + x))*x*y + (3.0 + M_PI*M_PI*(-1.0 + x)*x)*y*y)*std::sin(std::sqrt(2.0)*M_PI*t);
                             fy = -2*(1 + (-3 + y)*y + x*(-5 + (4 - M_PI*M_PI*(-1 + y))*y) + x*x*(3 + M_PI*M_PI*(-1 + y)*y))*std::sin(std::sqrt(2.0)*M_PI*t);
-                            fx = 2*(1 + (-3 + x)*x - 5*y + (4 + M_PI*M_PI*(-1 + x))*x*y + (3 - M_PI*M_PI*(-1 + x)*x)*y*y)*std::sin(std::sqrt(2)*M_PI*t);
-                            fy = 2*(1 + (-3 + y)*y + x*(-5 + (4 + M_PI*M_PI*(-1 + y))*y) + x*x*(3 - M_PI*M_PI*(-1 + y)*y))*std::sin(std::sqrt(2)*M_PI*t);
-                            fx *= -1.0;
-                            fy *= -1.0;
+//                            fx = 2*(1 + (-3 + x)*x - 5*y + (4 + M_PI*M_PI*(-1 + x))*x*y + (3 - M_PI*M_PI*(-1 + x)*x)*y*y)*std::sin(std::sqrt(2)*M_PI*t);
+//                            fy = 2*(1 + (-3 + y)*y + x*(-5 + (4 + M_PI*M_PI*(-1 + y))*y) + x*x*(3 - M_PI*M_PI*(-1 + y)*y))*std::sin(std::sqrt(2)*M_PI*t);
+//                            fx *= -1.0;
+//                            fy *= -1.0;
                             static_vector<double, 2> f{fx,fy};
                             return f;
                         };

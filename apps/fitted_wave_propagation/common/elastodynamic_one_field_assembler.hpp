@@ -199,7 +199,7 @@ public:
             for (size_t j = 0; j < mass_matrix.cols(); j++)
             {
                 if ( asm_map[j].assemble() )
-                    m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
+                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
             }
         }
 
@@ -207,6 +207,8 @@ public:
             
     void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
+        LHS.setZero();
+        RHS.setZero();
         for (auto& cell : msh)
         {
             auto reconstruction_operator   = make_matrix_symmetric_gradrec(msh, cell, m_hho_di);
@@ -237,6 +239,7 @@ public:
             
     void assemble_mass(const Mesh& msh){
         
+        MASS.setZero();
         size_t cell_i = 0;
         for (auto& cell : msh)
         {
@@ -259,7 +262,21 @@ public:
         for (auto& cell : msh)
         {
             Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, cell, m_hho_di.cell_degree(), vec_fun);
-            scatter_dof_data(msh, cell, x_glob, x_proj_dof);
+            scatter_cell_dof_data(msh, cell, x_glob, x_proj_dof);
+        }
+    }
+            
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+
+        for (auto& cell : msh)
+        {
+            auto fcs = faces(msh, cell);
+            for (size_t i = 0; i < fcs.size(); i++)
+            {
+                auto face = fcs[i];
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
+                scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
+            }
         }
     }
             
@@ -313,12 +330,24 @@ public:
     }
     
     void
-    scatter_dof_data(  const Mesh& msh, const typename Mesh::cell_type& cell,
+    scatter_cell_dof_data(  const Mesh& msh, const typename Mesh::cell_type& cell,
                     Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
     {
         auto cell_ofs = disk::priv::offset(msh, cell);
         size_t n_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         x_glob.block(cell_ofs * n_cbs, 0, n_cbs, 1) = x_proj_dof;
+    }
+            
+    void
+    scatter_face_dof_data(  const Mesh& msh, const typename Mesh::face_type& face,
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+    {
+        size_t n_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        size_t n_cells = msh.cells_size();
+        auto face_offset = disk::priv::offset(msh, face);
+        auto glob_offset = n_cbs * n_cells + m_compress_indexes.at(face_offset)*n_fbs;
+        x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
     }
             
     void load_material_data(const Mesh& msh){

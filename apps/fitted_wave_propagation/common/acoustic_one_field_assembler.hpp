@@ -238,6 +238,7 @@ public:
             
     void assemble_mass(const Mesh& msh){
         
+        MASS.setZero();
         size_t cell_i = 0;
         for (auto& cell : msh)
         {

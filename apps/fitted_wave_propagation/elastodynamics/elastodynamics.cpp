@@ -49,137 +49,145 @@ void HHOFirstOrderExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-//    using RealType = double;
-//    simulation_data sim_data = preprocessor::process_args(argc, argv);
-//    sim_data.print_simulation_data();
-//
-//    // Building a cartesian mesh
-//    timecounter tc;
-//    tc.tic();
-//    std::string filename = "mesh.txt";
-//    typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
-//    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
-//    mesh_type msh;
-//    disk::cartesian_mesh_loader<RealType, 2> loader;
-//    if (!loader.read_mesh(filename))
-//    {
-//        std::cout << "Problem loading mesh." << std::endl;
-//        return;
-//    }
-//    loader.populate_mesh(msh);
-//    tc.toc();
-//    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-//
-//    // Final time value 1.0
-//    std::vector<size_t> nt_v = {10,20,40,80,160,320,640};
-//    std::vector<double> dt_v = {0.1,0.05,0.025,0.0125,0.00625,0.003125,0.0015625};
-//    int tref = 6;
-//    size_t nt       = nt_v[tref];
-//    RealType dt     = dt_v[tref];
-//    RealType ti     = 0.0;
-//
-//    vec_analytic_functions functions;
-//    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
-//    RealType t = ti;
-//    auto exact_vec_fun      = functions.Evaluate_u(t);
-//    auto exact_vel_fun      = functions.Evaluate_v(t);
-//    auto exact_accel_fun    = functions.Evaluate_a(t);
-//    auto exact_flux_fun     = functions.Evaluate_sigma(t);
-//
-//    // Creating HHO approximation spaces and corresponding linear operator
-//    size_t cell_k_degree = sim_data.m_k_degree;
-//    if(sim_data.m_hdg_stabilization_Q){
-//        cell_k_degree++;
-//    }
-//    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
-//
-//    // Solving a primal HHO mixed problem
-//    boundary_type bnd(msh);
-//    bnd.addDirichletEverywhere(exact_vec_fun); // easy because boundary assumes zero every where any time.
-//
-//    tc.tic();
-//    auto assembler = elastodynamic_one_field_assembler<mesh_type>(msh, hho_di, bnd);
-//    assembler.load_material_data(msh);
-//    if(sim_data.m_hdg_stabilization_Q){
-//        assembler.set_hdg_stabilization();
-//    }
-//    tc.toc();
-//    std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
-//
-//    tc.tic();
-//    assembler.assemble_mass(msh);
-//    tc.toc();
-//    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
-//
-//    // Projecting initial scalar, velocity and acceleration
-//    Matrix<RealType, Dynamic, 1> u_dof_n, v_dof_n, a_dof_n;
-//    assembler.project_over_cells(msh, u_dof_n, exact_vec_fun);
-//    assembler.project_over_cells(msh, v_dof_n, exact_vel_fun);
-//    assembler.project_over_cells(msh, a_dof_n, exact_accel_fun);
-//
-//    size_t it = 0;
-//    std::string silo_file_name = "vec_";
-//    postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, u_dof_n, exact_vec_fun, false);
-//
-//    // Newmark process
-//    {
-//        Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
-//
-//        RealType beta = 0.25;
-//        RealType gamma = 0.5;
-//        nt = 10;
-//        for(size_t it = 1; it <= nt; it++){
-//
-//            std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
-//
-//            // Manufactured solution
-//            RealType t = dt*it+ti;
-//            auto exact_vec_fun     = functions.Evaluate_u(t);
-//            auto exact_vel_fun      = functions.Evaluate_v(t);
-//            auto exact_flux_fun     = functions.Evaluate_sigma(t);
-//            auto rhs_fun      = functions.Evaluate_f(t);
-//
-//            assembler.assemble(msh, rhs_fun);
-//
-//            // Compute intermediate state for scalar and rate
-//            u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
-//            v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
-//            Matrix<RealType, Dynamic, 1> res = assembler.LHS*u_dof_n;
-//
-//            assembler.LHS *= beta*(dt*dt);
-//            assembler.LHS += assembler.MASS;
-//            assembler.RHS -= res;
-//            tc.toc();
-//            std::cout << bold << cyan << "Assembly completed: " << tc << " seconds" << reset << std::endl;
-//
-//            tc.tic();
-//            SparseLU<SparseMatrix<RealType>> analysis;
-//            analysis.analyzePattern(assembler.LHS);
-//            analysis.factorize(assembler.LHS);
-//            a_dof_np = analysis.solve(assembler.RHS); // new acceleration
-//            tc.toc();
-//
-//            std::cout << bold << cyan << "Solution completed: " << tc << " seconds" << reset << std::endl;
-//
-//            // update scalar and rate
-//            u_dof_n += beta*dt*dt*a_dof_np;
-//            v_dof_n += gamma*dt*a_dof_np;
-//            a_dof_n  = a_dof_np;
-//
-//            std::string silo_file_name = "vec_";
-//            postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, u_dof_n, exact_vec_fun, false);
-//
-//            if(it == nt){
-//                auto assembler_c = one_field_vectorial_assembler<mesh_type>(msh, hho_di, bnd);
-//                postprocessor<mesh_type>::compute_errors_one_field_vectorial(msh, hho_di, assembler_c, u_dof_n, exact_vec_fun, exact_flux_fun);
-//            }
-//
-//        }
-//    }
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+
+    // Building a cartesian mesh
+    timecounter tc;
+    tc.tic();
+    std::string filename = "mesh.txt";
+    typedef disk::cartesian_mesh<RealType, 2>   mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
+    mesh_type msh;
+    disk::cartesian_mesh_loader<RealType, 2> loader;
+    if (!loader.read_mesh(filename))
+    {
+        std::cout << "Problem loading mesh." << std::endl;
+        return;
+    }
+    loader.populate_mesh(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+
+    // Final time value 1.0
+    std::vector<size_t> nt_v = {10,20,40,80,160,320,640};
+    std::vector<double> dt_v = {0.1,0.05,0.025,0.0125,0.00625,0.003125,0.0015625};
+    int tref = 6;
+    size_t nt       = nt_v[tref];
+    RealType dt     = dt_v[tref];
+    RealType ti     = 0.0;
+
+    vec_analytic_functions functions;
+    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
+    RealType t = ti;
+    auto exact_vec_fun      = functions.Evaluate_u(t);
+    auto exact_vel_fun      = functions.Evaluate_v(t);
+    auto exact_accel_fun    = functions.Evaluate_a(t);
+    auto exact_flux_fun     = functions.Evaluate_sigma(t);
+
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t cell_k_degree = sim_data.m_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+
+    // Solving a primal HHO mixed problem
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(exact_vec_fun); // easy because boundary assumes zero every where any time.
+
+    tc.tic();
+    auto assembler = elastodynamic_one_field_assembler<mesh_type>(msh, hho_di, bnd);
+    assembler.load_material_data(msh);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    tc.toc();
+    std::cout << bold << cyan << "Assembler created: " << tc.to_double() << " seconds" << reset << std::endl;
+
+    tc.tic();
+    assembler.assemble_mass(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+
+    // Projecting initial displacement, velocity and acceleration
+    tc.tic();
+    Matrix<RealType, Dynamic, 1> u_dof_n, v_dof_n, a_dof_n;
+    assembler.project_over_cells(msh, u_dof_n, exact_vec_fun);
+    assembler.project_over_faces(msh, u_dof_n, exact_vec_fun);
+    
+    assembler.project_over_cells(msh, v_dof_n, exact_vel_fun);
+    assembler.project_over_faces(msh, v_dof_n, exact_vel_fun);
+    
+    assembler.project_over_cells(msh, a_dof_n, exact_accel_fun);
+    assembler.project_over_faces(msh, a_dof_n, exact_accel_fun);
+    tc.toc();
+    std::cout << bold << cyan << "Initialization completed: " << tc << " seconds" << reset << std::endl;
+    
+    size_t it = 0;
+    std::string silo_file_name = "vec_";
+    postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, u_dof_n, exact_vec_fun, false);
+    
+    // Newmark process
+    {
+        Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
+
+        RealType beta = 0.25;
+        RealType gamma = 0.5;
+        nt = 10;
+        for(size_t it = 1; it <= nt; it++){
+
+            std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+
+            // Manufactured solution
+            RealType t = dt*it+ti;
+            auto exact_vec_fun      = functions.Evaluate_u(t);
+            auto exact_flux_fun     = functions.Evaluate_sigma(t);
+            auto rhs_fun            = functions.Evaluate_f(t);
+
+            assembler.assemble(msh, rhs_fun);
+
+            // Compute intermediate state for scalar and rate
+            u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
+            v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
+            Matrix<RealType, Dynamic, 1> res = assembler.LHS*u_dof_n;
+            
+            assembler.LHS *= beta*(dt*dt);
+            assembler.LHS += assembler.MASS;
+            assembler.RHS -= res;
+            tc.toc();
+            std::cout << bold << cyan << "Assembly completed: " << tc << " seconds" << reset << std::endl;
+            
+            tc.tic();
+            SparseLU<SparseMatrix<RealType>> analysis;
+            analysis.analyzePattern(assembler.LHS);
+            analysis.factorize(assembler.LHS);
+            a_dof_np = analysis.solve(assembler.RHS); // new acceleration
+            tc.toc();
+            std::cout << bold << cyan << "Solution completed: " << tc << " seconds" << reset << std::endl;
+
+            // update displacement, velocity and acceleration
+            u_dof_n += beta*dt*dt*a_dof_np;
+            v_dof_n += gamma*dt*a_dof_np;
+            a_dof_n  = a_dof_np;
+
+            std::string silo_file_name = "vec_";
+            postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, u_dof_n, exact_vec_fun, false);
+
+            if(it == nt){
+                auto assembler_c = one_field_vectorial_assembler<mesh_type>(msh, hho_di, bnd);
+                postprocessor<mesh_type>::compute_errors_one_field_vectorial(msh, hho_di, assembler_c, u_dof_n, exact_vec_fun, exact_flux_fun);
+            }
+
+        }
+        std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
+        std::cout << green << "Step size =  " << dt << reset << std::endl;
+    }
     
     
     // Examples solving the vector laplacian with optimal HHO convergence properties
-    HHOFirstOrderExample(argc, argv);
+//    HHOFirstOrderExample(argc, argv);
 //    HHOSecondOrderExample(argc, argv);
     
     return 0;
@@ -188,7 +196,7 @@ int main(int argc, char **argv)
 //void IHHOSecondOrder(int argc, char **argv){
 //
 //}
-
+#define quadratic_space_solution_Q
 void HHOFirstOrderExample(int argc, char **argv){
     
     using RealType = double;
