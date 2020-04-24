@@ -16,7 +16,9 @@
 #include "../common/three_fields_vectorial_assembler.hpp"
 
 #include "../common/acoustic_one_field_assembler.hpp"
+#include "../common/acoustic_two_fields_assembler.hpp"
 #include "../common/elastodynamic_one_field_assembler.hpp"
+#include "../common/elastodynamic_three_fields_assembler.hpp"
 
 
 template<typename Mesh>
@@ -545,7 +547,7 @@ public:
                 Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
 
                 auto sca_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                Matrix<RealType, Dynamic, 1> div_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
+                Matrix<RealType, Dynamic, 1> sigma_v_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
 
                 // Error integrals
                 for (auto & point_pair : int_rule) {
@@ -554,13 +556,13 @@ public:
                     
                     auto t_ten_phi = ten_basis.eval_functions( point_pair.point() );
                     assert(t_ten_phi.size() == ten_basis.size());
-                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_ten_phi);
+                    auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
                     
                     auto t_sca_phi = sca_basis.eval_functions( point_pair.point() );
                     assert(t_sca_phi.size() == sca_basis.size());
-                    auto div_u = disk::eval(div_x_cell_dof, t_sca_phi);
+                    auto sigma_v_h = disk::eval(sigma_v_x_cell_dof, t_sca_phi);
                     
-                    auto sigma_h  = 2.0*epsilon_h + div_u * static_matrix<RealType, 2, 2>::Identity();
+                    sigma_h  += sigma_v_h * static_matrix<RealType, 2, 2>::Identity();
                     
                     auto flux_diff = (flux_fun(point_pair.point()) - sigma_h).eval();
                     flux_l2_error += omega * flux_diff.squaredNorm();
@@ -697,7 +699,7 @@ public:
         std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
     }
     
-    // Write a silo file for two fields vectorial approximation
+    // Write a silo file for three fields vectorial approximation
     static void write_silo_three_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
 
         timecounter tc;
@@ -756,17 +758,17 @@ public:
                     Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
 
                     auto sca_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
+                    Matrix<RealType, Dynamic, 1> sigma_v_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
 
                     auto t_ten_phi = ten_basis.eval_functions( bar );
                     assert(t_ten_phi.size() == ten_basis.size());
-                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_ten_phi);
+                    auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
                     
                     auto t_sca_phi = sca_basis.eval_functions( bar );
                     assert(t_sca_phi.size() == sca_basis.size());
-                    auto div_u = disk::eval(div_x_cell_dof, t_sca_phi);
+                    auto sigma_v_h = disk::eval(sigma_v_x_cell_dof, t_sca_phi);
                 
-                    auto sigma_h  = 2.0*epsilon_h + div_u * static_matrix<RealType, 2, 2>::Identity();
+                    sigma_h  += sigma_v_h * static_matrix<RealType, 2, 2>::Identity();
 
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
@@ -835,17 +837,17 @@ public:
                     Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
 
                     auto sca_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
+                    Matrix<RealType, Dynamic, 1> sigma_v_x_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs, 0, n_sca_cbs, 1);
 
                     auto t_ten_phi = ten_basis.eval_functions( bar );
                     assert(t_ten_phi.size() == ten_basis.size());
-                    auto epsilon_h = disk::eval(ten_x_cell_dof, t_ten_phi);
+                    auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
                     
                     auto t_sca_phi = sca_basis.eval_functions( bar );
                     assert(t_sca_phi.size() == sca_basis.size());
-                    auto div_u = disk::eval(div_x_cell_dof, t_sca_phi);
+                    auto sigma_v_h = disk::eval(sigma_v_x_cell_dof, t_sca_phi);
                 
-                    auto sigma_h  = 2.0*epsilon_h + div_u * static_matrix<RealType, 2, 2>::Identity();
+                    sigma_h  += sigma_v_h * static_matrix<RealType, 2, 2>::Identity();
 
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
@@ -913,6 +915,82 @@ public:
         tc.toc();
         std::cout << std::endl;
         std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
+    
+    // Write a silo file with acoustic properties as zonal variables
+    static void write_silo_acoustic_property_map(std::string silo_file_name, Mesh & msh, std::vector< acoustic_material_data<double> > & material){
+
+        timecounter tc;
+        tc.tic();
+        
+        auto num_cells = msh.cells_size();
+        std::vector<double> rho_data, vp_data;
+        vp_data.reserve( num_cells );
+        rho_data.reserve( num_cells );
+
+        size_t cell_i = 0;
+        for (auto& cell : msh)
+        {
+            acoustic_material_data<double> acoustic_data = material[cell_i];
+            rho_data.push_back( acoustic_data.rho() );
+            vp_data.push_back( acoustic_data.vp() );
+            
+            cell_i++;
+        }
+
+        disk::silo_database silo;
+        silo_file_name += ".silo";
+        silo.create(silo_file_name.c_str());
+        silo.add_mesh(msh, "mesh");
+        disk::silo_zonal_variable<double> rho_silo("rho", rho_data);
+        disk::silo_zonal_variable<double> vp_silo("vp", vp_data);
+        silo.add_variable("mesh", rho_silo);
+        silo.add_variable("mesh", vp_silo);
+
+        silo.close();
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Properties file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
+    
+    // Write a silo file with elastic properties as zonal variables
+    static void write_silo_elastic_property_map(std::string silo_file_name, Mesh & msh, std::vector< elastic_material_data<double> > & material){
+
+        timecounter tc;
+        tc.tic();
+        
+        auto num_cells = msh.cells_size();
+        std::vector<double> rho_data, vp_data, vs_data;
+        rho_data.reserve( num_cells );
+        vp_data.reserve( num_cells );
+        vs_data.reserve( num_cells );
+
+        size_t cell_i = 0;
+        for (auto& cell : msh)
+        {
+            elastic_material_data<double> elastic_data = material[cell_i];
+            rho_data.push_back( elastic_data.rho() );
+            vp_data.push_back( elastic_data.vp() );
+            vs_data.push_back( elastic_data.vs() );
+            
+            cell_i++;
+        }
+
+        disk::silo_database silo;
+        silo_file_name += ".silo";
+        silo.create(silo_file_name.c_str());
+        silo.add_mesh(msh, "mesh");
+        disk::silo_zonal_variable<double> rho_silo("rho", rho_data);
+        disk::silo_zonal_variable<double> vp_silo("vp", vp_data);
+        disk::silo_zonal_variable<double> vs_silo("vs", vs_data);
+        silo.add_variable("mesh", rho_silo);
+        silo.add_variable("mesh", vp_silo);
+        silo.add_variable("mesh", vs_silo);
+
+        silo.close();
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Properties file rendered in : " << tc << " seconds" << reset << std::endl;
     }
     
 };

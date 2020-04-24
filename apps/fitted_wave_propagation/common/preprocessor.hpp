@@ -22,9 +22,11 @@ public:
     
     bool m_hdg_stabilization_Q;
     
+    size_t m_nt_divs;
+    
     bool m_render_silo_files_Q;
     
-    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_render_silo_files_Q(false) {
+    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_nt_divs(0), m_render_silo_files_Q(false) {
         
     }
     
@@ -33,6 +35,7 @@ public:
         m_k_degree              = other.m_k_degree;
         m_n_divs                = other.m_n_divs;
         m_hdg_stabilization_Q   = other.m_hdg_stabilization_Q;
+        m_nt_divs               = other.m_nt_divs;
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
     }
 
@@ -46,6 +49,7 @@ public:
         m_k_degree              = other.m_k_degree;
         m_n_divs                = other.m_n_divs;
         m_hdg_stabilization_Q   = other.m_hdg_stabilization_Q;
+        m_nt_divs               = other.m_nt_divs;
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
         
         return *this;
@@ -59,6 +63,7 @@ public:
         std::cout << bold << red << "face degree : " << m_k_degree << reset << std::endl;
         std::cout << bold << red << "refinements : " << m_n_divs << reset << std::endl;
         std::cout << bold << red << "stabilization type : " << m_hdg_stabilization_Q << reset << std::endl;
+        std::cout << bold << red << "time refinements : " << m_nt_divs << reset << std::endl;
         std::cout << bold << red << "write silo files : " << m_render_silo_files_Q << reset << std::endl;
     }
     
@@ -76,6 +81,7 @@ public:
                 "-k <int>:           Face polynomial degree: default 0\n"
                 "-l <int>:           Number of uniform refinements: default 0\n"
                 "-s <0-1>:           Stabilization type 0 -> HHO, 1 -> HDG: default 0 \n"
+                "-n <int>:           Number of uniform time refinements: default 0\n"
                 "-f <string>:        Write silo files to\n"
                 "-help:              Show help\n";
         exit(1);
@@ -83,11 +89,12 @@ public:
 
     static simulation_data process_args(int argc, char** argv)
     {
-        const char* const short_opts = "k:l:s:f";
+        const char* const short_opts = "k:l:s:n:f";
         const option long_opts[] = {
                 {"degree", required_argument, nullptr, 'k'},
                 {"ref", required_argument, nullptr, 'l'},
                 {"stab", required_argument, nullptr, 's'},
+                {"tref", required_argument, nullptr, 'n'},
                 {"file", required_argument, nullptr, 'f'},
                 {"help", no_argument, nullptr, 'h'},
                 {nullptr, no_argument, nullptr, 0}
@@ -95,6 +102,7 @@ public:
 
         size_t k_degree = 0;
         size_t n_divs   = 0;
+        size_t nt_divs   = 0;
         bool hdg_Q = false;
         bool silo_files_Q = false;
         
@@ -118,7 +126,11 @@ public:
             case 's':
                 hdg_Q = std::stoi(optarg);
                 break;
-
+                    
+            case 'n':
+                nt_divs = std::stoi(optarg);
+                break;
+                    
             case 'f':
                 silo_files_Q = std::stoi(optarg);
                 break;
@@ -136,8 +148,8 @@ public:
         sim_data.m_k_degree = k_degree;
         sim_data.m_n_divs = n_divs;
         sim_data.m_hdg_stabilization_Q = hdg_Q;
+        sim_data.m_nt_divs = nt_divs;
         sim_data.m_render_silo_files_Q = silo_files_Q;
-        
         return sim_data;
     }
 };

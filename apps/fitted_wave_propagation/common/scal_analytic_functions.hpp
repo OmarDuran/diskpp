@@ -9,7 +9,7 @@
 #ifndef scal_analytic_functions_hpp
 #define scal_analytic_functions_hpp
 
-#define contrast 1.0
+#define contrast 10.0
 #define n_terms 100
 
 class scal_analytic_functions

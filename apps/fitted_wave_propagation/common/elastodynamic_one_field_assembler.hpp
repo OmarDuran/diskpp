@@ -383,6 +383,14 @@ public:
         m_hho_stabilization_Q = true;
     }
             
+    boundary_type & get_bc_conditions(){
+             return m_bnd;
+    }
+            
+    std::vector< elastic_material_data<T> > & get_material_data(){
+        return m_material;
+    }
+            
 };
 
 #endif /* elastodynamic_one_field_assembler_hpp */

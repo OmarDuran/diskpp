@@ -5,6 +5,7 @@
 //  Created by Omar Durán on 4/11/20.
 //
 
+#pragma once
 #ifndef one_field_vectorial_assembler_hpp
 #define one_field_vectorial_assembler_hpp
 

@@ -1,19 +1,20 @@
 //
-//  three_fields_vectorial_assembler.hpp
+//  elastodynamic_three_fields_assembler.hpp
 //  acoustics
 //
-//  Created by Omar Durán on 4/12/20.
+//  Created by Omar Durán on 4/23/20.
 //
 
 #pragma once
-#ifndef three_fields_vectorial_assembler_hpp
-#define three_fields_vectorial_assembler_hpp
+#ifndef elastodynamic_three_fields_assembler_hpp
+#define elastodynamic_three_fields_assembler_hpp
 
 #include "bases/bases.hpp"
 #include "methods/hho"
+#include "../common/elastic_material_data.hpp"
 
 template<typename Mesh>
-class three_fields_vectorial_assembler
+class elastodynamic_three_fields_assembler
 {
     
     
@@ -26,6 +27,8 @@ class three_fields_vectorial_assembler
     disk::hho_degree_info               m_hho_di;
     boundary_type                       m_bnd;
     std::vector< Triplet<T> >           m_triplets;
+    std::vector< Triplet<T> >           m_mass_triplets;
+    std::vector< elastic_material_data<T> > m_material;
 
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
@@ -65,8 +68,9 @@ public:
 
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
+    SparseMatrix<T>         MASS;
 
-    three_fields_vectorial_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd)
+    elastodynamic_three_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd)
         : m_hho_di(hho_di), m_bnd(bnd), m_hho_stabilization_Q(true)
     {
             
@@ -104,6 +108,7 @@ public:
 
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
+        MASS = SparseMatrix<T>( system_size, system_size );
     }
 
     void scatter_data(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -174,13 +179,53 @@ public:
         }
 
     }
+            
+    void scatter_mass_data(const Mesh& msh, const typename Mesh::cell_type& cl,
+    const Matrix<T, Dynamic, Dynamic>& mass_matrix)
+    {
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        auto fcs = faces(msh, cl);
+        size_t n_dof = n_cbs + n_fbs*fcs.size();
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs + n_fbs*fcs.size());
+
+        auto cell_offset        = disk::priv::offset(msh, cl);
+        auto cell_LHS_offset    = cell_offset * n_cbs;
+
+        for (size_t i = 0; i < n_dof; i++)
+            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+
+        assert( asm_map.size() == mass_matrix.rows() && asm_map.size() == mass_matrix.cols() );
+
+        for (size_t i = 0; i < mass_matrix.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+
+            for (size_t j = 0; j < mass_matrix.cols(); j++)
+            {
+                if ( asm_map[j].assemble() )
+                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
+            }
+        }
+    }
 
     void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
-        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
-        size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
+        LHS.setZero();
+        RHS.setZero();
+        size_t cell_i = 0;
         for (auto& cell : msh)
         {
+            elastic_material_data<T> & material = m_material[cell_i];
+            T rho = material.rho();
+            T vs = material.vs();
+            T mu = rho * vs * vs;
+            
             auto reconstruction_operator   = strain_tensor_reconstruction(msh, cell);
             Matrix<T, Dynamic, Dynamic> R_operator = reconstruction_operator.second;
             auto n_rows = R_operator.rows();
@@ -205,26 +250,209 @@ public:
                 S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
             }
             
-            // For the sake of clarity ...
-            T lambda, mu;
-            lambda = 1.0;
-            mu = 1.0;
-            
-            R_operator.block(0, 0, n_ten_cbs, n_ten_cbs) *= (1.0/(2.0*mu));
-            D_operator.block(0, 0, n_sca_cbs, n_sca_cbs) *= (1.0/(lambda));
-            
             Matrix<T, Dynamic, Dynamic> mixed_elastic_hho_operator = R_operator + D_operator + 2.0*mu*S_operator;
             Matrix<T, Dynamic, 1> f_loc = mixed_rhs(msh, cell, rhs_fun);
-            
+
             scatter_data(msh, cell, mixed_elastic_hho_operator, f_loc);
+            cell_i++;
         }
         finalize();
     }
+            
+    void assemble_mass(const Mesh& msh){
+        
+        MASS.setZero();
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
 
+        size_t cell_i = 0;
+        for (auto& cell : msh)
+        {
+            elastic_material_data<T> & material = m_material[cell_i];
+            T rho = material.rho();
+            T vp = material.vp();
+            T vs = material.vs();
+            T mu = rho * vs * vs;
+            T lamda = rho * vp * vp - 2*mu;
+            
+            auto fcs = faces(msh, cell);
+            size_t n_dof = n_cbs + n_fbs*fcs.size();
+            Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(n_dof, n_dof);
+            
+            // Symmetric tensor mass block
+            Matrix<T, Dynamic, Dynamic> mass_matrix_sigma  = symmetric_tensor_mass_matrix(msh, cell);
+            mass_matrix_sigma *= (1.0/(2.0*mu));
+            
+            // scalar hydrostatic component mass mass block
+            auto scal_basis = make_scalar_monomial_basis(msh, cell, m_hho_di.face_degree());
+            Matrix<T, Dynamic, Dynamic> mass_matrix_sigma_v = make_mass_matrix(msh, cell, scal_basis);
+            mass_matrix_sigma_v *= (1.0/(lamda));
+            
+            // vector velocity mass mass block
+            auto vec_basis = disk::make_vector_monomial_basis(msh, cell, m_hho_di.cell_degree());
+            Matrix<T, Dynamic, Dynamic> mass_matrix_v = disk::make_mass_matrix(msh, cell, vec_basis);
+            mass_matrix_sigma_v *= rho;
+            
+            // local mass scatter
+            mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
+            mass_matrix.block(n_ten_cbs, n_ten_cbs, n_sca_cbs, n_sca_cbs) = mass_matrix_sigma_v;
+            mass_matrix.block(n_ten_cbs+n_sca_cbs, n_ten_cbs+n_sca_cbs, n_vec_cbs, n_vec_cbs) = mass_matrix_v;
+        
+            scatter_mass_data(msh, cell, mass_matrix);
+            cell_i++;
+        }
+        finalize_mass();
+    }
+            
+    Matrix<T, Dynamic, Dynamic>
+    symmetric_tensor_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cell)
+    {
+            
+        size_t dim = Mesh::dimension;
+        auto gradeg = m_hho_di.grad_degree();
+        auto ten_b = make_sym_matrix_monomial_basis(msh, cell, gradeg);
+        auto ten_bs = disk::sym_matrix_basis_size(gradeg, dim, dim);
+        Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(ten_bs, ten_bs);
+        
+        auto qps = integrate(msh, cell, 2 * gradeg);
+
+        // number of tensor components
+        size_t dec = 0;
+         if (dim == 3)
+             dec = 6;
+         else if (dim == 2)
+             dec = 3;
+         else
+             std::logic_error("Expected 3 >= dim > 1");
+
+         for (auto& qp : qps)
+         {
+             auto phi = ten_b.eval_functions(qp.point());
+
+             for (size_t j = 0; j < ten_bs; j++)
+             {
+                 
+                auto qp_phi_j = disk::priv::inner_product(qp.weight(), phi[j]);
+                for (size_t i = j; i < ten_bs; i += dec){
+                         mass_matrix(i, j) += disk::priv::inner_product(phi[i], qp_phi_j);
+                }
+             }
+         }
+
+        for (size_t j = 0; j < ten_bs; j++){
+            for (size_t i = 0; i < j; i++){
+                 mass_matrix(i, j) = mass_matrix(j, i);
+            }
+        }
+        
+        return mass_matrix;
+    }
+
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
+        size_t n_dof = MASS.rows();
+        x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
+        for (auto& cell : msh)
+        {
+            Matrix<T, Dynamic, 1> x_proj_ten_dof = project_ten_function(msh, cell, ten_fun);
+            Matrix<T, Dynamic, 1> x_proj_sca_dof = project_hydrostatic_function(msh, cell, ten_fun);
+            Matrix<T, Dynamic, 1> x_proj_vec_dof = project_function(msh, cell, m_hho_di.cell_degree(), vec_fun);
+            
+            Matrix<T, Dynamic, 1> x_proj_dof = Matrix<T, Dynamic, 1>::Zero(n_cbs);
+            x_proj_dof.block(0, 0, n_ten_cbs, 1)                    = x_proj_ten_dof;
+            x_proj_dof.block(n_ten_cbs, 0, n_sca_cbs, 1)            = x_proj_sca_dof;
+            x_proj_dof.block(n_ten_cbs+n_sca_cbs, 0, n_vec_cbs, 1)  = x_proj_vec_dof;
+            scatter_cell_dof_data(msh, cell, x_glob, x_proj_dof);
+        }
+    }
+            
+    Matrix<T, Dynamic, 1> project_ten_function(const Mesh& msh, const typename Mesh::cell_type& cell,
+                      std::function<static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun){
+    
+        Matrix<T, Dynamic, Dynamic> mass_matrix  = symmetric_tensor_mass_matrix(msh, cell);
+        size_t dim = Mesh::dimension;
+        auto gradeg = m_hho_di.grad_degree();
+        auto ten_bs = disk::sym_matrix_basis_size(gradeg, dim, dim);
+        auto ten_b = make_sym_matrix_monomial_basis(msh, cell, gradeg);
+        Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(ten_bs);
+
+        const auto qps = integrate(msh, cell, 2 * gradeg);
+        for (auto& qp : qps)
+        {
+            auto phi = ten_b.eval_functions(qp.point());
+            static_matrix<T, 2,2> sigma = ten_fun(qp.point());
+            T trace = 0.0;
+            for (size_t d = 0; d < dim; d++){
+             trace += sigma(d,d);
+            }
+            static_matrix<T, 2,2> sigma_s = sigma - (trace)*static_matrix<T, 2, 2>::Identity();
+            for (size_t i = 0; i < ten_bs; i++){
+                auto qp_phi_i = disk::priv::inner_product(qp.weight(), phi[i]);
+                rhs(i,0) += disk::priv::inner_product(qp_phi_i,sigma_s);
+            }
+        }
+        Matrix<T, Dynamic, 1> x_dof = mass_matrix.llt().solve(rhs);
+        return x_dof;
+    }
+            
+    Matrix<T, Dynamic, 1> project_hydrostatic_function(const Mesh& msh, const typename Mesh::cell_type& cell,
+                      std::function<static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
+
+        size_t dim = Mesh::dimension;
+        auto facedeg = m_hho_di.face_degree();
+        size_t sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), dim);
+        auto sca_basis = make_scalar_monomial_basis(msh, cell, facedeg);
+        Matrix<T, Dynamic, Dynamic> mass_matrix = make_mass_matrix(msh, cell, sca_basis);
+
+        Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(sca_cbs);
+        const auto qps = integrate(msh, cell, (2*facedeg+1));
+        for (auto& qp : qps)
+        {
+            auto phi = sca_basis.eval_functions(qp.point());
+            static_matrix<double, 2,2> sigma = ten_fun(qp.point());
+            T trace = 0.0;
+            for (size_t d = 0; d < dim; d++){
+             trace += sigma(d,d);
+            }
+            trace *= qp.weight();
+            for (size_t i = 0; i < sca_cbs; i++){
+              rhs(i,0) += disk::priv::inner_product(phi[i], trace);;
+            }
+        }
+        Matrix<T, Dynamic, 1> x_dof = mass_matrix.llt().solve(rhs);
+        return x_dof;
+    }
+            
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+
+        for (auto& cell : msh)
+        {
+            auto fcs = faces(msh, cell);
+            for (size_t i = 0; i < fcs.size(); i++)
+            {
+                auto face = fcs[i];
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
+                scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
+            }
+        }
+    }
+            
     void finalize(void)
     {
         LHS.setFromTriplets( m_triplets.begin(), m_triplets.end() );
         m_triplets.clear();
+    }
+            
+    void finalize_mass(void)
+    {
+        MASS.setFromTriplets( m_mass_triplets.begin(), m_mass_triplets.end() );
+        m_mass_triplets.clear();
     }
 
     Matrix<T, Dynamic, 1>
@@ -265,6 +493,31 @@ public:
             }
         }
         return x_el;
+    }
+            
+    void scatter_cell_dof_data(  const Mesh& msh, const typename Mesh::cell_type& cell,
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+    {
+        auto cell_ofs = disk::priv::offset(msh, cell);
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
+        x_glob.block(cell_ofs * n_cbs, 0, n_cbs, 1) = x_proj_dof;
+    }
+    
+    void scatter_face_dof_data(  const Mesh& msh, const typename Mesh::face_type& face,
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+    {
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        size_t n_cells = msh.cells_size();
+        auto face_offset = disk::priv::offset(msh, face);
+        auto glob_offset = n_cbs * n_cells + m_compress_indexes.at(face_offset)*n_fbs;
+        x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
     }
             
     std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
@@ -318,12 +571,10 @@ public:
              }
          }
 
-        // upper part
          for (size_t j = 0; j < ten_bs; j++)
              for (size_t i = 0; i < j; i++)
                  gr_lhs(i, j) = gr_lhs(j, i);
 
-         // compute rhs
          if (celdeg > 0)
          {
              const auto qpc = integrate(msh, cell, graddeg + celdeg - 1);
@@ -335,7 +586,7 @@ public:
 
                  gr_rhs.block(0, 0, ten_bs, vec_bs) += disk::priv::outer_product(gphi, qp_dphi);
 
-             } // end qp
+             }
          }
 
          const auto fcs = faces(msh, cell);
@@ -363,7 +614,6 @@ public:
 
         // Shrinking data
         matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
-        data_mixed.block(0, 0, ten_bs, ten_bs) = gr_lhs;
         data_mixed.block(0, (ten_bs + sca_bs), ten_bs, n_cols-(ten_bs + sca_bs)) = -gr_rhs;
         data_mixed.block((ten_bs + sca_bs), 0, n_rows-(ten_bs + sca_bs), ten_bs) = gr_rhs.transpose();
 
@@ -429,6 +679,38 @@ public:
         ret.block(ten_bs + sca_bs,0,vec_bs,1) = ret_loc;
         return ret;
     }
+     
+    void load_material_data(const Mesh& msh){
+        m_material.clear();
+        m_material.reserve(msh.cells_size());
+        T rho = 1.0;
+        T vp = sqrt(3.0);
+        T vs = 1.0;
+        elastic_material_data<T> material(rho,vp,vs);
+        size_t cell_i = 0;
+        for (auto& cell : msh)
+        {
+            m_material.push_back(material);
+            cell_i++;
+        }
+    }
+      
+    void load_material_data(const Mesh& msh, std::function<std::vector<double>(const typename Mesh::point_type& )> elastic_mat_fun){
+        m_material.clear();
+        m_material.reserve(msh.cells_size());
+        size_t cell_i = 0;
+        for (auto& cell : msh)
+        {
+            auto bar = barycenter(msh, cell);
+            std::vector<double> mat_data = elastic_mat_fun(bar);
+            T rho = mat_data[0];
+            T vp = mat_data[1];
+            T vs = mat_data[2];
+            elastic_material_data<T> material(rho,vp,vs);
+            m_material.push_back(material);
+            cell_i++;
+        }
+    }
             
     void set_hdg_stabilization(){
         if(m_hho_di.cell_degree() > m_hho_di.face_degree())
@@ -446,6 +728,14 @@ public:
     void set_hho_stabilization(){
         m_hho_stabilization_Q = true;
     }
+            
+    boundary_type & get_bc_conditions(){
+             return m_bnd;
+    }
+            
+    std::vector< elastic_material_data<T> > & get_material_data(){
+        return m_material;
+    }
 };
 
-#endif /* three_fields_vectorial_assembler_hpp */
+#endif /* elastodynamic_three_fields_assembler_hpp */

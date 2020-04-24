@@ -28,8 +28,6 @@ protected:
     
     size_t m_n_elements = 0;
     
-    MESH    m_mesh;
-    
 public:
     
     fitted_geometry_builder() {
@@ -51,13 +49,11 @@ public:
         return m_n_elements;
     }
     
-    // get the mesh
-    MESH & get_mesh() {
-        return m_mesh;
-    }
-    
     // build the mesh
     virtual bool build_mesh()  = 0;
+    
+    // move generated mesh data to an external mesh storage
+    virtual void move_to_mesh_storage(MESH& msh) = 0;
     
     // Print in log file relevant mesh information
     virtual void print_log_file()    = 0;
@@ -77,16 +73,28 @@ class cartesian_2d_mesh_builder : public fitted_geometry_builder<disk::generic_m
     typedef typename mesh_type::edge_type           edge_type;
     typedef typename mesh_type::surface_type        surface_type;
     
-    mesh_type                                       msh;
+    struct polygon_2d
+    {
+        std::vector<size_t>                 m_member_nodes;
+        std::set<std::array<size_t, 2>>     m_member_edges;
+        bool operator<(const polygon_2d & other) {
+            return m_member_nodes < other.m_member_nodes;
+        }
+    };
+    
     std::vector<point_type>                         points;
     std::vector<node_type>                          vertices;
-    std::vector<std::pair<size_t,edge_type>>        edges;
-    std::vector<std::pair<size_t,edge_type>>        skeleton_edges;
-    std::vector<std::pair<size_t,edge_type>>        boundary_edges;
-    std::vector<std::pair<size_t,surface_type>>     surfaces;
+    std::vector<std::array<size_t, 2>>              facets;
+    std::vector<std::array<size_t, 2>>              skeleton_edges;
+    std::vector<std::array<size_t, 2>>              boundary_edges;
+    std::vector<polygon_2d>                         polygons;
+    
 
     T m_lx = 0.0;
     T m_ly = 0.0;
+            
+    T m_x_t = 0.0;
+    T m_y_t = 0.0;
     
     size_t m_nx = 0;
     size_t m_ny = 0;
@@ -102,8 +110,15 @@ class cartesian_2d_mesh_builder : public fitted_geometry_builder<disk::generic_m
         skeleton_edges.reserve(n_skel_edges);
         boundary_edges.reserve(n_bc_edges);
         
-        size_t n_surfaces = m_nx * m_ny;
-        surfaces.reserve(n_surfaces);
+        size_t n_polygons = m_nx * m_ny;
+        polygons.reserve(n_polygons);
+    }
+            
+    void validate_edge(std::array<size_t, 2> & edge){
+        assert(edge[0] != edge[1]);
+        if (edge[0] > edge[1]){
+            std::swap(edge[0], edge[1]);
+        }
     }
     
 public:
@@ -140,13 +155,15 @@ public:
     // build the mesh
     bool build_mesh(){
         
-        std::vector<T> range_x(m_nx+1);
+        reserve_storage();
+        
+        std::vector<T> range_x(m_nx+1,0.0);
         T dx = m_lx/T(m_nx);
         for (unsigned int i = 0; i <= m_nx; i++) {
             range_x[i] = i*dx;
         }
         
-        std::vector<T> range_y(m_ny+1);
+        std::vector<T> range_y(m_ny+1,0.0);
         T dy = m_ly/T(m_ny);
         for (unsigned int i = 0; i <= m_ny; i++) {
             range_y[i] = i*dy;
@@ -154,9 +171,9 @@ public:
         
         size_t node_id = 0;
         for (unsigned int j = 0; j <= m_ny; j++) {
-            T yv = range_y[j];
+            T yv = range_y[j] + m_y_t;
             for (unsigned int i = 0; i <= m_nx; i++) {
-                T xv = range_y[i];
+                T xv = range_x[i] + m_x_t;
                 point_type point(xv, yv);
                 points.push_back(point);
                 vertices.push_back(node_type(point_identifier<2>(node_id)));
@@ -165,93 +182,92 @@ public:
         }
         
         size_t edge_id = 0;
-        for (size_t j = 0; j <= m_ny; j++) {
-            for (size_t i = 0; i <= m_nx; i++) {
+        for (size_t j = 0; j < m_ny; j++) {
+            for (size_t i = 0; i < m_nx; i++) {
                 
-                size_t id_0 = i + (j - 1) * (m_nx + 1);
+                size_t id_0 = i + j * (m_nx + 1);
                 size_t id_1 = id_0 + 1;
-                size_t id_2 = i + (m_nx + 1) + 1 + (j - 1)* (m_nx + 1);
+                size_t id_2 = i + (m_nx + 1) + 1 + j* (m_nx + 1);
                 size_t id_3 = id_2 - 1;
                 
                 // Adding edges: Cases to avoid edge duplicity
                 if (i==0 && j==0) {
-                    auto e0 = edge_type({
-                        typename node_type::id_type(id_0),
-                        typename node_type::id_type(id_1)});
-                    edges.push_back( std::make_pair(edge_id, e0) );
+            
+                    std::array<size_t, 2> e0 = {id_0,id_1};
+                    validate_edge(e0);
+                    facets.push_back( e0 );
+                    boundary_edges.push_back( e0 );
                     edge_id++;
                     
-                    auto e1 = edge_type({
-                        typename node_type::id_type(id_1),
-                        typename node_type::id_type(id_2)});
-                    edges.push_back( std::make_pair(edge_id, e1) );
+                    std::array<size_t, 2> e1 = {id_1,id_2};
+                    validate_edge(e1);
+                    facets.push_back( e1 );
+                    if(j == m_ny - 1) boundary_edges.push_back( e1 );
                     edge_id++;
                     
-                    auto e2 = edge_type({
-                        typename node_type::id_type(id_2),
-                        typename node_type::id_type(id_3)});
-                    edges.push_back( std::make_pair(edge_id, e2) );
+                    std::array<size_t, 2> e2 = {id_2,id_3};
+                    validate_edge(e2);
+                    facets.push_back( e2 );
                     edge_id++;
                     
-                    auto e3 = edge_type({
-                        typename node_type::id_type(id_3),
-                        typename node_type::id_type(id_1)});
-                    edges.push_back( std::make_pair(edge_id, e3) );
+                    std::array<size_t, 2> e3 = {id_3,id_0};
+                    validate_edge(e3);
+                    facets.push_back( e3 );
+                    boundary_edges.push_back( e3 );
                     edge_id++;
                 }
                 
-                if ((i>=1 && i < m_nx) && j==0) {
-                    auto e0 = edge_type({
-                        typename node_type::id_type(id_0),
-                        typename node_type::id_type(id_1)});
-                    edges.push_back( std::make_pair(edge_id, e0) );
+                if ((i>0 && i < m_nx) && j==0) {
+                    std::array<size_t, 2> e0 = {id_0,id_1};
+                    validate_edge(e0);
+                    facets.push_back( e0 );
+                    boundary_edges.push_back( e0 );
                     edge_id++;
                     
-                    auto e1 = edge_type({
-                        typename node_type::id_type(id_1),
-                        typename node_type::id_type(id_2)});
-                    edges.push_back( std::make_pair(edge_id, e1) );
+                    std::array<size_t, 2> e1 = {id_1,id_2};
+                    validate_edge(e1);
+                    facets.push_back( e1 );
+                    if(i == m_nx - 1) boundary_edges.push_back( e1 );
                     edge_id++;
                     
-                    auto e2 = edge_type({
-                        typename node_type::id_type(id_2),
-                        typename node_type::id_type(id_3)});
-                    edges.push_back( std::make_pair(edge_id, e2) );
+                    std::array<size_t, 2> e2 = {id_2,id_3};
+                    validate_edge(e2);
+                    facets.push_back( e2 );
+                    if(j == m_ny - 1) boundary_edges.push_back( e2 );
                     edge_id++;
                 }
-                if (i==1 && j>=1) {
+                if (i==0 && j>0) {
                     
-                    auto e1 = edge_type({
-                        typename node_type::id_type(id_1),
-                        typename node_type::id_type(id_2)});
-                    edges.push_back( std::make_pair(edge_id, e1) );
+                    std::array<size_t, 2> e1 = {id_1,id_2};
+                    validate_edge(e1);
+                    facets.push_back( e1 );
                     edge_id++;
                     
-                    auto e2 = edge_type({
-                        typename node_type::id_type(id_2),
-                        typename node_type::id_type(id_3)});
-                    edges.push_back( std::make_pair(edge_id, e2) );
+                    std::array<size_t, 2> e2 = {id_2,id_3};
+                    validate_edge(e2);
+                    facets.push_back( e2 );
+                    if(j == m_ny - 1) boundary_edges.push_back( e2 );
                     edge_id++;
                     
-                    auto e3 = edge_type({
-                        typename node_type::id_type(id_3),
-                        typename node_type::id_type(id_1)});
-                    edges.push_back( std::make_pair(edge_id, e3) );
+                    std::array<size_t, 2> e3 = {id_3,id_0};
+                    validate_edge(e3);
+                    boundary_edges.push_back( e3 );
+                    facets.push_back( e3 );
                     edge_id++;
                 }
                 
-                if (i>=1 && j>=1) {
+                if (i>0 && j>0) {
                     
-                    auto e1 = edge_type({
-                        typename node_type::id_type(id_1),
-                        typename node_type::id_type(id_2)});
-                    edges.push_back( std::make_pair(edge_id, e1) );
+                    std::array<size_t, 2> e1 = {id_1,id_2};
+                    validate_edge(e1);
+                    facets.push_back( e1 );
+                    if(i == m_nx - 1) boundary_edges.push_back( e1 );
                     edge_id++;
                     
-                    auto e2 = edge_type({
-                        typename node_type::id_type(id_2),
-                        typename node_type::id_type(id_3)});
-                    edges.push_back( std::make_pair(edge_id, e2) );
+                    std::array<size_t, 2> e2 = {id_2,id_3};
+                    validate_edge(e2);
+                    facets.push_back( e2 );
+                    if(j == m_ny - 1) boundary_edges.push_back( e2 );
                     edge_id++;
 
                 }
@@ -259,35 +275,127 @@ public:
         }
         
         size_t surface_id = 0;
-        for (size_t j = 0; j <= m_ny; j++) {
-            for (size_t i = 0; i <= m_nx; i++) {
+        for (size_t j = 0; j < m_ny; j++) {
+            for (size_t i = 0; i < m_nx; i++) {
                 
-                size_t id_0 = i + (j - 1) * (m_nx + 1);
+                size_t id_0 = i + j * (m_nx + 1);
                 size_t id_1 = id_0 + 1;
-                size_t id_2 = i + (m_nx + 1) + 1 + (j - 1)* (m_nx + 1);
+                size_t id_2 = i + (m_nx + 1) + 1 + j* (m_nx + 1);
                 size_t id_3 = id_2 - 1;
-                
-                auto surface_edges = {
-                    typename edge_type::id_type(id_0),
-                    typename edge_type::id_type(id_1),
-                    typename edge_type::id_type(id_2),
-                    typename edge_type::id_type(id_3)};
-                auto surface = surface_type(surface_edges);
-                surfaces.push_back( std::make_pair(surface_id, surface) );
+            
+                polygon_2d polygon;
+                polygon.m_member_nodes = {id_0,id_1,id_2,id_3};
+                std::array<size_t, 2> e0 = {id_0,id_1};
+                validate_edge(e0);
+                std::array<size_t, 2> e1 = {id_1,id_2};
+                validate_edge(e1);
+                std::array<size_t, 2> e2 = {id_2,id_3};
+                validate_edge(e2);
+                std::array<size_t, 2> e3 = {id_3,id_0};
+                validate_edge(e3);
+            
+                polygon.m_member_edges = {e0,e1,e2,e3};
+                polygons.push_back( polygon );
                 surface_id++;
                 
             }
         }
-        
+            
         return true;
     }
+
+
     
+    void move_to_mesh_storage(mesh_type& msh){
+        
+        auto storage = msh.backend_storage();
+        storage->points = std::move(points);
+        storage->nodes = std::move(vertices);
+        
+        std::vector<edge_type> edges;
+        edges.reserve(facets.size());
+        for (size_t i = 0; i < facets.size(); i++)
+        {
+            assert(facets[i][0] < facets[i][1]);
+            auto node1 = typename node_type::id_type(facets[i][0]);
+            auto node2 = typename node_type::id_type(facets[i][1]);
+
+            auto e = edge_type{{node1, node2}};
+
+            e.set_point_ids(facets[i].begin(), facets[i].end());
+            edges.push_back(e);
+        }
+        std::sort(edges.begin(), edges.end());
+            
+        storage->boundary_info.resize(edges.size());
+        for (size_t i = 0; i < boundary_edges.size(); i++)
+        {
+            assert(boundary_edges[i][0] < boundary_edges[i][1]);
+            auto node1 = typename node_type::id_type(boundary_edges[i][0]);
+            auto node2 = typename node_type::id_type(boundary_edges[i][1]);
+
+            auto e = edge_type{{node1, node2}};
+
+            auto position = find_element_id(edges.begin(), edges.end(), e);
+
+            if (position.first == false)
+            {
+                std::cout << "Bad bug at " << __FILE__ << "("
+                          << __LINE__ << ")" << std::endl;
+                return;
+            }
+
+            disk::bnd_info bi{0, true};
+            storage->boundary_info.at(position.second) = bi;
+        }
+            
+        storage->edges = std::move(edges);
+            
+        std::vector<surface_type> surfaces;
+        surfaces.reserve( polygons.size() );
+
+        for (auto& p : polygons)
+        {
+            std::vector<typename edge_type::id_type> surface_edges;
+            for (auto& e : p.m_member_edges)
+            {
+                assert(e[0] < e[1]);
+                auto n1 = typename node_type::id_type(e[0]);
+                auto n2 = typename node_type::id_type(e[1]);
+
+                edge_type edge{{n1, n2}};
+                auto edge_id = find_element_id(storage->edges.begin(),
+                                               storage->edges.end(), edge);
+                if (!edge_id.first)
+                {
+                    std::cout << "Bad bug at " << __FILE__ << "("
+                              << __LINE__ << ")" << std::endl;
+                    return;
+                }
+
+                surface_edges.push_back(edge_id.second);
+            }
+            auto surface = surface_type(surface_edges);
+            surface.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
+            surfaces.push_back( surface );
+        }
+
+        std::sort(surfaces.begin(), surfaces.end());
+        storage->surfaces = std::move(surfaces);
+        
+    }
+    
+    void set_translation_data(T x_t, T y_t){
+        m_x_t = x_t;
+        m_y_t = y_t;
+    }
+            
     // Print in log file relevant mesh information
     void print_log_file(){
-        fitted_geometry_builder<mesh_type>::m_n_elements = surfaces.size();
+        fitted_geometry_builder<mesh_type>::m_n_elements = polygons.size();
         std::ofstream file;
         file.open (fitted_geometry_builder<mesh_type>::m_log_file.c_str());
-        file << "Number of surfaces : " << surfaces.size() << std::endl;
+        file << "Number of surfaces : " << polygons.size() << std::endl;
         file << "Number of skeleton edges : " << skeleton_edges.size() << std::endl;
         file << "Number of boundary edges : " << boundary_edges.size() << std::endl;
         file << "Number of vertices : " << vertices.size() << std::endl;
