@@ -420,6 +420,12 @@ public:
         x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
     }
             
+    size_t get_n_face_dof(){
+        size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+        size_t n_face_dof = (m_n_edges - m_n_essential_edges) * n_fbs;
+        return n_face_dof;
+    }
+            
     std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
                  Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
     mixed_scalar_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell)

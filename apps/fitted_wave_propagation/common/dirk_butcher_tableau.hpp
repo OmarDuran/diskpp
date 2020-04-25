@@ -5,6 +5,7 @@
 //  Created by Omar Durán on 4/21/20.
 //
 
+#pragma once
 #ifndef dirk_butcher_tableau_hpp
 #define dirk_butcher_tableau_hpp
 
@@ -240,8 +241,6 @@ class dirk_butcher_tableau
         }
         
     }
-    
-    private:
   
 };
 

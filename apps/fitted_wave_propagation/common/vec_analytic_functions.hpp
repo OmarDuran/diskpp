@@ -36,11 +36,13 @@ class vec_analytic_functions
         switch (m_function_type) {
             case EFunctionNonPolynomial:
                 {
-                    return [](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
-                            double x,y;
+                    return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
+                            double x,y,ux,uy;
                             x = pt.x();
                             y = pt.y();
-                            static_vector<double, 2> u;
+                            ux = -std::cos(M_PI*y)*std::sin(std::sqrt(2)*M_PI*t)*std::sin(M_PI*x);
+                            uy =  std::cos(M_PI*x)*std::sin(std::sqrt(2)*M_PI*t)*std::sin(M_PI*y);
+                            static_vector<double, 2> u{ux,uy};
                             return u;
                         };
                 }
@@ -61,10 +63,12 @@ class vec_analytic_functions
             case EFunctionQuadraticInTime:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
-                            double x,y;
+                            double x,y,ux,uy;
                             x = pt.x();
                             y = pt.y();
-                            static_vector<double, 2> u;
+                            ux = -t*t*std::cos(M_PI*y)*std::sin(M_PI*x);
+                            uy =  t*t*std::cos(M_PI*x)*std::sin(M_PI*y);
+                            static_vector<double, 2> u{ux,uy};
                             return u;
                         };
                 }
@@ -88,10 +92,12 @@ class vec_analytic_functions
             case EFunctionNonPolynomial:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
-                            double x,y;
+                            double x,y,vx,vy;
                             x = pt.x();
                             y = pt.y();
-                            static_vector<double, 2> v;
+                            vx = -(std::sqrt(2)*M_PI*std::cos(std::sqrt(2)*M_PI*t)*std::cos(M_PI*y)*std::sin(M_PI*x));
+                            vy = std::sqrt(2)*M_PI*std::cos(std::sqrt(2)*M_PI*t)*std::cos(M_PI*x)*std::sin(M_PI*y);
+                            static_vector<double, 2> v{vx,vy};
                             return v;
                         };
                 }
@@ -113,10 +119,12 @@ class vec_analytic_functions
             case EFunctionQuadraticInTime:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
-                            double x,y;
+                            double x,y,vx,vy;
                             x = pt.x();
                             y = pt.y();
-                            static_vector<double, 2> v;
+                            vx = -2*t*std::cos(M_PI*y)*std::sin(M_PI*x);
+                            vy =  2*t*std::cos(M_PI*x)*std::sin(M_PI*y);
+                            static_vector<double, 2> v{vx,vy};
                             return v;
                         };
                 }
@@ -143,10 +151,12 @@ class vec_analytic_functions
             case EFunctionNonPolynomial:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
-                            double x,y;
-                            x = pt.x();
-                            y = pt.y();
-                            static_vector<double, 2> a;
+                            double x,y,ax,ay;
+                             x = pt.x();
+                             y = pt.y();
+                             ax = 2*M_PI*M_PI*std::cos(M_PI*y)*std::sin(std::sqrt(2)*M_PI*t)*std::sin(M_PI*x);
+                             ay = -2*M_PI*M_PI*std::cos(M_PI*x)*std::sin(std::sqrt(2)*M_PI*t)*std::sin(M_PI*y);
+                             static_vector<double, 2> a{ax,ay};
                             return a;
                         };
                 }
@@ -159,7 +169,7 @@ class vec_analytic_functions
                             y = pt.y();
                             ax = -2.0*M_PI*M_PI*(1.0 - x)*x*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t);
                             ay = -2.0*M_PI*M_PI*(1.0 - x)*x*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t);
-                         static_vector<double, 2> a{ax,ay};
+                            static_vector<double, 2> a{ax,ay};
                             return a;
                         };
                 }
@@ -167,10 +177,12 @@ class vec_analytic_functions
             case EFunctionQuadraticInTime:
                 {
                     return [](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
-                        double x,y;
+                        double x,y,ax,ay;
                         x = pt.x();
                         y = pt.y();
-                        static_vector<double, 2> a;
+                        ax = -2*std::cos(M_PI*y)*std::sin(M_PI*x);
+                        ay = 2*std::cos(M_PI*x)*std::sin(M_PI*y);
+                        static_vector<double, 2> a{ax,ay};
                         return a;
                         };
                 }
@@ -197,7 +209,7 @@ class vec_analytic_functions
                             double x,y;
                             x = pt.x();
                             y = pt.y();
-                            static_vector<double, 2> f;
+                            static_vector<double, 2> f{0,0};
                             return f;
                         };
                 }
@@ -210,10 +222,6 @@ class vec_analytic_functions
                             y = pt.y();
                             fx = -2.0*(1.0 + (-3.0 + x)*x - 5.0*y + (4.0 - M_PI*M_PI*(-1.0 + x))*x*y + (3.0 + M_PI*M_PI*(-1.0 + x)*x)*y*y)*std::sin(std::sqrt(2.0)*M_PI*t);
                             fy = -2*(1 + (-3 + y)*y + x*(-5 + (4 - M_PI*M_PI*(-1 + y))*y) + x*x*(3 + M_PI*M_PI*(-1 + y)*y))*std::sin(std::sqrt(2.0)*M_PI*t);
-//                            fx = 2*(1 + (-3 + x)*x - 5*y + (4 + M_PI*M_PI*(-1 + x))*x*y + (3 - M_PI*M_PI*(-1 + x)*x)*y*y)*std::sin(std::sqrt(2)*M_PI*t);
-//                            fy = 2*(1 + (-3 + y)*y + x*(-5 + (4 + M_PI*M_PI*(-1 + y))*y) + x*x*(3 - M_PI*M_PI*(-1 + y)*y))*std::sin(std::sqrt(2)*M_PI*t);
-//                            fx *= -1.0;
-//                            fy *= -1.0;
                             static_vector<double, 2> f{fx,fy};
                             return f;
                         };
@@ -222,10 +230,12 @@ class vec_analytic_functions
             case EFunctionQuadraticInTime:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
-                        double x,y;
+                        double x,y,fx,fy;
                         x = pt.x();
                         y = pt.y();
-                        static_vector<double, 2> f;
+                        fx = -2*(1 + M_PI*M_PI*t*t)*std::cos(M_PI*y)*std::sin(M_PI*x);
+                        fy = 2*(1 + M_PI*M_PI*t*t)*std::cos(M_PI*x)*std::sin(M_PI*y);
+                        static_vector<double, 2> f{fx,fy};
                         return f;
                         };
                 }
@@ -253,7 +263,9 @@ class vec_analytic_functions
                             double x,y;
                             x = pt.x();
                             y = pt.y();
-                            static_matrix<double,2,2> sigma(2,2);
+                            static_matrix<double,2,2> sigma = static_matrix<double,2,2>::Zero(2,2);
+                            sigma(0,0) = -2*M_PI*std::cos(M_PI*x)*std::cos(M_PI*y)*std::sin(std::sqrt(2)*M_PI*t);
+                            sigma(1,1) = 2*M_PI*std::cos(M_PI*x)*std::cos(M_PI*y)*std::sin(std::sqrt(2)*M_PI*t);
                             return sigma;
                         };
                 }
@@ -284,8 +296,10 @@ class vec_analytic_functions
                             double x,y;
                             x = pt.x();
                             y = pt.y();
-                            static_matrix<double,2,2> sigma(2,2);
-                             return sigma;
+                            static_matrix<double,2,2> sigma = static_matrix<double,2,2>::Zero(2,2);
+                            sigma(0,0) = -2*M_PI*t*t*std::cos(M_PI*x)*std::cos(M_PI*y);
+                            sigma(1,1) = 2*M_PI*t*t*std::cos(M_PI*x)*std::cos(M_PI*y);
+                            return sigma;
                         };
                 }
                 break;

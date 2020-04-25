@@ -250,7 +250,8 @@ public:
                 S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
             }
             
-            Matrix<T, Dynamic, Dynamic> mixed_elastic_hho_operator = R_operator + D_operator + 2.0*mu*S_operator;
+            T h_cell = diameter(msh, cell); // to eliminate SI dimension inconsistency.
+            Matrix<T, Dynamic, Dynamic> mixed_elastic_hho_operator = R_operator + D_operator + ((h_cell*2.0*mu)/vs)*S_operator;
             Matrix<T, Dynamic, 1> f_loc = mixed_rhs(msh, cell, rhs_fun);
 
             scatter_data(msh, cell, mixed_elastic_hho_operator, f_loc);
@@ -518,6 +519,12 @@ public:
         auto face_offset = disk::priv::offset(msh, face);
         auto glob_offset = n_cbs * n_cells + m_compress_indexes.at(face_offset)*n_fbs;
         x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
+    }
+     
+    size_t get_n_face_dof(){
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        size_t n_face_dof = (m_n_edges - m_n_essential_edges) * n_fbs;
+        return n_face_dof;
     }
             
     std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,

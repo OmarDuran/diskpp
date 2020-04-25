@@ -471,7 +471,6 @@ public:
                 auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
 
                 auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
-                auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
 
                 // Error integrals
                 for (auto & point_pair : int_rule) {

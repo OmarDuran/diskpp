@@ -43,6 +43,12 @@ using namespace Eigen;
 #include "../common/dirk_hho_scheme.hpp"
 #include "../common/dirk_butcher_tableau.hpp"
 
+// explicit RK schemes
+#include "../common/ssprk_hho_scheme.hpp"
+#include "../common/ssprk_shu_osher_tableau.hpp"
+
+void EHHOFirstOrder(int argc, char **argv);
+
 void IHHOFirstOrder(int argc, char **argv);
 
 void IHHOSecondOrder(int argc, char **argv);
@@ -55,7 +61,8 @@ void HHOFirstOrderExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-    IHHOFirstOrder(argc, argv);
+    EHHOFirstOrder(argc, argv);
+//    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
     
     // Examples solving the vector laplacian with optimal HHO convergence properties
@@ -63,6 +70,152 @@ int main(int argc, char **argv)
 //    HHOSecondOrderExample(argc, argv);
     
     return 0;
+}
+
+void EHHOFirstOrder(int argc, char **argv){
+    
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+    
+    // Building a cartesian mesh
+    timecounter tc;
+    tc.tic();
+
+    RealType lx = 1.0;
+    RealType ly = 1.0;
+    size_t nx = 2;
+    size_t ny = 2;
+    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
+    mesh_type msh;
+
+    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+    mesh_builder.refine_mesh(sim_data.m_n_divs);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
+    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    // Time controls : Final time value 1.0
+    size_t nt = 10;
+    for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+        nt *= 2;
+    }
+    RealType ti = 0.0;
+    RealType tf = 1.0;
+    RealType dt     = tf/nt;
+    
+    vec_analytic_functions functions;
+    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    RealType t = ti;
+    auto exact_vel_fun      = functions.Evaluate_v(t);
+    auto exact_flux_fun     = functions.Evaluate_sigma(t);
+    auto rhs_fun            = functions.Evaluate_f(t);
+    
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t cell_k_degree = sim_data.m_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+
+    // Solving a primal HHO mixed problem
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(exact_vel_fun);
+    tc.tic();
+    auto assembler = elastodynamic_three_fields_assembler<mesh_type>(msh, hho_di, bnd);
+    assembler.load_material_data(msh);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    tc.toc();
+    std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    assembler.assemble_mass(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+    
+    // Projecting initial data
+    Matrix<RealType, Dynamic, 1> x_dof;
+    assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
+    assembler.project_over_faces(msh, x_dof, exact_vel_fun);
+    
+    size_t it = 0;
+    std::string silo_file_name = "vector_mixed_";
+        postprocessor<mesh_type>::write_silo_three_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+    
+    // Solving a first order equation HDG/HHO propagation problem
+    int s = 3;
+    Matrix<double, Dynamic, Dynamic> alpha;
+    Matrix<double, Dynamic, Dynamic> beta;
+    ssprk_shu_osher_tableau::OSSPRKSS(s, alpha, beta);
+
+//    tc.tic();
+//    assembler.assemble(msh, rhs_fun);
+//    tc.toc();
+//    std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
+//    size_t n_face_dof = assembler.get_n_face_dof();
+//    ssprk_hho_scheme ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+//    tc.toc();
+
+    Matrix<double, Dynamic, 1> x_dof_n;
+    for(size_t it = 1; it <= nt; it++){
+
+        std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+
+        RealType tn = dt*(it-1)+ti;
+        tc.tic();
+        {
+            
+            RealType t      = tn + dt;
+            auto rhs_fun    = functions.Evaluate_f(t);
+            tc.tic();
+            assembler.assemble(msh, rhs_fun);
+            tc.toc();
+            std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
+            size_t n_face_dof = assembler.get_n_face_dof();
+            ssprk_hho_scheme ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+            tc.toc();
+            
+            size_t n_dof = x_dof.rows();
+            Matrix<double, Dynamic, Dynamic> ys = Matrix<double, Dynamic, Dynamic>::Zero(n_dof, s+1);
+        
+            Matrix<double, Dynamic, 1> yn, ysi, yj;
+            ys.block(0, 0, n_dof, 1) = x_dof;
+            for (int i = 0; i < s; i++) {
+        
+                ysi = Matrix<double, Dynamic, 1>::Zero(n_dof, 1);
+                for (int j = 0; j <= i; j++) {
+                    yn = ys.block(0, j, n_dof, 1);
+                    ssprk_an.explicit_rk_weight(yn, yj, dt, alpha(i,j), beta(i,j));
+                    ysi += yj;
+                }
+                ys.block(0, i+1, n_dof, 1) = ysi;
+            }
+        
+            x_dof_n = ys.block(0, s, n_dof, 1);
+        }
+        tc.toc();
+        std::cout << bold << cyan << "SSPRK step completed: " << tc << " seconds" << reset << std::endl;
+        x_dof = x_dof_n;
+
+        t = tn + dt;
+        auto exact_vel_fun = functions.Evaluate_v(t);
+        auto exact_flux_fun = functions.Evaluate_sigma(t);
+
+        std::string silo_file_name = "vector_mixed_";
+            postprocessor<mesh_type>::write_silo_three_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+
+        if(it == nt){
+            // Computing errors
+            postprocessor<mesh_type>::compute_errors_three_fields_vectorial(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun);
+        }
+    }
+    
+    std::cout << green << "Number of SSPRK steps   =  " << s << reset << std::endl;
+    std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
+    std::cout << green << "Step size =  " << dt << reset << std::endl;
 }
 
 void IHHOFirstOrder(int argc, char **argv){
@@ -94,12 +247,12 @@ void IHHOFirstOrder(int argc, char **argv){
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
-    RealType ti = 0.25;
-    RealType tf = 1.25;
+    RealType ti = 0.0;
+    RealType tf = 0.1;
     RealType dt     = (tf-ti)/nt;
     
     vec_analytic_functions functions;
-    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
+    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_sigma(t);
@@ -135,7 +288,7 @@ void IHHOFirstOrder(int argc, char **argv){
     assembler.project_over_faces(msh, x_dof, exact_vel_fun);
 
     size_t it = 0;
-    std::string silo_file_name = "vec_mixed_";
+    std::string silo_file_name = "vector_mixed_";
         postprocessor<mesh_type>::write_silo_three_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
     
     // Solving a first order equation HDG/HHO propagation problem
@@ -144,7 +297,7 @@ void IHHOFirstOrder(int argc, char **argv){
     Matrix<RealType, Dynamic, 1> c;
 
     // DIRK(s) schemes
-    int s = 2;
+    int s = 3;
     bool is_sdirk_Q = true;
 
     if (is_sdirk_Q) {
@@ -213,7 +366,7 @@ void IHHOFirstOrder(int argc, char **argv){
         auto exact_vel_fun = functions.Evaluate_v(t);
         auto exact_flux_fun = functions.Evaluate_sigma(t);
 
-        std::string silo_file_name = "vec_mixed_";
+        std::string silo_file_name = "vector_mixed_";
             postprocessor<mesh_type>::write_silo_three_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
 
         if(it == nt){
@@ -253,16 +406,17 @@ void IHHOSecondOrder(int argc, char **argv){
 
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
 
-    // Final time value 1.0
-    std::vector<size_t> nt_v = {10,20,40,80,160,320,640};
-    std::vector<double> dt_v = {0.1,0.05,0.025,0.0125,0.00625,0.003125,0.0015625};
-    int tref = 3;
-    size_t nt       = nt_v[tref];
-    RealType dt     = dt_v[tref];
-    RealType ti     = 0.0;
+    // Time controls : Final time value 1.0
+    size_t nt = 10;
+    for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+        nt *= 2;
+    }
+    RealType ti = 0.0;
+    RealType tf = 0.1;
+    RealType dt     = (tf-ti)/nt;
 
     vec_analytic_functions functions;
-    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
+    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
     RealType t = ti;
     auto exact_vec_fun      = functions.Evaluate_u(t);
     auto exact_vel_fun      = functions.Evaluate_v(t);
@@ -278,7 +432,7 @@ void IHHOSecondOrder(int argc, char **argv){
 
     // Solving a primal HHO mixed problem
     boundary_type bnd(msh);
-    bnd.addDirichletEverywhere(exact_vec_fun); // easy because boundary assumes zero every where any time.
+    bnd.addDirichletEverywhere(exact_vec_fun);
 
     tc.tic();
     auto assembler = elastodynamic_one_field_assembler<mesh_type>(msh, hho_di, bnd);
@@ -327,7 +481,7 @@ void IHHOSecondOrder(int argc, char **argv){
             auto exact_vec_fun      = functions.Evaluate_u(t);
             auto exact_flux_fun     = functions.Evaluate_sigma(t);
             auto rhs_fun            = functions.Evaluate_f(t);
-
+            assembler.get_bc_conditions().updateDirichletFunction(exact_vec_fun, 0);
             assembler.assemble(msh, rhs_fun);
 
             // Compute intermediate state for scalar and rate
@@ -358,7 +512,7 @@ void IHHOSecondOrder(int argc, char **argv){
             postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, u_dof_n, exact_vec_fun, false);
 
             if(it == nt){
-                auto assembler_c = one_field_vectorial_assembler<mesh_type>(msh, hho_di, bnd);
+                auto assembler_c = one_field_vectorial_assembler<mesh_type>(msh, hho_di, assembler.get_bc_conditions());
                 postprocessor<mesh_type>::compute_errors_one_field_vectorial(msh, hho_di, assembler_c, u_dof_n, exact_vec_fun, exact_flux_fun);
             }
 
