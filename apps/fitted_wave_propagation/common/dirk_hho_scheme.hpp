@@ -21,7 +21,11 @@ class dirk_hho_scheme
     SparseMatrix<double> m_Mg;
     SparseMatrix<double> m_Kg;
     Matrix<double, Dynamic, 1> m_Fg;
-    SparseLU<SparseMatrix<double>> m_analysis;
+#ifdef HAVE_INTEL_MKL_FADE
+    PardisoLU<Eigen::SparseMatrix<double>>  m_analysis;
+#else
+    SparseLU<Eigen::SparseMatrix<double>>   m_analysis;
+#endif
     
     public:
     
@@ -48,9 +52,16 @@ class dirk_hho_scheme
         m_analysis.factorize(K);
     }
     
-    SparseLU<SparseMatrix<double>> & DirkAnalysis(){
-        return m_analysis;
-    }
+
+    #ifdef HAVE_INTEL_MKL_FADE
+        PardisoLU<Eigen::SparseMatrix<double>> & DirkAnalysis(){
+            return m_analysis;
+        }
+    #else
+        SparseLU<SparseMatrix<double>> & DirkAnalysis(){
+            return m_analysis;
+        }
+    #endif
     
     SparseMatrix<double> & Mg(){
         return m_Mg;

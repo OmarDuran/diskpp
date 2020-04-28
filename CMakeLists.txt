@@ -29,6 +29,13 @@ if (MKL_FOUND)
 	set(HAVE_INTEL_MKL TRUE)
 endif()
 
+find_package(TBB)
+if (TBB_FOUND)
+  include_directories(${TBB_INCLUDE_DIRS})
+  set(LINK_LIBS ${LINK_LIBS} ${TBB_LIBRARIES})
+  set(HAVE_INTEL_TBB TRUE)
+endif()
+
 find_package(SILO REQUIRED)
 #if (SILO_FOUND)
     include_directories("${SILO_INCLUDE_DIRS}")

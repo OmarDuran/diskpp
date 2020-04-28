@@ -45,7 +45,7 @@ class scal_analytic_functions
             case EFunctionQuadraticInSpace:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double {
-                        return (1 - pt.x())*pt.x()*(1 - pt.y())*pt.y()*std::cos(std::sqrt(2.0)*M_PI*t);
+                        return (1 - pt.x())*pt.x()*(1 - pt.y())*pt.y()*std::sin(std::sqrt(2.0)*M_PI*t);
                         };
                 }
                 break;
@@ -84,9 +84,9 @@ class scal_analytic_functions
                                 plvm = (1.0/100.0)*exp(-(20.0*((k-x-c1*t)-0.2))*(20.0*((k-x-c1*t)-0.2)));
                                 p+=c*(plvp-plvm);
                             }else{
-                                double pl;
-                                pl = (1.0/100.0)*exp(-(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2))*(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2)));
-                                p+=((2.0*c1)/(c2+c1))*c*pl;
+                                double pr;
+                                pr = (1.0/100.0)*exp(-(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2))*(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2)));
+                                p+=((2.0*c1)/(c2+c1))*c*pr;
                             }
                             c*=(c2-c1)/(c2+c1);
                         }
@@ -119,7 +119,7 @@ class scal_analytic_functions
             case EFunctionQuadraticInSpace:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double {
-                            return -(std::sqrt(2.0)*M_PI*(1 - pt.x())*pt.x()*(1 - pt.y())*pt.y()*std::sin(std::sqrt(2.0)*M_PI*t));
+                            return std::sqrt(2.0)*M_PI*(1 - pt.x())*pt.x()*(1 - pt.y())*pt.y()*std::cos(std::sqrt(2.0)*M_PI*t);
                         };
                 }
                 break;
@@ -193,7 +193,7 @@ class scal_analytic_functions
             case EFunctionQuadraticInSpace:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double {
-                            return -2*M_PI*M_PI*(1 - pt.x())*pt.x()*(1 - pt.y())*pt.y()*std::cos(std::sqrt(2)*M_PI*t);
+                            return -2*M_PI*M_PI*(1 - pt.x())*pt.x()*(1 - pt.y())*pt.y()*std::sin(std::sqrt(2)*M_PI*t);
                         };
                 }
                 break;
@@ -274,7 +274,7 @@ class scal_analytic_functions
                             double x,y,f;
                             x = pt.x();
                             y = pt.y();
-                            f = 2*(x - x*x + y - M_PI*M_PI*(-1 + x)*x*(-1 + y)*y - y*y)*std::cos(std::sqrt(2.0)*M_PI*t);
+                            f = 2*(x - x*x + y - M_PI*M_PI*(-1 + x)*x*(-1 + y)*y - y*y)*std::sin(std::sqrt(2.0)*M_PI*t);
                             return f;
                         };
                 }
@@ -329,8 +329,6 @@ class scal_analytic_functions
                             std::vector<double> flux(2);
                             flux[0] = (std::sin(std::sqrt(2)*M_PI*t)*std::cos(M_PI*x)*std::sin(M_PI*y))/std::sqrt(2.0);
                             flux[1] = (std::sin(std::sqrt(2)*M_PI*t)*std::sin(M_PI*x)*std::cos(M_PI*y))/std::sqrt(2.0);
-                            flux[0] *=-1.0;
-                            flux[1] *=-1.0;
                             return flux;
                         };
                 }
@@ -342,10 +340,8 @@ class scal_analytic_functions
                             x = pt.x();
                             y = pt.y();
                             std::vector<double> flux(2);
-                            flux[0] = (1 - x)*(1 - y)*y*std::cos(std::sqrt(2.0)*M_PI*t) - x*(1 - y)*y*std::cos(std::sqrt(2.0)*M_PI*t);
-                            flux[1] = (1 - x)*x*(1 - y)*std::cos(std::sqrt(2.0)*M_PI*t) - (1 - x)*x*y*std::cos(std::sqrt(2.0)*M_PI*t);
-                            flux[0] *=-1.0;
-                            flux[1] *=-1.0;
+                            flux[0] = (1 - x)*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t) - x*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t);
+                            flux[1] = (1 - x)*x*(1 - y)*std::sin(std::sqrt(2.0)*M_PI*t) - (1 - x)*x*y*std::sin(std::sqrt(2.0)*M_PI*t);
                             return flux;
                         };
                 }
@@ -359,8 +355,6 @@ class scal_analytic_functions
                             std::vector<double> flux(2);
                             flux[0] = M_PI*t*t*std::cos(M_PI*x)*std::sin(M_PI*y);
                             flux[1] = M_PI*t*t*std::sin(M_PI*x)*std::cos(M_PI*y);
-                            flux[0] *=-1.0;
-                            flux[1] *=-1.0;
                             return flux;
                         };
                 }
@@ -374,8 +368,6 @@ class scal_analytic_functions
                             std::vector<double> flux(2);
                             flux[0] = t*t*(1 - x)*(1 - y)*y - t*t*x*(1 - y)*y;
                             flux[1] = t*t*(1 - x)*x*(1 - y) - t*t*(1 - x)*x*y;
-                            flux[0] *=-1.0;
-                            flux[1] *=-1.0;
                             return flux;
                         };
                 }
@@ -397,9 +389,9 @@ class scal_analytic_functions
 
                                 if (x < 0.5) {
                                     double qxlvp, qxlvm;
-                                    qxlvp = -(8.0)* exp(-(20.0*((k+x-c1*t)-0.2))*(20.0*((k+x-c1*t)-0.2)))*((k+x-c1*t)-0.2);
-                                    qxlvm = (8.0)* exp(-(20.0*((k-x-c1*t)-0.2))*(20.0*((k-x-c1*t)-0.2)))*((k-x-c1*t)-0.2);
-                                    qx+=c*(qxlvp-qxlvm);
+                                    qxlvp = -(8.0)* exp(-(20.0*((k-x-c1*t)-0.2))*(20.0*((k-x-c1*t)-0.2)))*((k-x-c1*t)-0.2);
+                                    qxlvm = -(8.0)* exp(-(20.0*((k+x-c1*t)-0.2))*(20.0*((k+x-c1*t)-0.2)))*((k+x-c1*t)-0.2);
+                                    qx+=c*(qxlvp+qxlvm);
                                 }else{
                                     double qxl;
                                     qxl = -(8.0*(c1/c2))*exp(-(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2))*(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2)))*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2);
@@ -411,8 +403,6 @@ class scal_analytic_functions
                             std::vector<double> flux(2);
                             flux[0] = qx;
                             flux[1] = 0.0;
-                            flux[0] *=-1.0;
-                            flux[1] *=-1.0;
                             return flux;
                         };
                 }

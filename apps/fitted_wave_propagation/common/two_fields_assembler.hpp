@@ -302,8 +302,8 @@ public:
         // Shrinking data
         matrix_type data_mixed = matrix_type::Zero(nrows,ncols);
         data_mixed.block(0, 0, vec_cell_size, vec_cell_size) = gr_lhs;
-        data_mixed.block(0, vec_cell_size, vec_cell_size, ncols-vec_cell_size) = gr_rhs;
-        data_mixed.block(vec_cell_size, 0, nrows-vec_cell_size, vec_cell_size) = -gr_rhs.transpose();
+        data_mixed.block(0, vec_cell_size, vec_cell_size, ncols-vec_cell_size) = -gr_rhs;
+        data_mixed.block(vec_cell_size, 0, nrows-vec_cell_size, vec_cell_size) = gr_rhs.transpose();
         
         matrix_type oper = gr_lhs.llt().solve(gr_rhs);
         return std::make_pair(oper, data_mixed);

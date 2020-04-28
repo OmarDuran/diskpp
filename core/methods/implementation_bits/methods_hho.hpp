@@ -1196,7 +1196,8 @@ make_scalar_hho_stabilization(const Mesh&                                       
         const matrix_type proj3 = piKF.solve(MR2 * proj1);
         const matrix_type BRF   = proj2 + proj3;
 
-        data += BRF.transpose() * face_mass_matrix * BRF / hf;
+//        data += BRF.transpose() * face_mass_matrix * BRF / hf;
+        data += BRF.transpose() * face_mass_matrix * BRF;
     }
 
     return data;
@@ -1275,7 +1276,8 @@ make_vector_hho_stabilization(const Mesh&                                       
         const matrix_type proj3 = piKF.solve(MR2 * proj1);
         const matrix_type BRF   = proj2 + proj3;
 
-        data += BRF.transpose() * face_mass_matrix * BRF / hf;
+//        data += BRF.transpose() * face_mass_matrix * BRF / hf;
+        data += BRF.transpose() * face_mass_matrix * BRF;
     }
 
     return data;

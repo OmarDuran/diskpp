@@ -546,7 +546,7 @@ public:
         std::transform(points_begin(), points_end(), points_begin(), tr);
     }
 
-    /* Returns the numerial ID of a cell. */
+    /* Returns the numerical ID of a cell. */
     typename cell::id_type lookup(const cell& cl) const
     {
         auto ci = find_element_id(this->cells_begin(), this->cells_end(), cl);

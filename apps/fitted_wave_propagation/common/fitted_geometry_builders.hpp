@@ -345,8 +345,8 @@ public:
                 return;
             }
 
-            disk::bnd_info bi{0, true};
-            storage->boundary_info.at(position.second) = bi;
+                disk::bnd_info bi{0, true};
+                storage->boundary_info.at(position.second) = bi;
         }
             
         storage->edges = std::move(edges);
