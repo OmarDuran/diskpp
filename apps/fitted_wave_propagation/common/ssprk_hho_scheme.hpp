@@ -89,6 +89,10 @@ class ssprk_hho_scheme
         return m_Fc;
     }
     
+    void SetFg(Matrix<double, Dynamic, 1> & Fg){
+        m_Fc = Fg.block(0, 0, m_n_c_dof, 1);
+    }
+    
     void explicit_rk_weight(Matrix<double, Dynamic, 1> & x_dof, Matrix<double, Dynamic, 1> & x_dof_n, double dt, double a, double b){
         
         Matrix<double, Dynamic, 1> x_c_dof = x_dof.block(0, 0, m_n_c_dof, 1);

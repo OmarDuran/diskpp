@@ -142,7 +142,7 @@ public:
         m_siloDb = DBCreate(db_name.c_str(), DB_CLOBBER, DB_LOCAL, NULL, DB_PDB);
         if (m_siloDb)
             return true;
-
+        DBSetDeprecateWarnings(0);
         std::cout << "Error creating database" << std::endl;
         return false;
     }
@@ -152,7 +152,7 @@ public:
         m_siloDb = DBOpen(db_name.c_str(), DB_PDB, DB_APPEND);
         if (m_siloDb)
             return true;
-
+        DBSetDeprecateWarnings(0);
         std::cout << "Error opening database" << std::endl;
         return false;
     }
@@ -225,6 +225,7 @@ public:
     template<typename T>
     bool add_mesh(const cartesian_mesh<T,2>& msh, const std::string& name)
     {
+        DBSetDeprecateWarnings(0);
         std::vector<T> x_coords, y_coords;
         x_coords.reserve(msh.points_size());
         y_coords.reserve(msh.points_size());
@@ -277,6 +278,7 @@ public:
     template<typename T>
     bool add_mesh(const generic_mesh<T,2>& msh, const std::string& name)
     {
+        DBSetDeprecateWarnings(0);
         static_assert(std::is_same<T,double>::value, "Only double for now");
 
         std::vector<T> x_coords, y_coords;

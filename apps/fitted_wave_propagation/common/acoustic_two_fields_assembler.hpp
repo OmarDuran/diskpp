@@ -110,6 +110,8 @@ public:
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
         MASS = SparseMatrix<T>( system_size, system_size );
+        
+        classify_cells(msh);
     }
 
     void scatter_data(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -351,9 +353,9 @@ public:
 
         T rho = material.vp();
         T vp = material.vp();
-//        T h_cell = diameter(msh, cell); // to eliminate SI dimension inconsistency.
-//        return R_operator + ((h_cell)/(vp*rho))*S_operator;
-        return R_operator + ((1.0)/(vp*rho))*S_operator;
+        T h_cell = diameter(msh, cell); // to eliminate SI dimension inconsistency.
+        return R_operator + ((h_cell)/(vp*rho))*S_operator;
+//        return R_operator + ((1.0)/(vp*rho))*S_operator;
     }
             
     void assemble_rhs(const Mesh& msh, std::function<double(const typename Mesh::point_type& )> rhs_fun, bool parallele_Q = false){
@@ -684,11 +686,18 @@ public:
         T rho = 1.0;
         T vp = 1.0;
         acoustic_material_data<T> material(rho,vp);
-        size_t cell_i = 0;
-        for (auto& cell : msh)
+        for (size_t cell_id = 0; cell_id < msh.cells_size(); cell_id++)
         {
             m_material.push_back(material);
-            cell_i++;
+        }
+    }
+    
+    void load_material_data(const Mesh& msh, acoustic_material_data<T> material){
+        m_material.clear();
+        m_material.reserve(msh.cells_size());
+        for (size_t cell_id = 0; cell_id < msh.cells_size(); cell_id++)
+        {
+            m_material.push_back(material);
         }
     }
       

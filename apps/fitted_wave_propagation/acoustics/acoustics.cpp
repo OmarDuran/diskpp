@@ -15,6 +15,7 @@
 #include <cmath>
 #include <memory>
 #include <sstream>
+#include <fstream>
 #include <list>
 #include <getopt.h>
 
@@ -46,10 +47,6 @@ using namespace Eigen;
 #include "../common/ssprk_hho_scheme.hpp"
 #include "../common/ssprk_shu_osher_tableau.hpp"
 
-#ifdef HAVE_INTEL_TBB
-#include "tbb/task_scheduler_init.h"
-#endif
-
 void HeterogeneousEHHOFirstOrder(int argc, char **argv);
 
 void EHHOFirstOrder(int argc, char **argv);
@@ -62,23 +59,16 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv);
 
 void IHHOSecondOrder(int argc, char **argv);
 
-void HHOSecondOrderExample(int argc, char **argv);
 
-void HHOFirstOrderExample(int argc, char **argv);
+void HHOTwoFieldsConvergenceExample(int argc, char **argv);
+
+void HHOOneFieldConvergenceExample(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
-
-//    size_t n_threads = 8;
-//#ifdef HAVE_INTEL_TBB
-//    if (n_threads <= 0) {
-//        n_threads = 1;
-//    }
-//    tbb::task_scheduler_init init(n_threads);
-//#endif
     
 //    HeterogeneousEHHOFirstOrder(argc, argv);
-    HeterogeneousIHHOFirstOrder(argc, argv);
+//    HeterogeneousIHHOFirstOrder(argc, argv);
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
 
@@ -88,233 +78,360 @@ int main(int argc, char **argv)
 
     
 //    // Examples solving the laplacian with optimal HHO convergence properties
-//    HHOFirstOrderExample(argc, argv);
-//    HHOSecondOrderExample(argc, argv);
+//    HHOTwoFieldsConvergenceExample(argc, argv);
+    HHOOneFieldConvergenceExample(argc, argv);
     
     return 0;
 }
 
-void HHOFirstOrderExample(int argc, char **argv){
+//void HHOFirstOrderExample(int argc, char **argv){
+//
+//    using RealType = double;
+//    simulation_data sim_data = preprocessor::process_args(argc, argv);
+//    sim_data.print_simulation_data();
+//
+//    // Building a cartesian mesh
+//    timecounter tc;
+//    tc.tic();
+//
+//    RealType lx = 1.0;
+//    RealType ly = 1.0;
+//    size_t nx = 2;
+//    size_t ny = 2;
+//    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+//    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+//    mesh_type msh;
+//
+//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+//    mesh_builder.refine_mesh(sim_data.m_n_divs);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
+//
+//    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+//
+//    // Manufactured solution
+//#ifdef quadratic_space_solution_Q
+//
+//    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
+//        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+//    };
+//
+//    auto exact_flux_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
+//        double x,y;
+//        x = pt.x();
+//        y = pt.y();
+//        std::vector<RealType> flux(2);
+//        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
+//        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
+//        return flux;
+//    };
+//
+//    auto rhs_fun = [](const typename mesh_type::point_type& pt) -> RealType {
+//        double x,y;
+//        x = pt.x();
+//        y = pt.y();
+//        return -2.0*((x - 1)*x + (y - 1)*y);
+//    };
+//
+//#else
+//
+//    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
+//        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+//    };
+//
+//    auto exact_flux_fun = [](const mesh_type::point_type& pt) -> std::vector<RealType> {
+//        double x,y;
+//        x = pt.x();
+//        y = pt.y();
+//        std::vector<RealType> flux(2);
+//        flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
+//        flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
+//        return flux;
+//    };
+//
+//    auto rhs_fun = [](const mesh_type::point_type& pt) -> RealType {
+//        double x,y;
+//        x = pt.x();
+//        y = pt.y();
+//        return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+//    };
+//
+//#endif
+//
+//    // Creating HHO approximation spaces and corresponding linear operator
+//    size_t cell_k_degree = sim_data.m_k_degree;
+//    if(sim_data.m_hdg_stabilization_Q){
+//        cell_k_degree++;
+//    }
+//    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+//
+//
+//    // Solving a primal HHO mixed problem
+//    boundary_type bnd(msh);
+//    bnd.addDirichletEverywhere(exact_scal_fun);
+//    tc.tic();
+//    auto assembler = two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+//
+//    if(sim_data.m_hdg_stabilization_Q){
+//        assembler.set_hdg_stabilization();
+//    }
+//    assembler.assemble(msh, rhs_fun);
+//    tc.toc();
+//    std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+//
+//    tc.tic();
+//    SparseLU<SparseMatrix<RealType>> analysis_t;
+//    analysis_t.analyzePattern(assembler.LHS);
+//    analysis_t.factorize(assembler.LHS);
+//    Matrix<RealType, Dynamic, 1> x_dof = analysis_t.solve(assembler.RHS); // new state
+//    tc.toc();
+//    std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
+//    std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+//
+//    // Computing errors
+//    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun);
+//
+//    size_t it = 0;
+//    std::string silo_file_name = "scalar_mixed_";
+//    postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
+//}
+
+void HHOTwoFieldsConvergenceExample(int argc, char **argv){
 
     using RealType = double;
-    simulation_data sim_data = preprocessor::process_args(argc, argv);
-    sim_data.print_simulation_data();
-    
-    // Building a cartesian mesh
-    timecounter tc;
-    tc.tic();
-
-    RealType lx = 1.0;
-    RealType ly = 1.0;
-    size_t nx = 2;
-    size_t ny = 2;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-    mesh_type msh;
-
-    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh(sim_data.m_n_divs);
-    mesh_builder.build_mesh();
-    mesh_builder.move_to_mesh_storage(msh);
-
-    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
-    // Manufactured solution
-#ifdef quadratic_space_solution_Q
+    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    sim_data.print_simulation_data();
 
-    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+    // Manufactured exact solution
+    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
+    auto exact_scal_fun = [quadratic_function_Q](const mesh_type::point_type& pt) -> RealType {
+        if(quadratic_function_Q){
+            return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+        }else{
+            return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        }
+        
     };
 
-    auto exact_flux_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
+    auto exact_flux_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
         double x,y;
         x = pt.x();
         y = pt.y();
         std::vector<RealType> flux(2);
-        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
-        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
-        return flux;
+        if(quadratic_function_Q){
+            flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
+            flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
+            return flux;
+        }else{
+            flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
+            flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
+            return flux;
+        }
+
     };
 
-    auto rhs_fun = [](const typename mesh_type::point_type& pt) -> RealType {
+    auto rhs_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> RealType {
         double x,y;
         x = pt.x();
         y = pt.y();
-        return -2.0*((x - 1)*x + (y - 1)*y);
+        if(quadratic_function_Q){
+            return -2.0*((x - 1)*x + (y - 1)*y);
+        }else{
+            return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        }
     };
 
-#else
+    // simple material
+    RealType rho = 1.0;
+    RealType vp = 1.0;
+    acoustic_material_data<RealType> material(rho,vp);
+    
+    std::ofstream error_file("steady_scalar_mixed_error.txt");
+    
+    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+        std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
+        error_file << "Approximation with k : " << k << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
+            
+            // Building a cartesian mesh
+            timecounter tc;
+            tc.tic();
+            RealType lx = 1.0;
+            RealType ly = 1.0;
+            size_t nx = 4;
+            size_t ny = 4;
+            mesh_type msh;
+            
+            cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+            mesh_builder.refine_mesh(l);
+            mesh_builder.build_mesh();
+            mesh_builder.move_to_mesh_storage(msh);
+            std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Creating HHO approximation spaces and corresponding linear operator
+            size_t cell_k_degree = k;
+            if(sim_data.m_hdg_stabilization_Q){
+                cell_k_degree++;
+            }
+            disk::hho_degree_info hho_di(cell_k_degree,k);
 
-    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-    };
-
-    auto exact_flux_fun = [](const mesh_type::point_type& pt) -> std::vector<RealType> {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        std::vector<RealType> flux(2);
-        flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
-        flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
-        return flux;
-    };
-
-    auto rhs_fun = [](const mesh_type::point_type& pt) -> RealType {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-    };
-
-#endif
-
-    // Creating HHO approximation spaces and corresponding linear operator
-    size_t cell_k_degree = sim_data.m_k_degree;
-    if(sim_data.m_hdg_stabilization_Q){
-        cell_k_degree++;
+            // Solving a scalar primal HHO problem
+            boundary_type bnd(msh);
+            bnd.addDirichletEverywhere(exact_scal_fun);
+            tc.tic();
+            auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+            if(sim_data.m_hdg_stabilization_Q){
+                assembler.set_hdg_stabilization();
+            }
+            assembler.load_material_data(msh,material);
+            assembler.assemble(msh, rhs_fun);
+            assembler.assemble_mass(msh);
+            tc.toc();
+            std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Solving LS
+            tc.tic();
+            SparseLU<SparseMatrix<RealType>> analysis;
+            analysis.analyzePattern(assembler.LHS);
+            analysis.factorize(assembler.LHS+assembler.MASS);
+            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS); // new state
+            tc.toc();
+            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
+            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Computing errors
+            postprocessor<mesh_type>::compute_errors_two_fields_II(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, error_file);
+            
+            if (sim_data.m_render_silo_files_Q) {
+                std::string silo_file_name = "steady_scalar_mixed_k" + std::to_string(k) + "_";
+                postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, l, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
+            }
+        }
+        error_file << std::endl << std::endl;
     }
-    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
-
-
-    // Solving a primal HHO mixed problem
-    boundary_type bnd(msh);
-    bnd.addDirichletEverywhere(exact_scal_fun);
-    tc.tic();
-    auto assembler = two_fields_assembler<mesh_type>(msh, hho_di, bnd);
-    if(sim_data.m_hdg_stabilization_Q){
-        assembler.set_hdg_stabilization();
-    }
-    assembler.assemble(msh, rhs_fun);
-    tc.toc();
-    std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    tc.tic();
-    SparseLU<SparseMatrix<RealType>> analysis_t;
-    analysis_t.analyzePattern(assembler.LHS);
-    analysis_t.factorize(assembler.LHS);
-    Matrix<RealType, Dynamic, 1> x_dof = analysis_t.solve(assembler.RHS); // new state
-    tc.toc();
-    std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-    std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    // Computing errors
-    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun);
-    
-    size_t it = 0;
-    std::string silo_file_name = "scalar_mixed_";
-    postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
+    error_file.close();
 }
 
-#define quadratic_space_solution_Q
-void HHOSecondOrderExample(int argc, char **argv){
+void HHOOneFieldConvergenceExample(int argc, char **argv){
 
     using RealType = double;
-    simulation_data sim_data = preprocessor::process_args(argc, argv);
-    sim_data.print_simulation_data();
-    
-    // Building a cartesian mesh
-    timecounter tc;
-    tc.tic();
-    
-    RealType lx = 1.0;
-    RealType ly = 1.0;
-    size_t nx = 2;
-    size_t ny = 2;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-    mesh_type msh;
     
-    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh(sim_data.m_n_divs);
-    mesh_builder.build_mesh();
-    mesh_builder.move_to_mesh_storage(msh);
-    
-    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    // Manufactured solution
-#ifdef quadratic_space_solution_Q
+    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    sim_data.print_simulation_data();
 
-    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+    // Manufactured exact solution
+    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
+    auto exact_scal_fun = [quadratic_function_Q](const mesh_type::point_type& pt) -> RealType {
+        if(quadratic_function_Q){
+            return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+        }else{
+            return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        }
+        
     };
 
-    auto exact_flux_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
+    auto exact_flux_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
         double x,y;
         x = pt.x();
         y = pt.y();
         std::vector<RealType> flux(2);
-        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
-        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
-        return flux;
+        if(quadratic_function_Q){
+            flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
+            flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
+            return flux;
+        }else{
+            flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
+            flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
+            return flux;
+        }
+
     };
 
-    auto rhs_fun = [](const typename mesh_type::point_type& pt) -> RealType {
+    auto rhs_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> RealType {
         double x,y;
         x = pt.x();
         y = pt.y();
-        return -2.0*((x - 1)*x + (y - 1)*y);
+        if(quadratic_function_Q){
+            return -2.0*((x - 1)*x + (y - 1)*y);
+        }else{
+            return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        }
     };
 
-#else
+    // simple material
+    RealType rho = 1.0;
+    RealType vp = 1.0;
+    acoustic_material_data<RealType> material(rho,vp);
+    
+    std::ofstream error_file("steady_scalar_error.txt");
+    
+    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+        std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
+        error_file << "Approximation with k : " << k << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
+            
+            // Building a cartesian mesh
+            timecounter tc;
+            tc.tic();
+            RealType lx = 1.0;
+            RealType ly = 1.0;
+            size_t nx = 2;
+            size_t ny = 2;
+            mesh_type msh;
+            
+            cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+            mesh_builder.refine_mesh(l);
+            mesh_builder.build_mesh();
+            mesh_builder.move_to_mesh_storage(msh);
+            std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Creating HHO approximation spaces and corresponding linear operator
+            size_t cell_k_degree = k;
+            if(sim_data.m_hdg_stabilization_Q){
+                cell_k_degree++;
+            }
+            disk::hho_degree_info hho_di(cell_k_degree,k);
 
-    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-    };
-
-    auto exact_flux_fun = [](const mesh_type::point_type& pt) -> std::vector<RealType> {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        std::vector<RealType> flux(2);
-        flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
-        flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
-        return flux;
-    };
-
-    auto rhs_fun = [](const mesh_type::point_type& pt) -> RealType {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-    };
-
-#endif
-
-    // Creating HHO approximation spaces and corresponding linear operator
-    size_t cell_k_degree = sim_data.m_k_degree;
-    if(sim_data.m_hdg_stabilization_Q){
-        cell_k_degree++;
+            // Solving a scalar primal HHO problem
+            boundary_type bnd(msh);
+            bnd.addDirichletEverywhere(exact_scal_fun);
+            tc.tic();
+            auto assembler = acoustic_one_field_assembler<mesh_type>(msh, hho_di, bnd);
+            if(sim_data.m_hdg_stabilization_Q){
+                assembler.set_hdg_stabilization();
+            }
+            assembler.load_material_data(msh,material);
+            assembler.assemble(msh, rhs_fun);
+            assembler.apply_bc(msh);
+            tc.toc();
+            std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Solving LS
+            tc.tic();
+            SparseLU<SparseMatrix<RealType>> analysis;
+            analysis.analyzePattern(assembler.LHS);
+            analysis.factorize(assembler.LHS);
+            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS);
+            tc.toc();
+            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
+            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Computing errors
+            postprocessor<mesh_type>::compute_errors_one_field_II(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun,error_file);
+            
+            if (sim_data.m_render_silo_files_Q) {
+                std::string silo_file_name = "steady_scalar_k" + std::to_string(k) + "_";
+                postprocessor<mesh_type>::write_silo_one_field(silo_file_name, l, msh, hho_di, x_dof, exact_scal_fun, false);
+            }
+        }
+        error_file << std::endl << std::endl;
     }
-    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
-
-
-    // Solving a primal HHO mixed problem
-    boundary_type bnd(msh);
-    bnd.addDirichletEverywhere(exact_scal_fun);
-    tc.tic();
-    auto assembler = one_field_assembler<mesh_type>(msh, hho_di, bnd);
-    if(sim_data.m_hdg_stabilization_Q){
-        assembler.set_hdg_stabilization();
-    }
-    assembler.assemble(msh, rhs_fun);
-    tc.toc();
-    std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    tc.tic();
-    SparseLU<SparseMatrix<RealType>> analysis_t;
-    analysis_t.analyzePattern(assembler.LHS);
-    analysis_t.factorize(assembler.LHS);
-    Matrix<RealType, Dynamic, 1> x_dof = analysis_t.solve(assembler.RHS); // new state
-    tc.toc();
-    std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-    std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    // Computing errors
-    postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun);
-    
-    size_t it = 0;
-    std::string silo_file_name = "scalar_";
-    postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, x_dof, exact_scal_fun, false);
+    error_file.close();
 }
 
 void IHHOSecondOrder(int argc, char **argv){
@@ -482,9 +599,9 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.1;
+    RealType ly = 0.01;
     size_t nx = 10;
-    size_t ny = 3;
+    size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
@@ -502,7 +619,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
-    RealType ti = 0.25;
+    RealType ti = 0.0;
     RealType tf = 0.5;
     RealType dt     = tf/nt;
 
@@ -576,7 +693,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     std::string silo_file_name = "scalar_";
     postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
     
-    bool standar_Q = false;
+    bool standar_Q = true;
     // Newmark process
     {
                 
@@ -832,9 +949,9 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.1;
+    RealType ly = 0.01;
     size_t nx = 10;
-    size_t ny = 3;
+    size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
@@ -1076,6 +1193,11 @@ void EHHOFirstOrder(int argc, char **argv){
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     tc.tic();
+    assembler.classify_cells(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
+    
+    tc.tic();
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
@@ -1107,7 +1229,13 @@ void EHHOFirstOrder(int argc, char **argv){
     for(size_t it = 1; it <= nt; it++){
 
         std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
-
+        
+        {   // Updating rhs
+            RealType t = dt*(it)+ti;
+            auto rhs_fun            = functions.Evaluate_f(t);
+            assembler.assemble_rhs(msh, rhs_fun);
+            ssprk_an.SetFg(assembler.RHS);
+        }
         RealType tn = dt*(it-1)+ti;
         tc.tic();
         {
@@ -1163,7 +1291,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.1;
+    RealType ly = 0.01;
     size_t nx = 10;
     size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
@@ -1184,8 +1312,8 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.5;
-    RealType dt     = tf/nt;
+    RealType tf = 0.25;
+    RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
     functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionInhomogeneousInSpace);
@@ -1215,7 +1343,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
         RealType rho, vp;
         rho = 1.0;
         if (x < 0.5) {
-            vp = 10.0;
+            vp = 1.0;
         }else{
             vp = 1.0;
         }
@@ -1230,6 +1358,11 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     }
     tc.toc();
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    assembler.classify_cells(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
     
     tc.tic();
     assembler.assemble_mass(msh);
@@ -1254,7 +1387,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     tc.tic();
     assembler.assemble(msh, rhs_fun);
     tc.toc();
-    std::cout << bold << cyan << "First stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
+    std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
     size_t n_face_dof = assembler.get_n_face_dof();
     ssprk_hho_scheme ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
     tc.toc();
@@ -1263,10 +1396,17 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     for(size_t it = 1; it <= nt; it++){
 
         std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
-
+        
+        {   // Updating rhs
+            RealType t = dt*(it)+ti;
+            auto rhs_fun            = functions.Evaluate_f(t);
+            assembler.assemble_rhs(msh, rhs_fun);
+            ssprk_an.SetFg(assembler.RHS);
+        }
         RealType tn = dt*(it-1)+ti;
         tc.tic();
         {
+            
             size_t n_dof = x_dof.rows();
             Matrix<double, Dynamic, Dynamic> ys = Matrix<double, Dynamic, Dynamic>::Zero(n_dof, s+1);
         
