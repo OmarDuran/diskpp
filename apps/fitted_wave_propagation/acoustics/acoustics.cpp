@@ -60,260 +60,32 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv);
 void IHHOSecondOrder(int argc, char **argv);
 
 
-void HHOTwoFieldsConvergenceExample(int argc, char **argv);
-
 void HHOOneFieldConvergenceExample(int argc, char **argv);
+
+void HHOTwoFieldsConvergenceExample(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
     
 //    HeterogeneousEHHOFirstOrder(argc, argv);
 //    HeterogeneousIHHOFirstOrder(argc, argv);
-//    HeterogeneousIHHOSecondOrder(argc, argv);
-
+    
+    HeterogeneousIHHOSecondOrder(argc, argv);
 
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
-//    IHHOSecondOrder(argc, argv);
-
     
-//    // Examples solving the laplacian with optimal HHO convergence properties
-    HHOTwoFieldsConvergenceExample(argc, argv);
+//    IHHOSecondOrder(argc, argv);
+    
+    
+//    // Examples using main app objects for solving the laplacian with optimal convergence rates
+    
+//    // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
+//    // Dual HHO
+//    HHOTwoFieldsConvergenceExample(argc, argv);
     
     return 0;
-}
-
-//void HHOFirstOrderExample(int argc, char **argv){
-//
-//    using RealType = double;
-//    simulation_data sim_data = preprocessor::process_args(argc, argv);
-//    sim_data.print_simulation_data();
-//
-//    // Building a cartesian mesh
-//    timecounter tc;
-//    tc.tic();
-//
-//    RealType lx = 1.0;
-//    RealType ly = 1.0;
-//    size_t nx = 2;
-//    size_t ny = 2;
-//    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-//    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-//    mesh_type msh;
-//
-//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-//    mesh_builder.refine_mesh(sim_data.m_n_divs);
-//    mesh_builder.build_mesh();
-//    mesh_builder.move_to_mesh_storage(msh);
-//
-//    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-//
-//    // Manufactured solution
-//#ifdef quadratic_space_solution_Q
-//
-//    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-//        return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
-//    };
-//
-//    auto exact_flux_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        std::vector<RealType> flux(2);
-//        flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
-//        flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
-//        return flux;
-//    };
-//
-//    auto rhs_fun = [](const typename mesh_type::point_type& pt) -> RealType {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        return -2.0*((x - 1)*x + (y - 1)*y);
-//    };
-//
-//#else
-//
-//    auto exact_scal_fun = [](const mesh_type::point_type& pt) -> RealType {
-//        return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-//    };
-//
-//    auto exact_flux_fun = [](const mesh_type::point_type& pt) -> std::vector<RealType> {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        std::vector<RealType> flux(2);
-//        flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
-//        flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
-//        return flux;
-//    };
-//
-//    auto rhs_fun = [](const mesh_type::point_type& pt) -> RealType {
-//        double x,y;
-//        x = pt.x();
-//        y = pt.y();
-//        return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-//    };
-//
-//#endif
-//
-//    // Creating HHO approximation spaces and corresponding linear operator
-//    size_t cell_k_degree = sim_data.m_k_degree;
-//    if(sim_data.m_hdg_stabilization_Q){
-//        cell_k_degree++;
-//    }
-//    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
-//
-//
-//    // Solving a primal HHO mixed problem
-//    boundary_type bnd(msh);
-//    bnd.addDirichletEverywhere(exact_scal_fun);
-//    tc.tic();
-//    auto assembler = two_fields_assembler<mesh_type>(msh, hho_di, bnd);
-//
-//    if(sim_data.m_hdg_stabilization_Q){
-//        assembler.set_hdg_stabilization();
-//    }
-//    assembler.assemble(msh, rhs_fun);
-//    tc.toc();
-//    std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
-//
-//    tc.tic();
-//    SparseLU<SparseMatrix<RealType>> analysis_t;
-//    analysis_t.analyzePattern(assembler.LHS);
-//    analysis_t.factorize(assembler.LHS);
-//    Matrix<RealType, Dynamic, 1> x_dof = analysis_t.solve(assembler.RHS); // new state
-//    tc.toc();
-//    std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-//    std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
-//
-//    // Computing errors
-//    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun);
-//
-//    size_t it = 0;
-//    std::string silo_file_name = "scalar_mixed_";
-//    postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
-//}
-
-void HHOTwoFieldsConvergenceExample(int argc, char **argv){
-
-    using RealType = double;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-    
-    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
-    sim_data.print_simulation_data();
-
-    // Manufactured exact solution
-    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
-    auto exact_scal_fun = [quadratic_function_Q](const mesh_type::point_type& pt) -> RealType {
-        if(quadratic_function_Q){
-            return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
-        }else{
-            return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-        }
-        
-    };
-
-    auto exact_flux_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        std::vector<RealType> flux(2);
-        if(quadratic_function_Q){
-            flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
-            flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
-            return flux;
-        }else{
-            flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
-            flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
-            return flux;
-        }
-
-    };
-
-    auto rhs_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> RealType {
-        double x,y;
-        x = pt.x();
-        y = pt.y();
-        if(quadratic_function_Q){
-            return -2.0*((x - 1)*x + (y - 1)*y);
-        }else{
-            return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
-        }
-    };
-
-    // simple material
-    RealType rho = 1.0;
-    RealType vp = 1.0;
-    acoustic_material_data<RealType> material(rho,vp);
-    
-    std::ofstream error_file("steady_scalar_mixed_error.txt");
-    
-    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
-        std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
-        error_file << "Approximation with k : " << k << std::endl;
-        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
-            
-            // Building a cartesian mesh
-            timecounter tc;
-            tc.tic();
-            RealType lx = 1.0;
-            RealType ly = 1.0;
-            size_t nx = 2;
-            size_t ny = 2;
-            mesh_type msh;
-            
-            cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-            mesh_builder.refine_mesh(l);
-            mesh_builder.build_mesh();
-            mesh_builder.move_to_mesh_storage(msh);
-            std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-            
-            // Creating HHO approximation spaces and corresponding linear operator
-            size_t cell_k_degree = k;
-            if(sim_data.m_hdg_stabilization_Q){
-                cell_k_degree++;
-            }
-            disk::hho_degree_info hho_di(cell_k_degree,k);
-
-            // Solving a scalar primal HHO problem
-            boundary_type bnd(msh);
-            bnd.addDirichletEverywhere(exact_scal_fun);
-            tc.tic();
-            auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
-            if(sim_data.m_hdg_stabilization_Q){
-                assembler.set_hdg_stabilization();
-            }
-            assembler.load_material_data(msh,material);
-            assembler.assemble(msh, rhs_fun);
-            assembler.assemble_mass(msh, false);
-            assembler.apply_bc(msh);
-            tc.toc();
-            std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
-            
-            // Solving LS
-            tc.tic();
-            SparseLU<SparseMatrix<RealType>> analysis;
-            analysis.analyzePattern(assembler.LHS+assembler.MASS);
-            analysis.factorize(assembler.LHS+assembler.MASS);
-            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS); // new state
-            tc.toc();
-            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
-            
-            // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields_II(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, error_file);
-            
-            if (sim_data.m_render_silo_files_Q) {
-                std::string silo_file_name = "steady_scalar_mixed_k" + std::to_string(k) + "_";
-                postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, l, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
-            }
-        }
-        error_file << std::endl << std::endl;
-    }
-    error_file.close();
 }
 
 void HHOOneFieldConvergenceExample(int argc, char **argv){
@@ -423,11 +195,131 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
             std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
             
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_one_field_II(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun,error_file);
+            postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun,error_file);
             
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "steady_scalar_k" + std::to_string(k) + "_";
                 postprocessor<mesh_type>::write_silo_one_field(silo_file_name, l, msh, hho_di, x_dof, exact_scal_fun, false);
+            }
+        }
+        error_file << std::endl << std::endl;
+    }
+    error_file.close();
+}
+
+void HHOTwoFieldsConvergenceExample(int argc, char **argv){
+
+    using RealType = double;
+    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    sim_data.print_simulation_data();
+
+    // Manufactured exact solution
+    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
+    auto exact_scal_fun = [quadratic_function_Q](const mesh_type::point_type& pt) -> RealType {
+        if(quadratic_function_Q){
+            return (1.0-pt.x())*pt.x() * (1.0-pt.y())*pt.y();
+        }else{
+            return std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        }
+        
+    };
+
+    auto exact_flux_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        std::vector<RealType> flux(2);
+        if(quadratic_function_Q){
+            flux[0] = (1 - x)*(1 - y)*y - x*(1 - y)*y;
+            flux[1] = (1 - x)*x*(1 - y) - (1 - x)*x*y;
+            return flux;
+        }else{
+            flux[0] =  M_PI*std::cos(M_PI*pt.x())*std::sin(M_PI*pt.y());
+            flux[1] =  M_PI*std::sin(M_PI*pt.x())*std::cos(M_PI*pt.y());
+            return flux;
+        }
+
+    };
+
+    auto rhs_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> RealType {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        if(quadratic_function_Q){
+            return -2.0*((x - 1)*x + (y - 1)*y);
+        }else{
+            return 2.0*M_PI*M_PI*std::sin(M_PI*pt.x())*std::sin(M_PI*pt.y());
+        }
+    };
+
+    // simple material
+    RealType rho = 1.0;
+    RealType vp = 1.0;
+    acoustic_material_data<RealType> material(rho,vp);
+    
+    std::ofstream error_file("steady_scalar_mixed_error.txt");
+    
+    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+        std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
+        error_file << "Approximation with k : " << k << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
+            
+            // Building a cartesian mesh
+            timecounter tc;
+            tc.tic();
+            RealType lx = 1.0;
+            RealType ly = 1.0;
+            size_t nx = 2;
+            size_t ny = 2;
+            mesh_type msh;
+            
+            cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+            mesh_builder.refine_mesh(l);
+            mesh_builder.build_mesh();
+            mesh_builder.move_to_mesh_storage(msh);
+            std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Creating HHO approximation spaces and corresponding linear operator
+            size_t cell_k_degree = k;
+            if(sim_data.m_hdg_stabilization_Q){
+                cell_k_degree++;
+            }
+            disk::hho_degree_info hho_di(cell_k_degree,k);
+
+            // Solving a scalar primal HHO problem
+            boundary_type bnd(msh);
+            bnd.addDirichletEverywhere(exact_scal_fun);
+            tc.tic();
+            auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+            if(sim_data.m_hdg_stabilization_Q){
+                assembler.set_hdg_stabilization();
+            }
+            assembler.load_material_data(msh,material);
+            assembler.assemble(msh, rhs_fun);
+            assembler.assemble_mass(msh, false);
+            assembler.apply_bc(msh);
+            tc.toc();
+            std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Solving LS
+            tc.tic();
+            SparseLU<SparseMatrix<RealType>> analysis;
+            analysis.analyzePattern(assembler.LHS+assembler.MASS);
+            analysis.factorize(assembler.LHS+assembler.MASS);
+            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS); // new state
+            tc.toc();
+            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
+            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Computing errors
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, error_file);
+            
+            if (sim_data.m_render_silo_files_Q) {
+                std::string silo_file_name = "steady_scalar_mixed_k" + std::to_string(k) + "_";
+                postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, l, msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, false);
             }
         }
         error_file << std::endl << std::endl;
@@ -497,11 +389,6 @@ void IHHOSecondOrder(int argc, char **argv){
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     tc.tic();
-    assembler.classify_cells(msh);
-    tc.toc();
-    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
-    
-    tc.tic();
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
@@ -512,14 +399,21 @@ void IHHOSecondOrder(int argc, char **argv){
     assembler.project_over_cells(msh, v_dof_n, exact_vel_fun);
     assembler.project_over_cells(msh, a_dof_n, exact_accel_fun);
     
-    size_t it = 0;
-    std::string silo_file_name = "scalar_";
-    postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "scalar_";
+        postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+    }
+    
+    std::ofstream simulation_log("acoustic_one_field.txt");
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
+    }
     
     bool standar_Q = true;
     // Newmark process
     {
-                
         Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
 
         RealType beta = 0.25;
@@ -574,18 +468,24 @@ void IHHOSecondOrder(int argc, char **argv){
             v_dof_n += gamma*dt*a_dof_np;
             a_dof_n  = a_dof_np;
             
-            std::string silo_file_name = "scalar_";
-            postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+            if (sim_data.m_render_silo_files_Q) {
+                std::string silo_file_name = "scalar_";
+                postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+            }
+            
+            if (sim_data.m_report_energy_Q) {
+                postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
+            }
             
             if(it == nt){
-                auto assembler_c = one_field_assembler<mesh_type>(msh, hho_di, bnd);
-                postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler_c, p_dof_n, exact_scal_fun, exact_flux_fun);
+                postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, p_dof_n, exact_scal_fun, exact_flux_fun, simulation_log);
             }
             
         }
-        std::cout << green << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-        std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
-        std::cout << green << "Step size =  " << dt << reset << std::endl;
+        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+        simulation_log << "Number of time steps =  " << nt << std::endl;
+        simulation_log << "Step size =  " << dt << std::endl;
+        simulation_log.flush();
     }
 }
 
@@ -672,11 +572,6 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     tc.tic();
-    assembler.classify_cells(msh);
-    tc.toc();
-    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
-    
-    tc.tic();
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
@@ -690,14 +585,21 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     assembler.project_over_cells(msh, a_dof_n, exact_accel_fun);
     assembler.project_over_faces(msh, a_dof_n, exact_accel_fun);
     
-    size_t it = 0;
-    std::string silo_file_name = "scalar_";
-    postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "scalar_";
+        postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+    }
     
-    bool standar_Q = true;
+    std::ofstream simulation_log("acoustic_one_field.txt");
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
+    }
+    
+    bool standar_Q = false;
     // Newmark process
     {
-                
         Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
 
         RealType beta = 0.25;
@@ -752,18 +654,24 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             v_dof_n += gamma*dt*a_dof_np;
             a_dof_n  = a_dof_np;
             
-            std::string silo_file_name = "scalar_";
-            postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+            if (sim_data.m_render_silo_files_Q) {
+                std::string silo_file_name = "scalar_";
+                postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+            }
+            
+            if (sim_data.m_report_energy_Q) {
+                postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
+            }
             
             if(it == nt){
-                auto assembler_c = one_field_assembler<mesh_type>(msh, hho_di, bnd);
-                postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler_c, p_dof_n, exact_scal_fun, exact_flux_fun);
+                postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, p_dof_n, exact_scal_fun, exact_flux_fun, simulation_log);
             }
             
         }
-        std::cout << green << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-        std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
-        std::cout << green << "Step size =  " << dt << reset << std::endl;
+        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+        simulation_log << "Number of time steps =  " << nt << std::endl;
+        simulation_log << "Step size =  " << dt << std::endl;
+        simulation_log.flush();
     }
 }
 

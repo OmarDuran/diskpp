@@ -27,7 +27,7 @@ class postprocessor {
 public:
     
     /// Compute L2 and H1 errors for one field approximation
-    static void compute_errors_one_field(Mesh & msh, disk::hho_degree_info & hho_di, one_field_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_one_field(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_one_field_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -90,159 +90,17 @@ public:
         }
         tc.toc();
         error_file << std::endl;
-        error_file << "Error completed: " << tc << " seconds" << std::endl;
-        error_file << "Characteristic h size = " << std::endl << h << std::endl;
-        error_file << "L2-norm error = " << std::sqrt(scalar_l2_error) << std::endl;
-        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
-        error_file.flush();
-
-
-    }
-    
-    /// Compute L2 and H1 errors for one field approximation
-    static void compute_errors_one_field_II(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_one_field_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
-
-        timecounter tc;
-        tc.tic();
-
-        using RealType = double;
-        auto dim = Mesh::dimension;
-        size_t cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
-        
-        RealType scalar_l2_error = 0.0;
-        RealType flux_l2_error = 0.0;
-        size_t cell_i = 0;
-        RealType h;
-        for (auto& cell : msh)
-        {
-            if(cell_i == 0){
-                h = diameter(msh, cell);
-            }
-
-            Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(cell_i*cell_dof, 0, cell_dof, 1);
-
-            // scalar evaluation
-            {
-                auto cell_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
-                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
-                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, scal_fun);
-                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
-                Matrix<RealType, Dynamic, 1> diff = real_dofs - scalar_cell_dof;
-                scalar_l2_error += diff.dot(mass*diff);
-
-            }
-
-            // flux evaluation
-            {
-                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
-                auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
-                auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
-                Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_dof_data(msh, cell, x_dof);
-                Matrix<RealType, Dynamic, 1> recdofs = gr.first * all_dofs;
-
-                // Error integrals
-                for (auto & point_pair : int_rule) {
-
-                    RealType omega = point_pair.weight();
-                    auto t_dphi = rec_basis.eval_gradients( point_pair.point() );
-                    Matrix<RealType, 1, 2> grad_uh = Matrix<RealType, 1, 2>::Zero();
-
-                    for (size_t i = 1; i < t_dphi.rows(); i++){
-                        grad_uh = grad_uh + recdofs(i-1)*t_dphi.block(i, 0, 1, 2);
-                    }
-
-                    Matrix<RealType, 1, 2> grad_u_exact = Matrix<RealType, 1, 2>::Zero();
-                    grad_u_exact(0,0) =  flux_fun(point_pair.point())[0];
-                    grad_u_exact(0,1) =  flux_fun(point_pair.point())[1];
-                    flux_l2_error += omega * (grad_u_exact - grad_uh).dot(grad_u_exact - grad_uh);
-
-                }
-            }
-
-            cell_i++;
-        }
-        tc.toc();
-        error_file << std::endl;
-        error_file << "Error completed: " << tc << " seconds" << std::endl;
-        error_file << "Characteristic h size = " << h << std::endl;
-        error_file << "L2-norm error = " << std::sqrt(scalar_l2_error) << std::endl;
-        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
-        error_file.flush();
-
-
-    }
-    
-    /// Compute L2 and H1 errors for two fields approximation
-    static void compute_errors_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun){
-
-        timecounter tc;
-        tc.tic();
-
-        using RealType = double;
-        size_t n_scal_dof = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
-        size_t n_vec_dof = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
-        size_t cell_dof = n_scal_dof + n_vec_dof;
-        
-        RealType scalar_l2_error = 0.0;
-        RealType flux_l2_error = 0.0;
-        size_t cell_i = 0;
-        RealType h;
-        for (auto& cell : msh)
-        {
-            if(cell_i == 0){
-                h = diameter(msh, cell);
-            }
-
-            // scalar evaluation
-            {
-                auto cell_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
-                Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(cell_i*cell_dof+n_vec_dof, 0, n_scal_dof, 1);
-                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
-                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, scal_fun);
-                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
-                Matrix<RealType, Dynamic, 1> diff = real_dofs - scalar_cell_dof;
-                scalar_l2_error += diff.dot(mass*diff);
-
-            }
-
-            // flux evaluation
-            {
-                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
-                auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
-                Matrix<RealType, Dynamic, 1> flux_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_vec_dof, 1);
-                
-                // Error integrals
-                for (auto & point_pair : int_rule) {
-
-                    RealType omega = point_pair.weight();
-                    auto t_dphi = cell_basis.eval_gradients( point_pair.point() );
-                    
-                    Matrix<RealType, 1, 2> grad_uh = Matrix<RealType, 1, 2>::Zero();
-                    for (size_t i = 1; i < t_dphi.rows(); i++){
-                      grad_uh = grad_uh + flux_cell_dof(i-1)*t_dphi.block(i, 0, 1, 2);
-                    }
-
-                    Matrix<RealType, 1, 2> grad_u_exact = Matrix<RealType, 1, 2>::Zero();
-                    grad_u_exact(0,0) =  flux_fun(point_pair.point())[0];
-                    grad_u_exact(0,1) =  flux_fun(point_pair.point())[1];
-                    flux_l2_error += omega * (grad_u_exact - grad_uh).dot(grad_u_exact - grad_uh);
-
-                }
-            }
-
-            cell_i++;
-        }
-        tc.toc();
-        std::cout << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
-        std::cout << green << "Characteristic h size = " << std::endl << h << std::endl;
-        std::cout << green << "L2-norm error = " << std::endl << std::sqrt(scalar_l2_error) << std::endl;
-        std::cout << green << "H1-norm error = " << std::endl << std::sqrt(flux_l2_error) << std::endl;
-        
+        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "L2-norm error = " << std::sqrt(scalar_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
+        error_file.flush();
+
+
     }
     
     /// Compute L2 and H1 errors for two fields approximation
-    static void compute_errors_two_fields_II(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -304,12 +162,81 @@ public:
         tc.toc();
         
         error_file << std::endl;
-        error_file << "Error completed: " << tc << " seconds" << std::endl;
+        std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
         error_file << "L2-norm error = " << std::sqrt(scalar_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
         error_file.flush();
         
+    }
+    
+    /// Compute the discrete acoustic energy for one field approximation
+    static void compute_acoustic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & p_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        size_t cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
+        
+        RealType energy_h = 0.0;
+        
+        size_t cell_ind = 0;
+        for (auto &cell : msh) {
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
+            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
+        
+            energy_h += term_1(0,0);
+        
+            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, p_dof);
+            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
+            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+        
+            energy_h += term_2(0,0);
+            cell_ind++;
+        }
+        energy_h *= 0.5;
+        tc.toc();
+        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
+        energy_file << time << "   " << energy_h << std::endl;
+    }
+    
+    /// Compute the discrete acoustic energy for one field approximation
+    static double compute_acoustic_energy_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_two_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        size_t n_scal_cbs = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_cbs = n_scal_cbs + n_vec_cbs;
+        
+        RealType energy_h = 0.0;
+        
+        size_t cell_ind = 0;
+        for (auto &cell : msh) {
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_dof = x_dof.block(cell_ind*n_cbs, 0, n_cbs, 1);
+            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_dof;
+            Matrix<RealType, 1, 1> term = cell_dof.transpose() * cell_mass_tested;
+        
+            energy_h += term(0,0);
+    
+            cell_ind++;
+        }
+        energy_h *= 0.5;
+        tc.toc();
+        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
+        energy_file << time << "   " << energy_h << std::endl;
+        return energy_h;
     }
     
     // Write a silo file for one field approximation

@@ -351,10 +351,7 @@ public:
         size_t cell_ind = 0;
         for (auto& cell : msh)
         {
-            acoustic_material_data<T> & material = m_material[cell_ind];
-            auto scal_basis = disk::make_scalar_monomial_basis(msh, cell, m_hho_di.cell_degree());
-            Matrix<T, Dynamic, Dynamic> mass_matrix = disk::make_mass_matrix(msh, cell, scal_basis);
-            mass_matrix *= (1.0/(material.rho()*material.vp()*material.vp()));
+            Matrix<T, Dynamic, Dynamic> mass_matrix = mass_operator(cell_ind,msh,cell);
             scatter_mass_data(msh, cell, mass_matrix);
             cell_ind++;
         }
@@ -379,9 +376,19 @@ public:
         acoustic_material_data<T> & material = m_material[cell_ind];
         return (1.0/material.rho())*R_operator + material.rho()*S_operator;
     }
+    
+    Matrix<T, Dynamic, Dynamic> mass_operator(size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell){
+
+        acoustic_material_data<T> & material = m_material[cell_ind];
+        auto scal_basis = disk::make_scalar_monomial_basis(msh, cell, m_hho_di.cell_degree());
+        Matrix<T, Dynamic, Dynamic> mass_matrix = disk::make_mass_matrix(msh, cell, scal_basis);
+        mass_matrix *= (1.0/(material.rho()*material.vp()*material.vp()));
+        return mass_matrix;
+    }
             
     void classify_cells(const Mesh& msh){
 
+        m_elements_with_bc_eges.clear();
         size_t cell_ind = 0;
         for (auto& cell : msh)
         {

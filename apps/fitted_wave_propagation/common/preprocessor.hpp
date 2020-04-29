@@ -88,24 +88,26 @@ public:
     static void PrintHelp()
     {
         std::cout <<
-                "-k <int>:           Face polynomial degree: default 0\n"
-                "-l <int>:           Number of uniform space refinements: default 0\n"
-                "-s <0-1>:           Stabilization type 0 -> HHO, 1 -> HDG: default 0 \n"
-                "-n <int>:           Number of uniform time refinements: default 0\n"
-                "-f <string>:        Write silo files to\n"
-                "-help:              Show help\n";
+                "-k <int>:  Face polynomial degree: default 0\n"
+                "-l <int>:  Number of uniform space refinements: default 0\n"
+                "-s <0-1>:  Stabilization type 0 -> HHO, 1 -> HDG-like: default 0 \n"
+                "-n <int>:  Number of uniform time refinements: default 0\n"
+                "-f <0-1>:  Write silo files: default 0\n"
+                "-e <0-1>:  Report (time,energy) pairs: default 0\n"
+                "-help:     Show help\n";
         exit(1);
     }
 
     static simulation_data process_args(int argc, char** argv)
     {
-        const char* const short_opts = "k:l:s:n:f:";
+        const char* const short_opts = "k:l:s:n:f:e:";
         const option long_opts[] = {
                 {"degree", required_argument, nullptr, 'k'},
                 {"xref", required_argument, nullptr, 'l'},
                 {"stab", required_argument, nullptr, 's'},
                 {"tref", required_argument, nullptr, 'n'},
-                {"file", required_argument, nullptr, 'f'},
+                {"file", optional_argument, nullptr, 'f'},
+                {"energy", optional_argument, nullptr, 'e'},
                 {"help", no_argument, nullptr, 'h'},
                 {nullptr, no_argument, nullptr, 0}
         };
@@ -115,6 +117,7 @@ public:
         size_t nt_divs   = 0;
         bool hdg_Q = false;
         bool silo_files_Q = false;
+        bool report_energy_Q = false;
         
         while (true)
         {
@@ -145,6 +148,11 @@ public:
                 silo_files_Q = std::stoi(optarg);
                 break;
 
+            case 'e':
+                report_energy_Q = std::stoi(optarg);
+                break;
+                    
+
             case 'h': // -h or --help
             case '?': // Unrecognized option
             default:
@@ -160,30 +168,30 @@ public:
         sim_data.m_hdg_stabilization_Q = hdg_Q;
         sim_data.m_nt_divs = nt_divs;
         sim_data.m_render_silo_files_Q = silo_files_Q;
+        sim_data.m_report_energy_Q = report_energy_Q;
         return sim_data;
     }
     
     static void PrintTestHelp()
     {
         std::cout <<
-                "-k <int>:           Maximum Face polynomial degree: default 0\n"
-                "-l <int>:           Maximum Number of uniform space refinements: default 0\n"
-                "-s <0-1>:           Stabilization type 0 -> HHO, 1 -> HDG: default 0 \n"
-                "-q <0-1>:           Quadratic function type 0 -> non-polynomial, 1 -> quadratic: default 0 \n"
-                "-f <string>:        Write silo files to\n"
-                "-help:              Show help\n";
+                "-k <int>:  Maximum Face polynomial degree: default 0\n"
+                "-l <int>:  Maximum Number of uniform space refinements: default 0\n"
+                "-s <0-1>:  Stabilization type 0 -> HHO, 1 -> HDG-like: default 0 \n"
+                "-q <0-1>:  Quadratic function type 0 -> non-polynomial, 1 -> quadratic: default 0 \n"
+                "-f <0-1>:  Write silo files : default 0\n"
+                "-help:     Show help\n";
         exit(1);
     }
     
     static simulation_data process_convergence_test_args(int argc, char** argv)
     {
-        const char* const short_opts = "k:l:s:n:q:f:";
+        const char* const short_opts = "k:l:s:q:f:";
         const option long_opts[] = {
                 {"degree", required_argument, nullptr, 'k'},
                 {"xref", required_argument, nullptr, 'l'},
                 {"stab", required_argument, nullptr, 's'},
-                {"tref", required_argument, nullptr, 'n'},
-                {"file", required_argument, nullptr, 'f'},
+                {"file", optional_argument, nullptr, 'f'},
                 {"qfunc", optional_argument, nullptr, 'q'},
                 {"help", no_argument, nullptr, 'h'},
                 {nullptr, no_argument, nullptr, 0}
@@ -214,9 +222,6 @@ public:
 
             case 's':
                 hdg_Q = std::stoi(optarg);
-                break;
-                    
-            case 'n':
                 break;
 
             case 'q':
