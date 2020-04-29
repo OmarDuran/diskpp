@@ -78,8 +78,8 @@ int main(int argc, char **argv)
 
     
 //    // Examples solving the laplacian with optimal HHO convergence properties
-//    HHOTwoFieldsConvergenceExample(argc, argv);
-    HHOOneFieldConvergenceExample(argc, argv);
+    HHOTwoFieldsConvergenceExample(argc, argv);
+//    HHOOneFieldConvergenceExample(argc, argv);
     
     return 0;
 }
@@ -261,8 +261,8 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             tc.tic();
             RealType lx = 1.0;
             RealType ly = 1.0;
-            size_t nx = 4;
-            size_t ny = 4;
+            size_t nx = 2;
+            size_t ny = 2;
             mesh_type msh;
             
             cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -288,14 +288,15 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             }
             assembler.load_material_data(msh,material);
             assembler.assemble(msh, rhs_fun);
-            assembler.assemble_mass(msh);
+            assembler.assemble_mass(msh, false);
+            assembler.apply_bc(msh);
             tc.toc();
             std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
             
             // Solving LS
             tc.tic();
             SparseLU<SparseMatrix<RealType>> analysis;
-            analysis.analyzePattern(assembler.LHS);
+            analysis.analyzePattern(assembler.LHS+assembler.MASS);
             analysis.factorize(assembler.LHS+assembler.MASS);
             Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS); // new state
             tc.toc();
