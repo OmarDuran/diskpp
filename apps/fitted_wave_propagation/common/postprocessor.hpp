@@ -9,12 +9,6 @@
 #ifndef postprocessor_hpp
 #define postprocessor_hpp
 
-#include <stdio.h>
-#include "../common/one_field_assembler.hpp"
-#include "../common/one_field_vectorial_assembler.hpp"
-#include "../common/two_fields_assembler.hpp"
-#include "../common/three_fields_vectorial_assembler.hpp"
-
 #include "../common/acoustic_one_field_assembler.hpp"
 #include "../common/acoustic_two_fields_assembler.hpp"
 #include "../common/elastodynamic_one_field_assembler.hpp"
@@ -168,75 +162,6 @@ public:
         error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
         error_file.flush();
         
-    }
-    
-    /// Compute the discrete acoustic energy for one field approximation
-    static void compute_acoustic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & p_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
-
-        timecounter tc;
-        tc.tic();
-
-        using RealType = double;
-        auto dim = Mesh::dimension;
-        size_t cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
-        
-        RealType energy_h = 0.0;
-        
-        size_t cell_ind = 0;
-        for (auto &cell : msh) {
-            
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
-            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
-            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
-        
-            energy_h += term_1(0,0);
-        
-            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, p_dof);
-            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
-            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
-        
-            energy_h += term_2(0,0);
-            cell_ind++;
-        }
-        energy_h *= 0.5;
-        tc.toc();
-        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
-        energy_file << time << "   " << energy_h << std::endl;
-    }
-    
-    /// Compute the discrete acoustic energy for one field approximation
-    static double compute_acoustic_energy_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_two_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
-
-        timecounter tc;
-        tc.tic();
-
-        using RealType = double;
-        auto dim = Mesh::dimension;
-        size_t n_scal_cbs = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
-        size_t n_vec_cbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
-        size_t n_cbs = n_scal_cbs + n_vec_cbs;
-        
-        RealType energy_h = 0.0;
-        
-        size_t cell_ind = 0;
-        for (auto &cell : msh) {
-            
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_dof = x_dof.block(cell_ind*n_cbs, 0, n_cbs, 1);
-            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_dof;
-            Matrix<RealType, 1, 1> term = cell_dof.transpose() * cell_mass_tested;
-        
-            energy_h += term(0,0);
-    
-            cell_ind++;
-        }
-        energy_h *= 0.5;
-        tc.toc();
-        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
-        energy_file << time << "   " << energy_h << std::endl;
-        return energy_h;
     }
     
     // Write a silo file for one field approximation
@@ -495,7 +420,7 @@ public:
     }
     
     /// Compute L2 and H1 errors for one field vectorial approximation
-    static void compute_errors_one_field_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, one_field_vectorial_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun){
+    static void compute_errors_one_field_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_one_field_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -506,15 +431,15 @@ public:
         
         RealType vector_l2_error = 0.0;
         RealType flux_l2_error = 0.0;
-        size_t cell_i = 0;
         RealType h;
+        size_t cell_ind = 0;
         for (auto& cell : msh)
         {
-            if(cell_i == 0){
+            if(cell_ind == 0){
                 h = diameter(msh, cell);
             }
 
-            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_i*cell_dof, 0, cell_dof, 1);
+            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
 
             // scalar evaluation
             {
@@ -527,6 +452,10 @@ public:
 
             }
 
+            elastic_material_data<RealType> material = assembler.get_material_data()[cell_ind];
+            RealType mu = material.rho()*material.vs()*material.vs();
+            RealType lambda = material.rho()*material.vp()*material.vp() - 2.0*mu;
+            
             // flux evaluation
             {
                 auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
@@ -553,28 +482,28 @@ public:
                     auto epsilon = disk::eval(GTu, gphi, dim);
                     auto divphi   = cbas_s.eval_functions(point_pair.point());
                     auto trace_epsilon = disk::eval(divu, divphi);
-                    auto sigma = 2.0 * epsilon + trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
+                    auto sigma = 2.0 * mu * epsilon + lambda * trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
                     auto flux_diff = (flux_fun(point_pair.point()) - sigma).eval();
                     flux_l2_error += omega * flux_diff.squaredNorm();
 
                 }
             }
 
-            cell_i++;
+            cell_ind++;
         }
         tc.toc();
-        std::cout << std::endl;
+        error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
-        std::cout << green << "Characteristic h size = " << std::endl << h << std::endl;
-        std::cout << green << "L2-norm error = " << std::endl << std::sqrt(vector_l2_error) << std::endl;
-        std::cout << green << "H1-norm error = " << std::endl << std::sqrt(flux_l2_error) << std::endl;
-
+        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "L2-norm error = " << std::sqrt(vector_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
+        error_file.flush();
 
 
     }
     
     /// Compute L2 and H1 errors for two fields vectorial approximation
-    static void compute_errors_three_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun){
+    static void compute_errors_three_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -644,13 +573,12 @@ public:
             cell_i++;
         }
         tc.toc();
-        std::cout << std::endl;
+        error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
-        std::cout << green << "Characteristic h size = " << std::endl << h << std::endl;
-        std::cout << green << "L2-norm error = " << std::endl << std::sqrt(vector_l2_error) << std::endl;
-        std::cout << green << "H1-norm error = " << std::endl << std::sqrt(flux_l2_error) << std::endl;
-
-
+        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "L2-norm error = " << std::sqrt(vector_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
+        error_file.flush();
 
     }
 
@@ -1018,6 +946,73 @@ public:
         tc.toc();
         std::cout << std::endl;
         std::cout << bold << cyan << "Properties file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
+    
+    /// Compute the discrete acoustic energy for one field approximation
+    static void compute_acoustic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & p_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        size_t cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
+        
+        RealType energy_h = 0.0;
+        
+        size_t cell_ind = 0;
+        for (auto &cell : msh) {
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
+            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
+        
+            energy_h += term_1(0,0);
+        
+            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, p_dof);
+            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
+            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+        
+            energy_h += term_2(0,0);
+            cell_ind++;
+        }
+        energy_h *= 0.5;
+        tc.toc();
+        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
+        energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+    }
+    
+    /// Compute the discrete acoustic energy for one field approximation
+    static void compute_acoustic_energy_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_two_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        size_t n_scal_cbs = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_cbs = n_scal_cbs + n_vec_cbs;
+        
+        RealType energy_h = 0.0;
+        
+        size_t cell_ind = 0;
+        for (auto &cell : msh) {
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_dof = x_dof.block(cell_ind*n_cbs, 0, n_cbs, 1);
+            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_dof;
+            Matrix<RealType, 1, 1> term = cell_dof.transpose() * cell_mass_tested;
+        
+            energy_h += term(0,0);
+    
+            cell_ind++;
+        }
+        energy_h *= 0.5;
+        tc.toc();
+        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
+        energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
     }
     
     // Write a silo file with elastic properties as zonal variables

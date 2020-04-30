@@ -5,11 +5,13 @@
 //  Created by Omar Durán on 4/21/20.
 //
 
+#pragma once
 #ifndef acoustic_two_fields_assembler_hpp
 #define acoustic_two_fields_assembler_hpp
 
 #include "bases/bases.hpp"
 #include "methods/hho"
+#include "../common/acoustic_material_data.hpp"
 
 #ifdef HAVE_INTEL_TBB
 #include <tbb/parallel_for.h>
@@ -302,31 +304,7 @@ public:
         }
         finalize();
     }
-            
-    void apply_bc(const Mesh& msh){
-        
-        #ifdef HAVE_INTEL_TBB
-                size_t n_cells = m_elements_with_bc_eges.size();
-                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
-                    [this,&msh] (size_t & i){
-                        size_t cell_ind = m_elements_with_bc_eges[i];
-                        auto& cell = msh.backend_storage()->surfaces[cell_ind];
-                        Matrix<T, Dynamic, Dynamic> mixed_operator_loc = mixed_operator(cell_ind, msh, cell);
-                        scatter_bc_data(msh, cell, mixed_operator_loc);
-                }
-            );
-        #else
-            auto storage = msh.backend_storage();
-            for (auto& cell_ind : m_elements_with_bc_eges)
-            {
-                auto& cell = storage->surfaces[cell_ind];
-                Matrix<T, Dynamic, Dynamic> mixed_operator_loc = mixed_operator(cell_ind, msh, cell);
-                scatter_bc_data(msh, cell, mixed_operator_loc);
-            }
-        #endif
-        
-    }
-            
+    
     Matrix<T, Dynamic, Dynamic> mixed_operator(size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell){
         acoustic_material_data<T> & material = m_material[cell_ind];
         auto reconstruction_operator   = mixed_scalar_reconstruction(msh, cell);
@@ -351,6 +329,30 @@ public:
         T rho = material.vp();
         T vp = material.vp();
         return R_operator + ((1.0)/(vp*rho))*S_operator;
+    }
+            
+    void apply_bc(const Mesh& msh){
+        
+        #ifdef HAVE_INTEL_TBB
+                size_t n_cells = m_elements_with_bc_eges.size();
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [this,&msh] (size_t & i){
+                        size_t cell_ind = m_elements_with_bc_eges[i];
+                        auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                        Matrix<T, Dynamic, Dynamic> mixed_operator_loc = mixed_operator(cell_ind, msh, cell);
+                        scatter_bc_data(msh, cell, mixed_operator_loc);
+                }
+            );
+        #else
+            auto storage = msh.backend_storage();
+            for (auto& cell_ind : m_elements_with_bc_eges)
+            {
+                auto& cell = storage->surfaces[cell_ind];
+                Matrix<T, Dynamic, Dynamic> mixed_operator_loc = mixed_operator(cell_ind, msh, cell);
+                scatter_bc_data(msh, cell, mixed_operator_loc);
+            }
+        #endif
+        
     }
             
     void assemble_rhs(const Mesh& msh, std::function<double(const typename Mesh::point_type& )> rhs_fun, bool parallele_Q = false){
@@ -385,13 +387,13 @@ public:
         for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
         {
             auto& cell = msh.backend_storage()->surfaces[cell_ind];
-            Matrix<T, Dynamic, Dynamic> mass_matrix = this->mass_operator(cell_ind, msh, cell, add_scalar_mass_Q);
-            this->scatter_mass_data(msh, cell, mass_matrix);
+            Matrix<T, Dynamic, Dynamic> mass_matrix = mass_operator(cell_ind, msh, cell, add_scalar_mass_Q);
+            scatter_mass_data(msh, cell, mass_matrix);
         }
         finalize_mass();
     }
             
-    Matrix<T, Dynamic, Dynamic> mass_operator(size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell, bool add_scalar_mass_Q){
+    Matrix<T, Dynamic, Dynamic> mass_operator(size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell, bool add_scalar_mass_Q = true){
             
         size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
         size_t n_vec_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;

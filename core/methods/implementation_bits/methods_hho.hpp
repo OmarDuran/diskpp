@@ -670,8 +670,6 @@ make_matrix_symmetric_gradrec_RT(const Mesh& msh, const typename Mesh::cell_type
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
 
-    const size_t N = Mesh::dimension;
-
     const auto graddeg = di.grad_degree();
     const auto celdeg  = di.cell_degree();
     const auto facdeg  = di.face_degree();
@@ -1196,8 +1194,7 @@ make_scalar_hho_stabilization(const Mesh&                                       
         const matrix_type proj3 = piKF.solve(MR2 * proj1);
         const matrix_type BRF   = proj2 + proj3;
 
-//        data += BRF.transpose() * face_mass_matrix * BRF / hf;
-        data += BRF.transpose() * face_mass_matrix * BRF;
+        data += BRF.transpose() * face_mass_matrix * BRF / hf;
     }
 
     return data;
@@ -1276,8 +1273,7 @@ make_vector_hho_stabilization(const Mesh&                                       
         const matrix_type proj3 = piKF.solve(MR2 * proj1);
         const matrix_type BRF   = proj2 + proj3;
 
-//        data += BRF.transpose() * face_mass_matrix * BRF / hf;
-        data += BRF.transpose() * face_mass_matrix * BRF;
+        data += BRF.transpose() * face_mass_matrix * BRF / hf;
     }
 
     return data;

@@ -11,6 +11,7 @@
 
 #include "bases/bases.hpp"
 #include "methods/hho"
+#include "../common/acoustic_material_data.hpp"
 
 #ifdef HAVE_INTEL_TBB
 #include <tbb/parallel_for.h>

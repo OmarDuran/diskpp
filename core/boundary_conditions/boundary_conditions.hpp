@@ -279,8 +279,7 @@ class BoundaryConditions
     void
     updateDirichletFunction(const Function& bcf, size_t bcf_index)
     {
-        const size_t bcf_id = m_dirichlet_func.size();
-        assert( 0 <= bcf_index && bcf_index < bcf_id );
+        assert( 0 <= bcf_index && bcf_index < m_dirichlet_func.size() );
         m_dirichlet_func[bcf_index] = bcf;
     }
     
@@ -288,8 +287,7 @@ class BoundaryConditions
     void
     updateNeumannFunction(const Function& bcf, size_t bcf_index)
     {
-        const size_t bcf_id = m_dirichlet_func.size();
-        assert( 0 <= bcf_index && bcf_index < bcf_id );
+        assert( 0 <= bcf_index && bcf_index < m_dirichlet_func.size() );
         m_neumann_func[bcf_index] = bcf;
     }
     
@@ -297,8 +295,7 @@ class BoundaryConditions
     void
     updateRobinFunction(const Function& bcf, size_t bcf_index)
     {
-        const size_t bcf_id = m_dirichlet_func.size();
-        assert( 0 <= bcf_index && bcf_index < bcf_id );
+        assert( 0 <= bcf_index && bcf_index < m_dirichlet_func.size() );
         m_robin_func[bcf_index] = bcf;
     }
     

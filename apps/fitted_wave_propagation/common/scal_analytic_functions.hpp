@@ -9,8 +9,8 @@
 #ifndef scal_analytic_functions_hpp
 #define scal_analytic_functions_hpp
 
-#define contrast 10.0
-#define n_terms 100
+#define contrast 2.0
+#define n_terms 300
 
 class scal_analytic_functions
 {
@@ -391,11 +391,11 @@ class scal_analytic_functions
                                     double qxlvp, qxlvm;
                                     qxlvp = -(8.0)* exp(-(20.0*((k-x-c1*t)-0.2))*(20.0*((k-x-c1*t)-0.2)))*((k-x-c1*t)-0.2);
                                     qxlvm = -(8.0)* exp(-(20.0*((k+x-c1*t)-0.2))*(20.0*((k+x-c1*t)-0.2)))*((k+x-c1*t)-0.2);
-                                    qx+=c*(qxlvp+qxlvm);
+                                    qx+=c1*c1*c*(qxlvp+qxlvm);
                                 }else{
                                     double qxl;
                                     qxl = -(8.0*(c1/c2))*exp(-(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2))*(20.0*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2)))*(((c1/c2)*(x-0.5)+0.5+k-c1*t)-0.2);
-                                    qx+=((2.0*c1)/(c2+c1))*c*qxl;
+                                    qx+=c2*c2*((2.0*c1)/(c2+c1))*c*qxl;
                                 }
                                 c*=(c2-c1)/(c2+c1);
                             }

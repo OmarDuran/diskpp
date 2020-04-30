@@ -67,14 +67,13 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
     
-//    HeterogeneousEHHOFirstOrder(argc, argv);
-//    HeterogeneousIHHOFirstOrder(argc, argv);
+    HeterogeneousEHHOFirstOrder(argc, argv);
     
-    HeterogeneousIHHOSecondOrder(argc, argv);
+//    HeterogeneousIHHOFirstOrder(argc, argv);
+//    HeterogeneousIHHOSecondOrder(argc, argv);
 
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
-    
 //    IHHOSecondOrder(argc, argv);
     
     
@@ -381,7 +380,12 @@ void IHHOSecondOrder(int argc, char **argv){
     bnd.addDirichletEverywhere(exact_scal_fun); // easy because boundary assumes zero every where any time.
     tc.tic();
     auto assembler = acoustic_one_field_assembler<mesh_type>(msh, hho_di, bnd);
-    assembler.load_material_data(msh);
+    
+    // simple material
+    RealType rho = 1.0;
+    RealType vp = 1.0;
+    acoustic_material_data<RealType> material(rho,vp);
+    assembler.load_material_data(msh,material);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
@@ -444,7 +448,8 @@ void IHHOSecondOrder(int argc, char **argv){
             auto exact_scal_fun     = functions.Evaluate_u(t);
             auto exact_flux_fun     = functions.Evaluate_q(t);
             auto rhs_fun            = functions.Evaluate_f(t);
-
+            
+            tc.tic();
             assembler.get_bc_conditions().updateDirichletFunction(exact_scal_fun, 0);
             assembler.assemble_rhs(msh, rhs_fun);
 
@@ -460,7 +465,6 @@ void IHHOSecondOrder(int argc, char **argv){
             tc.tic();
             a_dof_np = analysis.solve(assembler.RHS); // new acceleration
             tc.toc();
-            
             std::cout << bold << cyan << "Solution completed: " << tc << " seconds" << reset << std::endl;
 
             // update scalar and rate
@@ -597,7 +601,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
     }
     
-    bool standar_Q = false;
+    bool standar_Q = true;
     // Newmark process
     {
         Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
@@ -705,11 +709,11 @@ void IHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.2;
+    RealType tf = 1.0;
     RealType dt     = tf/nt;
     
     scal_analytic_functions functions;
-    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_q(t);
@@ -727,17 +731,17 @@ void IHHOFirstOrder(int argc, char **argv){
     bnd.addDirichletEverywhere(exact_vel_fun);
     tc.tic();
     auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
-    assembler.load_material_data(msh);
+    
+    // simple material
+    RealType rho = 1.0;
+    RealType vp = 1.0;
+    acoustic_material_data<RealType> material(rho,vp);
+    assembler.load_material_data(msh,material);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
     tc.toc();
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
-    
-    tc.tic();
-    assembler.classify_cells(msh);
-    tc.toc();
-    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
     
     tc.tic();
     assembler.assemble_mass(msh);
@@ -749,9 +753,17 @@ void IHHOFirstOrder(int argc, char **argv){
     assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
     assembler.project_over_faces(msh, x_dof, exact_vel_fun);
     
-    size_t it = 0;
-    std::string silo_file_name = "scalar_mixed_";
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "scalar_mixed_";
         postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+    }
+    
+    std::ofstream simulation_log("acoustic_two_fields.txt");
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+    }
     
     // Solving a first order equation HDG/HHO propagation problem
     Matrix<RealType, Dynamic, Dynamic> a;
@@ -796,7 +808,6 @@ void IHHOFirstOrder(int argc, char **argv){
             Matrix<double, Dynamic, 1> Fg, Fg_c,xd;
             xd = Matrix<double, Dynamic, 1>::Zero(n_dof, 1);
             
-            RealType t;
             Matrix<double, Dynamic, 1> yn, ki;
 
             x_dof_n = x_dof;
@@ -830,25 +841,33 @@ void IHHOFirstOrder(int argc, char **argv){
         auto exact_vel_fun = functions.Evaluate_v(t);
         auto exact_flux_fun = functions.Evaluate_q(t);
         
-        std::string silo_file_name = "scalar_mixed_";
+        if (sim_data.m_render_silo_files_Q) {
+            std::string silo_file_name = "scalar_mixed_";
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+        }
+        
+        if (sim_data.m_report_energy_Q) {
+            postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+        }
         
         if(it == nt){
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
         }
 
     }
     
-    std::cout << green << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-    std::cout << green << "Number of DIRK steps   =  " << s << reset << std::endl;
-    std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
-    std::cout << green << "Step size =  " << dt << reset << std::endl;
+    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+    simulation_log << "Number of DIRK steps =  " << s << std::endl;
+    simulation_log << "Number of time steps =  " << nt << std::endl;
+    simulation_log << "Step size =  " << dt << std::endl;
+    simulation_log.flush();
     
 }
 
 void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     
+    // An explicit pseudo-energy conserving time-integration scheme for Hamiltonian dynamics
     using RealType = double;
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
@@ -858,7 +877,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.01;
+    RealType ly = 0.25;
     size_t nx = 10;
     size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
@@ -908,12 +927,12 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         y = pt.y();
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
-        rho = 1.0;
         if (x < 0.5) {
             vp = 10.0;
         }else{
             vp = 1.0;
         }
+        rho = 1.0/(vp*vp); // this is required to make both formulation compatible keeping kappa = 1
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
         return mat_data;
@@ -930,11 +949,6 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     postprocessor<mesh_type>::write_silo_acoustic_property_map(silo_file_props_name, msh, assembler.get_material_data());
     
     tc.tic();
-    assembler.classify_cells(msh);
-    tc.toc();
-    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
-    
-    tc.tic();
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
@@ -944,9 +958,17 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
     assembler.project_over_faces(msh, x_dof, exact_vel_fun);
     
-    size_t it = 0;
-    std::string silo_file_name = "scalar_mixed_";
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "scalar_mixed_";
         postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+    }
+    
+    std::ofstream simulation_log("acoustic_two_fields.txt");
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+    }
     
     // Solving a first order equation HDG/HHO propagation problem
     Matrix<RealType, Dynamic, Dynamic> a;
@@ -960,7 +982,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     if (is_sdirk_Q) {
         dirk_butcher_tableau::sdirk_tables(s, a, b, c);
     }else{
-        dirk_butcher_tableau::odirk_tables(s, a, b, c);
+        dirk_butcher_tableau::dirk_tables(s, a, b, c);
     }
     
     tc.tic();
@@ -991,7 +1013,6 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
             Matrix<double, Dynamic, 1> Fg, Fg_c,xd;
             xd = Matrix<double, Dynamic, 1>::Zero(n_dof, 1);
             
-            ;
             Matrix<double, Dynamic, 1> yn, ki;
 
             x_dof_n = x_dof;
@@ -1024,20 +1045,28 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         t = tn + dt;
         auto exact_vel_fun = functions.Evaluate_v(t);
         auto exact_flux_fun = functions.Evaluate_q(t);
-        std::string silo_file_name = "scalar_mixed_";
+        
+        if (sim_data.m_render_silo_files_Q) {
+            std::string silo_file_name = "scalar_mixed_";
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+        }
+        
+        if (sim_data.m_report_energy_Q) {
+            postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+        }
         
         if(it == nt){
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
         }
 
     }
     
-    std::cout << green << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-    std::cout << green << "Number of DIRK steps   =  " << s << reset << std::endl;
-    std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
-    std::cout << green << "Step size =  " << dt << reset << std::endl;
+    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+    simulation_log << "Number of DIRK steps =  " << s << std::endl;
+    simulation_log << "Number of time steps =  " << nt << std::endl;
+    simulation_log << "Step size =  " << dt << std::endl;
+    simulation_log.flush();
     
 }
 
@@ -1102,11 +1131,6 @@ void EHHOFirstOrder(int argc, char **argv){
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     tc.tic();
-    assembler.classify_cells(msh);
-    tc.toc();
-    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
-    
-    tc.tic();
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
@@ -1116,9 +1140,18 @@ void EHHOFirstOrder(int argc, char **argv){
     assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
     assembler.project_over_faces(msh, x_dof, exact_vel_fun);
     
-    size_t it = 0;
-    std::string silo_file_name = "scalar_mixed_";
+    
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "scalar_mixed_";
         postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+    }
+    
+    std::ofstream simulation_log("acoustic_two_fields_explicit.txt");
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+    }
     
     // Solving a first order equation HDG/HHO propagation problem
     int s = 3;
@@ -1174,19 +1207,27 @@ void EHHOFirstOrder(int argc, char **argv){
         t = tn + dt;
         auto exact_vel_fun = functions.Evaluate_v(t);
         auto exact_flux_fun = functions.Evaluate_q(t);
-
-        std::string silo_file_name = "scalar_mixed_";
+        
+        if (sim_data.m_render_silo_files_Q) {
+            std::string silo_file_name = "scalar_mixed_";
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+        }
+        
+        if (sim_data.m_report_energy_Q) {
+            postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+        }
 
         if(it == nt){
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
         }
     }
     
-    std::cout << green << "Number of SSPRK steps   =  " << s << reset << std::endl;
-    std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
-    std::cout << green << "Step size =  " << dt << reset << std::endl;
+    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+    simulation_log << "Number of SSPRKSS steps =  " << s << std::endl;
+    simulation_log << "Number of time steps =  " << nt << std::endl;
+    simulation_log << "Step size =  " << dt << std::endl;
+    simulation_log.flush();
 }
 
 void HeterogeneousEHHOFirstOrder(int argc, char **argv){
@@ -1200,7 +1241,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.01;
+    RealType ly = 0.25;
     size_t nx = 10;
     size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
@@ -1221,7 +1262,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.25;
+    RealType tf = 0.5;
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
@@ -1252,7 +1293,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
         RealType rho, vp;
         rho = 1.0;
         if (x < 0.5) {
-            vp = 1.0;
+            vp = 2.0;
         }else{
             vp = 1.0;
         }
@@ -1269,11 +1310,6 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     tc.tic();
-    assembler.classify_cells(msh);
-    tc.toc();
-    std::cout << bold << cyan << "Element classification completed: " << tc << " seconds" << reset << std::endl;
-    
-    tc.tic();
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
@@ -1283,9 +1319,17 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
     assembler.project_over_faces(msh, x_dof, exact_vel_fun);
     
-    size_t it = 0;
-    std::string silo_file_name = "scalar_mixed_";
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "scalar_mixed_";
         postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+    }
+    
+    std::ofstream simulation_log("acoustic_two_fields_explicit.txt");
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+    }
     
     // Solving a first order equation HDG/HHO propagation problem
     int s = 3;
@@ -1341,18 +1385,26 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
         t = tn + dt;
         auto exact_vel_fun = functions.Evaluate_v(t);
         auto exact_flux_fun = functions.Evaluate_q(t);
-
-        std::string silo_file_name = "scalar_mixed_";
+        
+        if (sim_data.m_render_silo_files_Q) {
+            std::string silo_file_name = "scalar_mixed_";
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+        }
+        
+        if (sim_data.m_report_energy_Q) {
+            postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+        }
 
         if(it == nt){
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
         }
     }
     
-    std::cout << green << "Number of SSPRK steps   =  " << s << reset << std::endl;
-    std::cout << green << "Number of time steps =  " << nt << reset << std::endl;
-    std::cout << green << "Step size =  " << dt << reset << std::endl;
+    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+    simulation_log << "Number of SSPRKSS steps =  " << s << std::endl;
+    simulation_log << "Number of time steps =  " << nt << std::endl;
+    simulation_log << "Step size =  " << dt << std::endl;
+    simulation_log.flush();
     
 }
