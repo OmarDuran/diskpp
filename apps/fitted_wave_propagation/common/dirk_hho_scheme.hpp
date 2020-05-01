@@ -21,7 +21,7 @@ class dirk_hho_scheme
     SparseMatrix<double> m_Mg;
     SparseMatrix<double> m_Kg;
     Matrix<double, Dynamic, 1> m_Fg;
-#ifdef HAVE_INTEL_MKL_FADE
+#ifdef HAVE_INTEL_MKL
     PardisoLU<Eigen::SparseMatrix<double>>  m_analysis;
 #else
     SparseLU<Eigen::SparseMatrix<double>>   m_analysis;
@@ -29,7 +29,7 @@ class dirk_hho_scheme
     
     public:
     
-    dirk_hho_scheme(SparseMatrix<double> Kg, Matrix<double, Dynamic, 1> Fg, SparseMatrix<double> & Mg){
+    dirk_hho_scheme(SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg, SparseMatrix<double> & Mg){
         
         m_Mg = Mg;
         m_Kg = Kg;
@@ -37,7 +37,7 @@ class dirk_hho_scheme
         m_scale = 0.0;
     }
     
-    dirk_hho_scheme(SparseMatrix<double> Kg, Matrix<double, Dynamic, 1> Fg, SparseMatrix<double> & Mg, double scale){
+    dirk_hho_scheme(SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg, SparseMatrix<double> & Mg, double scale){
         
         m_Mg = Mg;
         m_Kg = Kg;
@@ -53,7 +53,7 @@ class dirk_hho_scheme
     }
     
 
-    #ifdef HAVE_INTEL_MKL_FADE
+    #ifdef HAVE_INTEL_MKL
         PardisoLU<Eigen::SparseMatrix<double>> & DirkAnalysis(){
             return m_analysis;
         }

@@ -398,9 +398,7 @@ public:
             auto n_s_cols = stabilization_operator.cols();
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }
-        
-//        T h_cell = diameter(msh, cell); // to eliminate SI dimension inconsistency.
-//        Matrix<T, Dynamic, Dynamic> mixed_elastic_hho_operator = R_operator + D_operator + ((h_cell*2.0*mu)/vs)*S_operator;
+            
         return R_operator + D_operator + ((2.0*mu)/vs)*S_operator;
     }
             
@@ -594,6 +592,12 @@ public:
             for (size_t i = 0; i < fcs.size(); i++)
             {
                 auto face = fcs[i];
+                auto fc_id = msh.lookup(face);
+                bool is_dirichlet_Q = m_bnd.is_dirichlet_face(fc_id);
+                if (is_dirichlet_Q)
+                {
+                    continue;
+                }
                 Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
                 scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
             }
@@ -623,9 +627,10 @@ public:
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        
-        Matrix<T, Dynamic, 1> x_el(n_vec_cbs + num_faces * n_fbs );
-        x_el.block(0, 0, n_vec_cbs, 1) = x_glob.block(cell_ofs * n_cbs + n_ten_cbs + n_sca_cbs, 0, n_vec_cbs, 1);
+        size_t n_dof = n_cbs + num_faces * n_fbs;
+            
+        Matrix<T, Dynamic, 1> x_el(n_dof);
+        x_el.block(0, 0, n_cbs, 1) = x_glob.block(cell_ofs * n_cbs, 0, n_cbs, 1);
         auto fcs = faces(msh, cl);
         for (size_t i = 0; i < fcs.size(); i++)
         {
@@ -640,13 +645,13 @@ public:
                 auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
-                x_el.block(n_vec_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
+                x_el.block(n_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
             }
             else
             {
                 auto face_ofs = disk::priv::offset(msh, fc);
                 auto global_ofs = n_cbs * msh.cells_size() + m_compress_indexes.at(face_ofs)*n_fbs;
-                x_el.block(n_vec_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
+                x_el.block(n_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
             }
         }
         return x_el;
@@ -851,6 +856,21 @@ public:
             m_material.push_back(material);
         }
     }
+            
+    void load_material_data(const Mesh& msh, std::function<std::vector<double>(const typename Mesh::point_type& )> elastic_mat_fun){
+        m_material.clear();
+        m_material.reserve(msh.cells_size());
+        for (auto& cell : msh)
+        {
+            auto bar = barycenter(msh, cell);
+            std::vector<double> mat_data = elastic_mat_fun(bar);
+            T rho = mat_data[0];
+            T vp = mat_data[1];
+            T vs = mat_data[2];
+            elastic_material_data<T> material(rho,vp,vs);
+            m_material.push_back(material);
+        }
+    }
      
     void load_material_data(const Mesh& msh){
         m_material.clear();
@@ -862,23 +882,6 @@ public:
         size_t cell_i = 0;
         for (auto& cell : msh)
         {
-            m_material.push_back(material);
-            cell_i++;
-        }
-    }
-      
-    void load_material_data(const Mesh& msh, std::function<std::vector<double>(const typename Mesh::point_type& )> elastic_mat_fun){
-        m_material.clear();
-        m_material.reserve(msh.cells_size());
-        size_t cell_i = 0;
-        for (auto& cell : msh)
-        {
-            auto bar = barycenter(msh, cell);
-            std::vector<double> mat_data = elastic_mat_fun(bar);
-            T rho = mat_data[0];
-            T vp = mat_data[1];
-            T vs = mat_data[2];
-            elastic_material_data<T> material(rho,vp,vs);
             m_material.push_back(material);
             cell_i++;
         }

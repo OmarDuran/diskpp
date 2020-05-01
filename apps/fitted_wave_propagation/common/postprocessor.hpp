@@ -1015,6 +1015,80 @@ public:
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
     }
     
+    /// Compute the discrete elastic energy for one field approximation
+    static void compute_elastic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & u_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        
+        RealType energy_h = 0.0;
+        
+        size_t cell_ind = 0;
+        for (auto &cell : msh) {
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
+            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
+        
+            energy_h += term_1(0,0);
+        
+            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, u_dof);
+            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
+            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+        
+            energy_h += term_2(0,0);
+            cell_ind++;
+        }
+        energy_h *= 0.5;
+        tc.toc();
+        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
+        energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+    }
+    
+    /// Compute the discrete acoustic energy for one field approximation
+    static void compute_elastic_energy_three_fields(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_three_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_sca_cbs = disk::scalar_basis_size(hho_di.face_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        
+        RealType energy_h = 0.0;
+        
+        size_t cell_ind = 0;
+        for (auto &cell : msh) {
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+            Matrix<RealType, Dynamic, 1> x_dof_loc = assembler.gather_dof_data(msh, cell, x_dof);
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix_v = mass_matrix.block(n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs, n_vec_cbs, n_vec_cbs);
+            Matrix<RealType, Dynamic, 1> v_dof = x_dof_loc.block(n_ten_cbs + n_sca_cbs, 0, n_vec_cbs, 1);
+            Matrix<RealType, Dynamic, 1> v_mass_tested = mass_matrix_v * v_dof;
+            Matrix<RealType, 1, 1> term_1 = v_dof.transpose() * v_mass_tested;
+            energy_h += term_1(0,0);
+            
+            Matrix<RealType, Dynamic, Dynamic> mass_matrix_stress = mass_matrix.block(0, 0, n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs);
+            Matrix<RealType, Dynamic, 1> sigma_dof = x_dof_loc.block(0, 0, n_ten_cbs + n_sca_cbs, 1);
+            Matrix<RealType, Dynamic, 1> epsilon_mass = mass_matrix_stress * sigma_dof;
+            Matrix<RealType, 1, 1> term_2 = sigma_dof.transpose() * epsilon_mass;
+            energy_h += term_2(0,0);
+    
+            cell_ind++;
+        }
+        energy_h *= 0.5;
+        tc.toc();
+        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
+        energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+    }
+    
     // Write a silo file with elastic properties as zonal variables
     static void write_silo_elastic_property_map(std::string silo_file_name, Mesh & msh, std::vector< elastic_material_data<double> > & material){
 

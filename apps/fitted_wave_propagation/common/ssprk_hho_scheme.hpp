@@ -30,7 +30,7 @@ class ssprk_hho_scheme
     
     public:
     
-    ssprk_hho_scheme(SparseMatrix<double> Kg, Matrix<double, Dynamic, 1> Fg, SparseMatrix<double> & Mg, size_t n_f_dof){
+    ssprk_hho_scheme(SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg, SparseMatrix<double> & Mg, size_t n_f_dof){
         
         
         m_n_c_dof = Kg.rows() - n_f_dof;

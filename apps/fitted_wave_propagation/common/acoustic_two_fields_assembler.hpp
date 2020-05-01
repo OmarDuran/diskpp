@@ -699,7 +699,6 @@ public:
     void load_material_data(const Mesh& msh, std::function<std::vector<double>(const typename Mesh::point_type& )> acoustic_mat_fun){
         m_material.clear();
         m_material.reserve(msh.cells_size());
-        size_t cell_i = 0;
         for (auto& cell : msh)
         {
             auto bar = barycenter(msh, cell);
@@ -708,7 +707,6 @@ public:
             T vp = mat_data[1];
             acoustic_material_data<T> material(rho,vp);
             m_material.push_back(material);
-            cell_i++;
         }
     }
             

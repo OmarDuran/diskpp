@@ -428,6 +428,12 @@ public:
             for (size_t i = 0; i < fcs.size(); i++)
             {
                 auto face = fcs[i];
+                auto fc_id = msh.lookup(face);
+                bool is_dirichlet_Q = m_bnd.is_dirichlet_face(fc_id);
+                if (is_dirichlet_Q)
+                {
+                    continue;
+                }
                 Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
                 scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
             }
@@ -509,6 +515,21 @@ public:
         m_material.reserve(msh.cells_size());
         for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
         {
+            m_material.push_back(material);
+        }
+    }
+            
+    void load_material_data(const Mesh& msh, std::function<std::vector<double>(const typename Mesh::point_type& )> elastic_mat_fun){
+        m_material.clear();
+        m_material.reserve(msh.cells_size());
+        for (auto& cell : msh)
+        {
+            auto bar = barycenter(msh, cell);
+            std::vector<double> mat_data = elastic_mat_fun(bar);
+            T rho = mat_data[0];
+            T vp = mat_data[1];
+            T vs = mat_data[2];
+            elastic_material_data<T> material(rho,vp,vs);
             m_material.push_back(material);
         }
     }
