@@ -326,7 +326,7 @@ public:
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }
 
-        T rho = material.vp();
+        T rho = material.rho();
         T vp = material.vp();
         return R_operator + ((1.0)/(vp*rho))*S_operator;
     }

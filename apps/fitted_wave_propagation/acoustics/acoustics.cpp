@@ -76,13 +76,13 @@ int main(int argc, char **argv)
 //
 //    HeterogeneousEHHOFirstOrder(argc, argv);
 //
-//    HeterogeneousIHHOFirstOrder(argc, argv);
+    HeterogeneousIHHOFirstOrder(argc, argv);
 //
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
 //    EHHOFirstOrder(argc, argv);
 //
-    IHHOFirstOrder(argc, argv);
+//    IHHOFirstOrder(argc, argv);
     
 //    IHHOSecondOrder(argc, argv);
     
@@ -513,7 +513,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.01;
+    RealType ly = 0.2;
     size_t nx = 10;
     size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
@@ -886,7 +886,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.25;
+    RealType ly = 0.2;
     size_t nx = 10;
     size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
@@ -911,7 +911,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
-    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionInhomogeneousInSpace);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_q(t);
@@ -985,8 +985,8 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     Matrix<RealType, Dynamic, 1> c;
     
     // DIRK(s) schemes
-    int s = 2;
-    bool is_sdirk_Q = false;
+    int s = 3;
+    bool is_sdirk_Q = true;
     
     if (is_sdirk_Q) {
         dirk_butcher_tableau::sdirk_tables(s, a, b, c);
