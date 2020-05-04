@@ -1058,6 +1058,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
             Matrix<RealType, Dynamic, 1> res = Kg*u_dof_n;
 
+            assembler.RHS.setZero();
             assembler.RHS -= res;
             tc.toc();
             std::cout << bold << cyan << "Rhs assembly completed: " << tc << " seconds" << reset << std::endl;

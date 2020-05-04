@@ -16,6 +16,8 @@ set(fitted_waves_headers ${fitted_waves_headers}
 	${CMAKE_CURRENT_SOURCE_DIR}/acoustic_two_fields_assembler.hpp	
 	${CMAKE_CURRENT_SOURCE_DIR}/elastodynamic_one_field_assembler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/elastodynamic_three_fields_assembler.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/fitted_geometry_builders.hpp	
+	${CMAKE_CURRENT_SOURCE_DIR}/linear_solver.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/dirk_hho_scheme.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ssprk_hho_scheme.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/dirk_butcher_tableau.hpp	

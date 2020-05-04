@@ -14,6 +14,9 @@
 #include "../common/elastodynamic_one_field_assembler.hpp"
 #include "../common/elastodynamic_three_fields_assembler.hpp"
 
+#ifdef HAVE_INTEL_TBB
+#include <tbb/parallel_for.h>
+#endif
 
 template<typename Mesh>
 class postprocessor {
@@ -86,8 +89,8 @@ public:
         error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
-        error_file << "L2-norm error = " << std::sqrt(scalar_l2_error) << std::endl;
-        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file.flush();
 
 
@@ -158,8 +161,8 @@ public:
         error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
-        error_file << "L2-norm error = " << std::sqrt(scalar_l2_error) << std::endl;
-        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file.flush();
         
     }
@@ -495,8 +498,8 @@ public:
         error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
-        error_file << "L2-norm error = " << std::sqrt(vector_l2_error) << std::endl;
-        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file.flush();
 
 
@@ -576,8 +579,8 @@ public:
         error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
-        error_file << "L2-norm error = " << std::sqrt(vector_l2_error) << std::endl;
-        error_file << "H1-norm error = " << std::sqrt(flux_l2_error) << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file.flush();
 
     }
@@ -958,27 +961,52 @@ public:
         auto dim = Mesh::dimension;
         size_t cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
         
-        RealType energy_h = 0.0;
+        std::vector<RealType> energy_vec(msh.cells_size());
+        #ifdef HAVE_INTEL_TBB
+                size_t n_cells = msh.cells_size();
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [&msh,&assembler,&energy_vec,&p_dof,&v_dof,&cell_dof] (size_t & cell_ind){
+                            auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+                            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
+                            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
+                            
+                            energy_vec[cell_ind] = term_1(0,0);
+                
+                            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
+                            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, p_dof);
+                            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
+                            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+                
+                            energy_vec[cell_ind] += term_2(0,0);
+                }
+            );
+        #else
+            for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
+            {
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+                Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
+                Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
+                
+                energy_vec[cell_ind] = term_1(0,0);
+    
+                Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
+                Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, p_dof);
+                Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
+                Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+    
+                energy_vec[cell_ind] += term_2(0,0);
         
-        size_t cell_ind = 0;
-        for (auto &cell : msh) {
-            
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
-            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
-            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
-        
-            energy_h += term_1(0,0);
-        
-            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, p_dof);
-            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
-            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
-        
-            energy_h += term_2(0,0);
-            cell_ind++;
-        }
+            }
+        #endif
+    
+        RealType energy_h = std::accumulate(energy_vec.begin(), energy_vec.end(),0.0);
         energy_h *= 0.5;
+        
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
@@ -995,21 +1023,37 @@ public:
         size_t n_vec_cbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
         size_t n_cbs = n_scal_cbs + n_vec_cbs;
         
-        RealType energy_h = 0.0;
-        
-        size_t cell_ind = 0;
-        for (auto &cell : msh) {
+        std::vector<RealType> energy_vec(msh.cells_size());
+        #ifdef HAVE_INTEL_TBB
+                size_t n_cells = msh.cells_size();
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [&msh,&assembler,&energy_vec,&x_dof,&n_cbs] (size_t & cell_ind){
+                            auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                            Matrix<RealType, Dynamic, 1> cell_dof = x_dof.block(cell_ind*n_cbs, 0, n_cbs, 1);
+                            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_dof;
+                            Matrix<RealType, 1, 1> term = cell_dof.transpose() * cell_mass_tested;
+                            energy_vec[cell_ind] = term(0,0);
+                }
+            );
+        #else
+            for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
+            {
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                Matrix<RealType, Dynamic, 1> cell_dof = x_dof.block(cell_ind*n_cbs, 0, n_cbs, 1);
+                Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_dof;
+                Matrix<RealType, 1, 1> term = cell_dof.transpose() * cell_mass_tested;
             
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_dof = x_dof.block(cell_ind*n_cbs, 0, n_cbs, 1);
-            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_dof;
-            Matrix<RealType, 1, 1> term = cell_dof.transpose() * cell_mass_tested;
+                energy_vec[cell_ind] = term(0,0);
         
-            energy_h += term(0,0);
+            }
+        #endif
     
-            cell_ind++;
-        }
+        RealType energy_h = std::accumulate(energy_vec.begin(), energy_vec.end(),0.0);
         energy_h *= 0.5;
+        
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
@@ -1024,27 +1068,52 @@ public:
         using RealType = double;
         size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         
-        RealType energy_h = 0.0;
+        std::vector<RealType> energy_vec(msh.cells_size());
+        #ifdef HAVE_INTEL_TBB
+                size_t n_cells = msh.cells_size();
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [&msh,&assembler,&energy_vec,&u_dof,&v_dof,&cell_dof] (size_t & cell_ind){
+                            auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+                            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
+                            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
+                            
+                            energy_vec[cell_ind] = term_1(0,0);
+
+                            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
+                            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, u_dof);
+                            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
+                            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+
+                            energy_vec[cell_ind] += term_2(0,0);
+                }
+            );
+        #else
+            for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
+            {
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+                Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
+                Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
+                
+                energy_vec[cell_ind] = term_1(0,0);
+
+                Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
+                Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, u_dof);
+                Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
+                Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+
+                energy_vec[cell_ind] += term_2(0,0);
         
-        size_t cell_ind = 0;
-        for (auto &cell : msh) {
-            
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_alpha_dof_n_v = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
-            Matrix<RealType, Dynamic, 1> cell_mass_tested = mass_matrix * cell_alpha_dof_n_v;
-            Matrix<RealType, 1, 1> term_1 = cell_alpha_dof_n_v.transpose() * cell_mass_tested;
-        
-            energy_h += term_1(0,0);
-        
-            Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, u_dof);
-            Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
-            Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
-        
-            energy_h += term_2(0,0);
-            cell_ind++;
-        }
+            }
+        #endif
+
+        RealType energy_h = std::accumulate(energy_vec.begin(), energy_vec.end(),0.0);
         energy_h *= 0.5;
+        
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
@@ -1061,29 +1130,54 @@ public:
         size_t n_sca_cbs = disk::scalar_basis_size(hho_di.face_degree(), Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         
-        RealType energy_h = 0.0;
+        std::vector<RealType> energy_vec(msh.cells_size());
+        #ifdef HAVE_INTEL_TBB
+                size_t n_cells = msh.cells_size();
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [&msh,&assembler,&energy_vec,&x_dof,&n_ten_cbs,&n_sca_cbs,&n_vec_cbs] (size_t & cell_ind){
+                            auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                            Matrix<RealType, Dynamic, 1> x_dof_loc = assembler.gather_dof_data(msh, cell, x_dof);
+                            
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix_v = mass_matrix.block(n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs, n_vec_cbs, n_vec_cbs);
+                            Matrix<RealType, Dynamic, 1> v_dof = x_dof_loc.block(n_ten_cbs + n_sca_cbs, 0, n_vec_cbs, 1);
+                            Matrix<RealType, Dynamic, 1> v_mass_tested = mass_matrix_v * v_dof;
+                            Matrix<RealType, 1, 1> term_1 = v_dof.transpose() * v_mass_tested;
+                            energy_vec[cell_ind] = term_1(0,0);
+                            
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix_stress = mass_matrix.block(0, 0, n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs);
+                            Matrix<RealType, Dynamic, 1> sigma_dof = x_dof_loc.block(0, 0, n_ten_cbs + n_sca_cbs, 1);
+                            Matrix<RealType, Dynamic, 1> epsilon_mass = mass_matrix_stress * sigma_dof;
+                            Matrix<RealType, 1, 1> term_2 = sigma_dof.transpose() * epsilon_mass;
+                            energy_vec[cell_ind] += term_2(0,0);
+                }
+            );
+        #else
+            for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
+            {
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                Matrix<RealType, Dynamic, 1> x_dof_loc = assembler.gather_dof_data(msh, cell, x_dof);
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix_v = mass_matrix.block(n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs, n_vec_cbs, n_vec_cbs);
+                Matrix<RealType, Dynamic, 1> v_dof = x_dof_loc.block(n_ten_cbs + n_sca_cbs, 0, n_vec_cbs, 1);
+                Matrix<RealType, Dynamic, 1> v_mass_tested = mass_matrix_v * v_dof;
+                Matrix<RealType, 1, 1> term_1 = v_dof.transpose() * v_mass_tested;
+                energy_vec[cell_ind] = term_1(0,0);
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix_stress = mass_matrix.block(0, 0, n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs);
+                Matrix<RealType, Dynamic, 1> sigma_dof = x_dof_loc.block(0, 0, n_ten_cbs + n_sca_cbs, 1);
+                Matrix<RealType, Dynamic, 1> epsilon_mass = mass_matrix_stress * sigma_dof;
+                Matrix<RealType, 1, 1> term_2 = sigma_dof.transpose() * epsilon_mass;
+                energy_vec[cell_ind] += term_2(0,0);
         
-        size_t cell_ind = 0;
-        for (auto &cell : msh) {
-            
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
-            Matrix<RealType, Dynamic, 1> x_dof_loc = assembler.gather_dof_data(msh, cell, x_dof);
-            
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix_v = mass_matrix.block(n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs, n_vec_cbs, n_vec_cbs);
-            Matrix<RealType, Dynamic, 1> v_dof = x_dof_loc.block(n_ten_cbs + n_sca_cbs, 0, n_vec_cbs, 1);
-            Matrix<RealType, Dynamic, 1> v_mass_tested = mass_matrix_v * v_dof;
-            Matrix<RealType, 1, 1> term_1 = v_dof.transpose() * v_mass_tested;
-            energy_h += term_1(0,0);
-            
-            Matrix<RealType, Dynamic, Dynamic> mass_matrix_stress = mass_matrix.block(0, 0, n_ten_cbs + n_sca_cbs, n_ten_cbs + n_sca_cbs);
-            Matrix<RealType, Dynamic, 1> sigma_dof = x_dof_loc.block(0, 0, n_ten_cbs + n_sca_cbs, 1);
-            Matrix<RealType, Dynamic, 1> epsilon_mass = mass_matrix_stress * sigma_dof;
-            Matrix<RealType, 1, 1> term_2 = sigma_dof.transpose() * epsilon_mass;
-            energy_h += term_2(0,0);
+            }
+        #endif
     
-            cell_ind++;
-        }
+        RealType energy_h = std::accumulate(energy_vec.begin(), energy_vec.end(),0.0);
         energy_h *= 0.5;
+        
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;

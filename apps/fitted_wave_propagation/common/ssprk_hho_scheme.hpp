@@ -23,8 +23,14 @@ class ssprk_hho_scheme
     SparseMatrix<double> m_Kfc;
     SparseMatrix<double> m_Sff;
     Matrix<double, Dynamic, 1> m_Fc;
-    SparseLU<SparseMatrix<double>> m_analysis_c;
-    SparseLU<SparseMatrix<double>> m_analysis_f;
+
+    #ifdef HAVE_INTEL_MKL
+        PardisoLU<Eigen::SparseMatrix<double>>  m_analysis_c;
+        PardisoLU<Eigen::SparseMatrix<double>>  m_analysis_f;
+    #else
+        SparseLU<SparseMatrix<double>> m_analysis_c;
+        SparseLU<SparseMatrix<double>> m_analysis_f;
+    #endif
     size_t m_n_c_dof;
     size_t m_n_f_dof;
     
@@ -57,13 +63,24 @@ class ssprk_hho_scheme
         m_analysis_f.factorize(m_Sff);
     }
     
-    SparseLU<SparseMatrix<double>> & CellsAnalysis(){
-        return m_analysis_c;
-    }
-    
-    SparseLU<SparseMatrix<double>> & FacesAnalysis(){
-        return m_analysis_f;
-    }
+
+    #ifdef HAVE_INTEL_MKL
+        PardisoLU<Eigen::SparseMatrix<double>> & CellsAnalysis(){
+            return m_analysis_c;
+        }
+        
+        PardisoLU<Eigen::SparseMatrix<double>> & FacesAnalysis(){
+            return m_analysis_f;
+        }
+    #else
+        SparseLU<SparseMatrix<double>> & CellsAnalysis(){
+            return m_analysis_c;
+        }
+        
+        SparseLU<SparseMatrix<double>> & FacesAnalysis(){
+            return m_analysis_f;
+        }
+    #endif
     
     SparseMatrix<double> & Mc(){
         return m_Mc;
