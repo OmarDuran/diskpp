@@ -9,149 +9,206 @@
 #ifndef linear_solver_hpp
 #define linear_solver_hpp
 
-#include <stdio.h>
 
+#ifdef HAVE_INTEL_TBB
+#include <tbb/parallel_for.h>
+#endif
+
+template<typename Mesh>
 class linear_solver
 {
+    using T = typename Mesh::coordinate_type;
+    
     private:
 
-    SparseMatrix<double> m_Kcc;
-    SparseMatrix<double> m_Kcf;
-    SparseMatrix<double> m_Kfc;
-    Matrix<double, Dynamic, 1> m_Fc;
-    Matrix<double, Dynamic, 1> m_Ff;
+    SparseMatrix<T> m_Kcc;
+    SparseMatrix<T> m_Kcf;
+    SparseMatrix<T> m_Kfc;
+    SparseMatrix<T> m_Kff;
+    Matrix<T, Dynamic, 1> m_Fc;
+    Matrix<T, Dynamic, 1> m_Ff;
     
-    SparseMatrix<double> m_K;
-    Matrix<double, Dynamic, 1> m_F;
+    SparseMatrix<T> m_Kcc_inv;
+    SparseMatrix<T> m_K;
+    Matrix<T, Dynamic, 1> m_F;
     
     #ifdef HAVE_INTEL_MKL
-        PardisoLU<Eigen::SparseMatrix<double>>  m_analysis_c;
-        PardisoLU<Eigen::SparseMatrix<double>>  m_analysis;
+        PardisoLU<Eigen::SparseMatrix<T>>  m_analysis;
     #else
-        SparseLU<SparseMatrix<double>> m_analysis_c;
-        SparseLU<SparseMatrix<double>> m_analysis;
+        SparseLU<SparseMatrix<T>> m_analysis;
     #endif
 
     size_t m_n_c_dof;
     size_t m_n_f_dof;
-    bool m_static_condensation_Q;
+    bool m_global_sc_Q;
     bool m_is_decomposed_Q;
     
-    void DecomposeCellTerm(){
-        m_analysis_c.analyzePattern(m_Kcc);
-        m_analysis_c.factorize(m_Kcc);
-    }
     
     void DecomposeK(){
         m_analysis.analyzePattern(m_K);
         m_analysis.factorize(m_K);
     }
     
-    Matrix<double, Dynamic, 1> solve_global(Matrix<double, Dynamic, 1> & Fg){
-        Matrix<double, Dynamic, 1> x_dof = m_analysis.solve(Fg);
+    Matrix<T, Dynamic, 1> solve_global(Matrix<T, Dynamic, 1> & Fg){
+        Matrix<T, Dynamic, 1> x_dof = m_analysis.solve(Fg);
         return x_dof;
     }
     
-    void SetFg(Matrix<double, Dynamic, 1> & Fg){
+    void scatter_segments(Matrix<T, Dynamic, 1> & Fg){
         assert(m_n_c_dof + m_n_f_dof == Fg.rows());
         m_Fc = Fg.block(0, 0, m_n_c_dof, 1);
         m_Ff = Fg.block(m_n_c_dof, 0, m_n_f_dof, 1);
     }
     
-    Matrix<double, Dynamic, 1> solve_sc(Matrix<double, Dynamic, 1> & Fg){
+    Matrix<T, Dynamic, 1> solve_sc(Matrix<T, Dynamic, 1> & Fg){
         
-        SetFg(Fg);
-        Matrix<double, Dynamic, 1> delta_c = m_analysis_c.solve(m_Fc);
+        scatter_segments(Fg);
+        Matrix<T, Dynamic, 1> delta_c = m_Kcc_inv*m_Fc;
         m_F = m_Ff - m_Kfc*delta_c;
+        Matrix<T, Dynamic, 1> x_n_f_dof = m_analysis.solve(m_F);
         
-        Matrix<double, Dynamic, 1> x_n_f_dof = m_analysis.solve(m_F);
-        
-        Matrix<double, Dynamic, 1> Kcf_x_f_dof = m_Kcf*x_n_f_dof;
-        Matrix<double, Dynamic, 1> delta_f = m_analysis_c.solve(Kcf_x_f_dof);
-        Matrix<double, Dynamic, 1> x_n_c_dof = delta_c - delta_f;
+        Matrix<T, Dynamic, 1> Kcf_x_f_dof = m_Kcf*x_n_f_dof;
+        Matrix<T, Dynamic, 1> delta_f = m_Kcc_inv*Kcf_x_f_dof;
+        Matrix<T, Dynamic, 1> x_n_c_dof = delta_c - delta_f;
         
         // Composing global solution
-        Matrix<double, Dynamic, 1> x_dof = Matrix<double, Dynamic, 1>::Zero(m_n_c_dof+m_n_f_dof,1);
+        Matrix<T, Dynamic, 1> x_dof = Matrix<T, Dynamic, 1>::Zero(m_n_c_dof+m_n_f_dof,1);
         x_dof.block(0, 0, m_n_c_dof, 1) = x_n_c_dof;
         x_dof.block(m_n_c_dof, 0, m_n_f_dof, 1) = x_n_f_dof;
         return x_dof;
+
     }
     
-    void factorize_sc(){
-        if (m_is_decomposed_Q) {
-            return;
-        }
-        DecomposeCellTerm();
-        DecomposeK();
-        m_is_decomposed_Q = true;
-    }
-    
-    void factorize_global(){
-        if (m_is_decomposed_Q) {
-            return;
-        }
-        DecomposeK();
-        m_is_decomposed_Q = true;
+    void scatter_blocks(SparseMatrix<T> & Kg){
+        
+        m_n_c_dof = Kg.rows() - m_n_f_dof;
+        
+        // scattering matrix blocks
+        m_Kcc = Kg.block(0, 0, m_n_c_dof, m_n_c_dof);
+        m_Kcf = Kg.block(0, m_n_c_dof, m_n_c_dof, m_n_f_dof);
+        m_Kfc = Kg.block(m_n_c_dof,0, m_n_f_dof, m_n_c_dof);
+        m_Kff = Kg.block(m_n_c_dof,m_n_c_dof, m_n_f_dof, m_n_f_dof);
+        m_is_decomposed_Q = false;
     }
     
     public:
     
-    linear_solver(SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg) : m_static_condensation_Q(false), m_is_decomposed_Q(false) {
-        SetK(Kg);
+    linear_solver(SparseMatrix<T> & Kg) : m_K(Kg), m_global_sc_Q(false), m_is_decomposed_Q(false)  {
+
     }
     
-    linear_solver(SparseMatrix<double> & K, SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg, size_t n_f_dof) : m_static_condensation_Q(true), m_is_decomposed_Q(false) {
-        SetK(K);
-        SetKg(Kg,n_f_dof);
-        SetFg(Fg);
+    linear_solver(SparseMatrix<T> & Kg, size_t n_f_dof) :
+        m_n_f_dof(n_f_dof),
+        m_global_sc_Q(true),
+        m_is_decomposed_Q(false) {
+        scatter_blocks(Kg);
     }
         
-    SparseMatrix<double> & Kcc(){
+    SparseMatrix<T> & Kcc(){
         return m_Kcc;
     }
     
-    SparseMatrix<double> & Kcf(){
+    SparseMatrix<T> & Kcf(){
         return m_Kcf;
     }
     
-    SparseMatrix<double> & Kfc(){
+    SparseMatrix<T> & Kfc(){
         return m_Kfc;
     }
 
-    Matrix<double, Dynamic, 1> & Fc(){
+    Matrix<T, Dynamic, 1> & Fc(){
         return m_Fc;
     }
     
-    void SetKg(SparseMatrix<double> & Kg, size_t n_f_dof){
-        m_n_c_dof = Kg.rows() - n_f_dof;
-        m_n_f_dof = n_f_dof;
+    void condense_equations(std::pair<size_t,size_t> cell_basis_data){
         
-        // scattering matrix blocks
-        m_Kcc = Kg.block(0, 0, m_n_c_dof, m_n_c_dof);
-        m_Kcf = Kg.block(0, m_n_c_dof, m_n_c_dof, n_f_dof);
-        m_Kfc = Kg.block(m_n_c_dof,0, n_f_dof, m_n_c_dof);
-        m_is_decomposed_Q = false;
-    }
-    
-    void SetK(SparseMatrix<double> & K){
-        m_K = K;
-        m_is_decomposed_Q = false;
-    }
-    
-    void factorize(){
-        if (m_static_condensation_Q) {
-            return factorize_sc();
-        }else{
-            return factorize_global();
+        if (!m_global_sc_Q) {
+            return;
         }
+        
+        size_t n_cells = cell_basis_data.first;
+        size_t n_cbs   = cell_basis_data.second;
+        size_t nnz_cc = n_cbs*n_cbs*n_cells;
+        std::vector< Triplet<T> > triplets_cc;
+        triplets_cc.resize(nnz_cc);
+        m_Kcc_inv = SparseMatrix<T>( m_n_c_dof, m_n_c_dof );
+        #ifdef HAVE_INTEL_TBB2
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [this,&triplets_cc,&n_cbs] (size_t & cell_ind){
+                    
+                    size_t stride_eq = cell_ind * n_cbs;
+                    size_t stride_l = cell_ind * n_cbs * n_cbs;
+
+                    SparseMatrix<T> K_cc_loc = m_Kcc.block(stride_eq, stride_eq, n_cbs, n_cbs);
+                    SparseLU<SparseMatrix<T>> analysis_cc;
+                    analysis_cc.analyzePattern(K_cc_loc);
+                    analysis_cc.factorize(K_cc_loc);
+                    Matrix<T, Dynamic, Dynamic> K_cc_inv_loc = analysis_cc.solve(Matrix<T, Dynamic, Dynamic>::Identity(n_cbs, n_cbs));
+            
+                    size_t l = 0;
+                    for (size_t i = 0; i < K_cc_inv_loc.rows(); i++)
+                    {
+                        for (size_t j = 0; j < K_cc_inv_loc.cols(); j++)
+                        {
+                            triplets_cc[stride_l+l] = Triplet<T>(stride_eq+i, stride_eq+j, K_cc_inv_loc(i,j));
+                            l++;
+                        }
+                    }
+                }
+            );
+        #else
+
+            for (size_t cell_ind = 0; cell_ind < n_cells; cell_ind++)
+            {
+                size_t stride_eq = cell_ind * n_cbs;
+                size_t stride_l = cell_ind * n_cbs * n_cbs;
+                
+                SparseMatrix<T> K_cc_loc = m_Kcc.block(stride_eq, stride_eq, n_cbs, n_cbs);
+                SparseLU<SparseMatrix<T>> analysis_cc;
+                analysis_cc.analyzePattern(K_cc_loc);
+                analysis_cc.factorize(K_cc_loc);
+                Matrix<T, Dynamic, Dynamic> K_cc_inv_loc = analysis_cc.solve(Matrix<T, Dynamic, Dynamic>::Identity(n_cbs, n_cbs));
+        
+                size_t l = 0;
+                for (size_t i = 0; i < K_cc_inv_loc.rows(); i++)
+                {
+                    for (size_t j = 0; j < K_cc_inv_loc.cols(); j++)
+                    {
+                        triplets_cc[stride_l+l] = Triplet<T>(stride_eq+i, stride_eq+j, K_cc_inv_loc(i,j));
+                        l++;
+                    }
+                }
+
+            }
+        #endif
+        
+        m_Kcc_inv.setFromTriplets( triplets_cc.begin(), triplets_cc.end() );
+        triplets_cc.clear();
+        m_K = m_Kff - m_Kfc*m_Kcc_inv*m_Kcf;
+        m_is_decomposed_Q = false;
+        return;
+
     }
         
-    Matrix<double, Dynamic, 1> solve(Matrix<double, Dynamic, 1> & Fg){
-        if (m_static_condensation_Q) {
+    void factorize(){
+        if (m_is_decomposed_Q) {
+            return;
+        }
+        DecomposeK();
+        m_is_decomposed_Q = true;
+    }
+        
+    Matrix<T, Dynamic, 1> solve(Matrix<T, Dynamic, 1> & Fg){
+        if (m_global_sc_Q) {
             return solve_sc(Fg);
         }else{
             return solve_global(Fg);
         }
+    }
+    
+    size_t n_equations(){
+        size_t n_equations = m_K.rows();
+        return n_equations;
     }
         
 };

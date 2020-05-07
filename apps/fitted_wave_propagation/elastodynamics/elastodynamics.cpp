@@ -33,6 +33,7 @@ using namespace Eigen;
 // application common sources
 #include "../common/display_settings.hpp"
 #include "../common/fitted_geometry_builders.hpp"
+#include "../common/linear_solver.hpp"
 #include "../common/vec_analytic_functions.hpp"
 #include "../common/preprocessor.hpp"
 #include "../common/postprocessor.hpp"
@@ -62,7 +63,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-    HeterogeneousIHHOFirstOrder(argc, argv);
+//    HeterogeneousIHHOFirstOrder(argc, argv);
     
 //    HeterogeneousIHHOSecondOrder(argc, argv);
     
@@ -75,7 +76,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-//    HHOThreeFieldsConvergenceExample(argc, argv);
+    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
 }
@@ -207,14 +208,42 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
             std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
             
             // Solving LS
-            tc.tic();
-            SparseLU<SparseMatrix<RealType>> analysis;
-            analysis.analyzePattern(assembler.LHS);
-            analysis.factorize(assembler.LHS);
-            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS);
-            tc.toc();
-            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            Matrix<RealType, Dynamic, 1> x_dof;
+            if (sim_data.m_sc_Q) {
+                tc.tic();
+                linear_solver<mesh_type> analysis(assembler.LHS,assembler.get_n_face_dof());
+                analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations (SC) : " << analysis.n_equations() << reset << std::endl;
+            }else{
+                tc.tic();
+                linear_solver<mesh_type> analysis(assembler.LHS);
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
+            }
             
             // Computing errors
             postprocessor<mesh_type>::compute_errors_one_field_vectorial(msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun,error_file);
@@ -357,14 +386,43 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
             std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
             
             // Solving LS
-            tc.tic();
-            SparseLU<SparseMatrix<RealType>> analysis;
-            analysis.analyzePattern(assembler.LHS+assembler.MASS);
-            analysis.factorize(assembler.LHS+assembler.MASS);
-            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS); // new state
-            tc.toc();
-            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+            Matrix<RealType, Dynamic, 1> x_dof;
+            if (sim_data.m_sc_Q) {
+                tc.tic();
+                SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
+                linear_solver<mesh_type> analysis(Kg,assembler.get_n_face_dof());
+                analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations (SC) : " << analysis.n_equations() << reset << std::endl;
+            }else{
+                tc.tic();
+                SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
+                linear_solver<mesh_type> analysis(Kg);
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
+            }
             
             // Computing errors
             postprocessor<mesh_type>::compute_errors_three_fields_vectorial(msh, hho_di, x_dof, exact_vec_fun, exact_flux_fun, error_file);

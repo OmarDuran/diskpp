@@ -34,6 +34,7 @@ using namespace Eigen;
 // application common sources
 #include "../common/display_settings.hpp"
 #include "../common/fitted_geometry_builders.hpp"
+#include "../common/linear_solver.hpp"
 #include "../common/acoustic_material_data.hpp"
 #include "../common/scal_analytic_functions.hpp"
 #include "../common/preprocessor.hpp"
@@ -76,10 +77,11 @@ int main(int argc, char **argv)
 //
 //    HeterogeneousEHHOFirstOrder(argc, argv);
 //
-    HeterogeneousIHHOFirstOrder(argc, argv);
+//    HeterogeneousIHHOFirstOrder(argc, argv);
 //
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
+    
 //    EHHOFirstOrder(argc, argv);
 //
 //    IHHOFirstOrder(argc, argv);
@@ -193,14 +195,41 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
             std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
             
             // Solving LS
-            tc.tic();
-            SparseLU<SparseMatrix<RealType>> analysis;
-            analysis.analyzePattern(assembler.LHS);
-            analysis.factorize(assembler.LHS);
-            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS);
-            tc.toc();
-            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+            Matrix<RealType, Dynamic, 1> x_dof;
+            if (sim_data.m_sc_Q) {
+                tc.tic();
+                linear_solver<mesh_type> analysis(assembler.LHS,assembler.get_n_face_dof());
+                analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations (SC) : " << analysis.n_equations() << reset << std::endl;
+            }else{
+                tc.tic();
+                linear_solver<mesh_type> analysis(assembler.LHS);
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
+            }
             
             // Computing errors
             postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun,error_file);
@@ -270,7 +299,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
     
     std::ofstream error_file("steady_scalar_mixed_error.txt");
     
-    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+    for(size_t k = 1; k <= sim_data.m_k_degree; k++){
         std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
         error_file << "Approximation with k : " << k << std::endl;
         for(size_t l = 0; l <= sim_data.m_n_divs; l++){
@@ -313,14 +342,43 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
             
             // Solving LS
-            tc.tic();
-            SparseLU<SparseMatrix<RealType>> analysis;
-            analysis.analyzePattern(assembler.LHS+assembler.MASS);
-            analysis.factorize(assembler.LHS+assembler.MASS);
-            Matrix<RealType, Dynamic, 1> x_dof = analysis.solve(assembler.RHS); // new state
-            tc.toc();
-            std::cout << bold << cyan << "Number of equations : " << assembler.RHS.rows() << reset << std::endl;
-            std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+            Matrix<RealType, Dynamic, 1> x_dof;
+            if (sim_data.m_sc_Q) {
+                tc.tic();
+                SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
+                linear_solver<mesh_type> analysis(Kg,assembler.get_n_face_dof());
+                analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations (SC) : " << analysis.n_equations() << reset << std::endl;
+            }else{
+                tc.tic();
+                SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
+                linear_solver<mesh_type> analysis(Kg);
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
+            }
             
             // Computing errors
             postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, error_file);
@@ -535,7 +593,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     }
     RealType ti = 0.0;
     RealType tf = 0.5;
-    RealType dt     = tf/nt;
+    RealType dt     = (tf-ti)/nt;
 
     
     scal_analytic_functions functions;
@@ -566,12 +624,13 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         y = pt.y();
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
-        rho = 1.0;
         if (x < 0.5) {
-            vp = 10.0;
+            vp = 100.0;
         }else{
             vp = 1.0;
         }
+//        rho = 1.0/(vp*vp); // this is required to make both formulations compatible by keeping kappa = 1
+        rho = 1.0;
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
         return mat_data;
@@ -601,7 +660,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
         std::string silo_file_name = "scalar_";
-        postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+        postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, v_dof_n, exact_vel_fun, false);
     }
     
     std::ofstream simulation_log("acoustic_one_field.txt");
@@ -619,7 +678,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         RealType gamma = 0.5;
         if (!standar_Q) {
             RealType kappa = 0.25;
-            gamma = 1.5;
+            gamma = 0.75;
             beta = kappa*(gamma+0.5)*(gamma+0.5);
         }
         
@@ -628,7 +687,11 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         SparseMatrix<double> Kg = assembler.LHS;
         assembler.LHS *= beta*(dt*dt);
         assembler.LHS += assembler.MASS;
-        SparseLU<SparseMatrix<RealType>> analysis;
+        #ifdef HAVE_INTEL_MKL
+            PardisoLU<Eigen::SparseMatrix<double>>  analysis;
+        #else
+            SparseLU<SparseMatrix<RealType>> analysis;
+        #endif
         analysis.analyzePattern(assembler.LHS);
         analysis.factorize(assembler.LHS);
         tc.toc();
@@ -641,6 +704,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             // Manufactured solution
             RealType t = dt*it+ti;
             auto exact_scal_fun     = functions.Evaluate_u(t);
+            auto exact_vel_fun      = functions.Evaluate_v(t);
             auto exact_flux_fun     = functions.Evaluate_q(t);
             auto rhs_fun            = functions.Evaluate_f(t);
 
@@ -669,7 +733,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "scalar_";
-                postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
+                postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, v_dof_n, exact_vel_fun, false);
             }
             
             if (sim_data.m_report_energy_Q) {
@@ -937,11 +1001,11 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
         if (x < 0.5) {
-            vp = 10.0;
+            vp = 100.0;
         }else{
             vp = 1.0;
         }
-        rho = 1.0/(vp*vp); // this is required to make both formulation compatible keeping kappa = 1
+        rho = 1.0/(vp*vp); // this is required to make both formulations compatible by keeping kappa = 1
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
         return mat_data;
@@ -1541,7 +1605,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
     Matrix<RealType, Dynamic, 1> c;
     
     // DIRK(s) schemes
-    int s = 2;
+    int s = 3;
     bool is_sdirk_Q = true;
     
     if (is_sdirk_Q) {
@@ -1745,7 +1809,7 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
         RealType gamma = 0.5;
         if (!standar_Q) {
             RealType kappa = 0.25;
-            gamma = 0.5125;
+            gamma = 1.0;
             beta = kappa*(gamma+0.5)*(gamma+0.5);
         }
         
@@ -1754,7 +1818,11 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
         SparseMatrix<double> Kg = assembler.LHS;
         assembler.LHS *= beta*(dt*dt);
         assembler.LHS += assembler.MASS;
-        SparseLU<SparseMatrix<RealType>> analysis;
+        #ifdef HAVE_INTEL_MKL
+            PardisoLU<Eigen::SparseMatrix<double>>  analysis;
+        #else
+            SparseLU<SparseMatrix<RealType>> analysis;
+        #endif
         analysis.analyzePattern(assembler.LHS);
         analysis.factorize(assembler.LHS);
         tc.toc();

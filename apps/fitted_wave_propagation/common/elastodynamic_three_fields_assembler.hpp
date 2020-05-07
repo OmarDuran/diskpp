@@ -11,6 +11,7 @@
 
 #include "bases/bases.hpp"
 #include "methods/hho"
+#include "../common/assembly_index.hpp"
 #include "../common/elastic_material_data.hpp"
 
 #ifdef HAVE_INTEL_TBB
@@ -38,36 +39,6 @@ class elastodynamic_three_fields_assembler
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
     bool        m_hho_stabilization_Q;
-
-    class assembly_index
-    {
-        size_t  idx;
-        bool    assem;
-
-    public:
-        assembly_index(size_t i, bool as)
-            : idx(i), assem(as)
-        {}
-
-        operator size_t() const
-        {
-            if (!assem)
-                throw std::logic_error("Invalid assembly_index");
-
-            return idx;
-        }
-
-        bool assemble() const
-        {
-            return assem;
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const assembly_index& as)
-        {
-            os << "(" << as.idx << "," << as.assem << ")";
-            return os;
-        }
-    };
 
 public:
 
@@ -681,13 +652,7 @@ public:
         auto glob_offset = n_cbs * n_cells + m_compress_indexes.at(face_offset)*n_fbs;
         x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
     }
-     
-    size_t get_n_face_dof(){
-        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        size_t n_face_dof = (m_n_edges - m_n_essential_edges) * n_fbs;
-        return n_face_dof;
-    }
-            
+                 
     std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
                  Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
     strain_tensor_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell)
@@ -910,6 +875,20 @@ public:
             
     std::vector< elastic_material_data<T> > & get_material_data(){
         return m_material;
+    }
+            
+    size_t get_n_face_dof(){
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        size_t n_face_dof = (m_n_edges - m_n_essential_edges) * n_fbs;
+        return n_face_dof;
+    }
+    
+    size_t get_cell_basis_data(){
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_cbs = n_ten_cbs + n_sca_cbs + n_vec_cbs;
+        return n_cbs;
     }
 };
 
