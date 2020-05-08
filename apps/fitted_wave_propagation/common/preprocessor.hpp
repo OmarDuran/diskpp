@@ -99,7 +99,7 @@ public:
                 "-n <int>:  Number of uniform time refinements: default 0\n"
                 "-f <0-1>:  Write silo files: default 0\n"
                 "-e <0-1>:  Report (time,energy) pairs: default 0\n"
-                "-c <0-1>:  Static Condensation: default 0 \n"
+                "-c <0-1>:  Static Condensation (implicit schemes): default 0 \n"
                 "-help:     Show help\n";
         exit(1);
     }
@@ -193,7 +193,7 @@ public:
                 "-s <0-1>:  Stabilization type 0 -> HHO, 1 -> HDG-like: default 0 \n"
                 "-q <0-1>:  Quadratic function type 0 -> non-polynomial, 1 -> quadratic: default 0 \n"
                 "-f <0-1>:  Write silo files : default 0\n"
-                "-c <0-1>:  Static Condensation: default 0 \n"
+                "-c <0-1>:  Static Condensation (implicit schemes): default 0 \n"
                 "-help:     Show help\n";
         exit(1);
     }

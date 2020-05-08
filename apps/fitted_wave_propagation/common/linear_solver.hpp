@@ -93,6 +93,10 @@ class linear_solver
     
     public:
     
+    linear_solver() : m_global_sc_Q(false), m_is_decomposed_Q(false)  {
+
+    }
+    
     linear_solver(SparseMatrix<T> & Kg) : m_K(Kg), m_global_sc_Q(false), m_is_decomposed_Q(false)  {
 
     }
@@ -103,7 +107,18 @@ class linear_solver
         m_is_decomposed_Q(false) {
         scatter_blocks(Kg);
     }
-        
+    
+    void SetKg(SparseMatrix<T> & Kg){
+        m_global_sc_Q = false;
+        m_K = Kg;
+    }
+
+    void SetKg(SparseMatrix<T> & Kg, size_t n_f_dof){
+        m_global_sc_Q = true;
+        m_n_f_dof = n_f_dof;
+        scatter_blocks(Kg);
+    }
+    
     SparseMatrix<T> & Kcc(){
         return m_Kcc;
     }
@@ -205,6 +220,7 @@ class linear_solver
             return solve_global(Fg);
         }
     }
+    
     
     size_t n_equations(){
         size_t n_equations = m_K.rows();

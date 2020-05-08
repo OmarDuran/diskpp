@@ -11,87 +11,99 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 #include <Eigen/SparseLU>
+#include "../common/linear_solver.hpp"
 
+template<typename Mesh>
 class dirk_hho_scheme
 {
+    using T = typename Mesh::coordinate_type;
     
     private:
 
-    double m_scale;
-    SparseMatrix<double> m_Mg;
-    SparseMatrix<double> m_Kg;
-    Matrix<double, Dynamic, 1> m_Fg;
-#ifdef HAVE_INTEL_MKL
-    PardisoLU<Eigen::SparseMatrix<double>>  m_analysis;
-#else
-    SparseLU<Eigen::SparseMatrix<double>>   m_analysis;
-#endif
+    T m_scale;
+    SparseMatrix<T> m_Mg;
+    SparseMatrix<T> m_Kg;
+    Matrix<T, Dynamic, 1> m_Fg;
+    linear_solver<Mesh>  m_analysis;
+    std::pair<size_t,size_t> m_cell_basis_data;
+    size_t m_n_f_dof;
+    bool m_global_sc_Q;
     
     public:
     
-    dirk_hho_scheme(SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg, SparseMatrix<double> & Mg){
+    dirk_hho_scheme(SparseMatrix<T> & Kg, Matrix<T, Dynamic, 1> & Fg, SparseMatrix<T> & Mg){
         
         m_Mg = Mg;
         m_Kg = Kg;
         m_Fg = Fg;
         m_scale = 0.0;
+        m_global_sc_Q = false;
     }
     
-    dirk_hho_scheme(SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg, SparseMatrix<double> & Mg, double scale){
-        
+    dirk_hho_scheme(SparseMatrix<T> & Kg, Matrix<T, Dynamic, 1> & Fg, SparseMatrix<T> & Mg, T scale){
         m_Mg = Mg;
         m_Kg = Kg;
         m_Fg = Fg;
         m_scale = scale;
-        DecomposeMatrix();
+        m_global_sc_Q = false;
+    }
+    
+    void set_static_condensation_data(std::pair<size_t,size_t> cell_basis_data, size_t n_f_dof){
+        m_cell_basis_data = cell_basis_data;
+        m_n_f_dof = n_f_dof;
+        m_global_sc_Q = true;
+    }
+    
+    void condense_equations(){
+        SparseMatrix<T> K = m_Mg + m_scale * m_Kg;
+        m_analysis.SetKg(K,m_n_f_dof);
+        m_analysis.condense_equations(m_cell_basis_data);
     }
     
     void DecomposeMatrix(){
-        SparseMatrix<double> K = m_Mg + m_scale * m_Kg;
-        m_analysis.analyzePattern(K);
-        m_analysis.factorize(K);
+        if(m_global_sc_Q)
+        {
+            condense_equations();
+        }else{
+            SparseMatrix<T> K = m_Mg + m_scale * m_Kg;
+            m_analysis.SetKg(K);
+        }
+        m_analysis.factorize();
+    }
+
+    linear_solver<Mesh> & DirkAnalysis(){
+        return m_analysis;
     }
     
-
-    #ifdef HAVE_INTEL_MKL
-        PardisoLU<Eigen::SparseMatrix<double>> & DirkAnalysis(){
-            return m_analysis;
-        }
-    #else
-        SparseLU<SparseMatrix<double>> & DirkAnalysis(){
-            return m_analysis;
-        }
-    #endif
-    
-    SparseMatrix<double> & Mg(){
+    SparseMatrix<T> & Mg(){
         return m_Mg;
     }
     
-    SparseMatrix<double> & Kg(){
+    SparseMatrix<T> & Kg(){
         return m_Kg;
     }
     
-    Matrix<double, Dynamic, 1> & Fg(){
+    Matrix<T, Dynamic, 1> & Fg(){
         return m_Fg;
     }
     
-    void SetScale(double & scale){
+    void SetScale(T & scale){
         m_scale = scale;
     }
     
-    void SetFg(Matrix<double, Dynamic, 1> & Fg){
+    void SetFg(Matrix<T, Dynamic, 1> & Fg){
         m_Fg = Fg;
     }
     
-    void irk_weight(Matrix<double, Dynamic, 1> & y, Matrix<double, Dynamic, 1> & k, double dt, double a, bool is_sdirk_Q){
+    void irk_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k, T dt, T a, bool is_sdirk_Q){
     
-        Matrix<double, Dynamic, 1> Fg = this->Fg();
+        Matrix<T, Dynamic, 1> Fg = this->Fg();
         Fg -= Kg()*y;
         
         if (is_sdirk_Q) {
             k = DirkAnalysis().solve(Fg);
         }else{
-            double scale = a * dt;
+            T scale = a * dt;
             SetScale(scale);
             DecomposeMatrix();
             k = DirkAnalysis().solve(Fg);

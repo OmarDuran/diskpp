@@ -349,7 +349,6 @@ public:
             contribute(cell);
         }
     #endif
-        apply_bc(msh);
     }
             
     void assemble_mass(const Mesh& msh, bool add_scalar_mass_Q = true){

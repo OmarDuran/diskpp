@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-    HHOThreeFieldsConvergenceExample(argc, argv);
+//    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
 }

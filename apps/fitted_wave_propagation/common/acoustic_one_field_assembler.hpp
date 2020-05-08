@@ -88,7 +88,7 @@ public:
         classify_cells(msh);
         expand_triplet(msh);
     }
-            
+    
     void scatter_data(const std::pair<size_t,size_t> & dest_indexes, const Mesh& msh, const typename Mesh::cell_type& cl,
              const Matrix<T, Dynamic, Dynamic>& lhs,
              const Matrix<T, Dynamic, 1>& rhs)
@@ -231,7 +231,7 @@ public:
 
     }
             
-    void scatter_mass_data(const size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
+    void scatter_mass_data(const Mesh& msh, const typename Mesh::cell_type& cl,
              const Matrix<T, Dynamic, Dynamic>& mass_matrix)
     {
         size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
@@ -246,8 +246,6 @@ public:
 
         assert( asm_map.size() == mass_matrix.rows() && asm_map.size() == mass_matrix.cols() );
 
-        size_t first_index = cell_ind * n_cbs;
-        size_t l = 0;
         for (size_t i = 0; i < mass_matrix.rows(); i++)
         {
             if (!asm_map[i].assemble())
@@ -256,12 +254,9 @@ public:
             for (size_t j = 0; j < mass_matrix.cols(); j++)
             {
                 if ( asm_map[j].assemble() )
-                    m_mass_triplets[first_index+l] = Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j));
-                    l++;
+                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
             }
         }
-        
-        assert( l == n_cbs);
 
     }
 
@@ -348,23 +343,13 @@ public:
     void assemble_mass(const Mesh& msh){
         
         MASS.setZero();
-        #ifdef HAVE_INTEL_TBB
-                size_t n_cells = msh.cells_size();
-                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
-                    [this,&msh] (size_t & cell_ind){
-                        auto& cell = msh.backend_storage()->surfaces[cell_ind];
-                        Matrix<T, Dynamic, Dynamic> mass_matrix = this->mass_operator(cell_ind,msh,cell);
-                        this->scatter_mass_data(cell_ind,msh, cell, mass_matrix);
-                }
-            );
-        #else
-            for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
-            {
-                auto& cell = msh.backend_storage()->surfaces[cell_ind];
-                Matrix<T, Dynamic, Dynamic> mass_matrix = mass_operator(cell_ind,msh,cell);
-                scatter_mass_data(cell_ind,msh, cell, mass_matrix);
-            }
-        #endif
+        size_t cell_ind = 0;
+        for (auto& cell : msh)
+        {
+            Matrix<T, Dynamic, Dynamic> mass_matrix = mass_operator(cell_ind,msh,cell);
+            scatter_mass_data(msh, cell, mass_matrix);
+            cell_ind++;
+        }
         finalize_mass();
     }
             
@@ -419,7 +404,10 @@ public:
     }
             
     void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<T(const typename Mesh::point_type& )> scal_fun){
-        size_t n_dof = MASS.rows();
+        
+        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+        size_t n_dof = n_cbs * msh.cells_size() + n_fbs * (m_n_edges - m_n_essential_edges);
         x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
         for (auto& cell : msh)
         {
@@ -479,12 +467,12 @@ public:
 
         // expanding global triplets
         m_triplets.resize(last_ind);
-        // expanding global triplets
-        m_mass_triplets.resize(n_cbs*n_cells);
     }
             
-    void clear_triplets(void)
+    void clear(void)
     {
+        m_elements_with_bc_eges.clear();
+        m_f_l_indexes.clear();
         m_triplets.clear();
         m_mass_triplets.clear();
     }
@@ -492,11 +480,13 @@ public:
     void finalize(void)
     {
         LHS.setFromTriplets( m_triplets.begin(), m_triplets.end() );
+        m_triplets.clear();
     }
             
     void finalize_mass(void)
     {
         MASS.setFromTriplets( m_mass_triplets.begin(), m_mass_triplets.end() );
+        m_mass_triplets.clear();
     }
             
     Matrix<T, Dynamic, 1>

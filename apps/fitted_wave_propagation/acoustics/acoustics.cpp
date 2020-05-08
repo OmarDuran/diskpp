@@ -74,11 +74,13 @@ int main(int argc, char **argv)
 //    HeterogeneousPulseIHHOFirstOrder(argc, argv);
 //
 //    HeterogeneousPulseIHHOSecondOrder(argc, argv);
-//
+
+    
+    
 //    HeterogeneousEHHOFirstOrder(argc, argv);
 //
-//    HeterogeneousIHHOFirstOrder(argc, argv);
-//
+    HeterogeneousIHHOFirstOrder(argc, argv);
+
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
@@ -625,12 +627,12 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
         if (x < 0.5) {
-            vp = 100.0;
+            vp = 50.0;
         }else{
             vp = 1.0;
         }
-//        rho = 1.0/(vp*vp); // this is required to make both formulations compatible by keeping kappa = 1
-        rho = 1.0;
+        rho = 1.0/(vp*vp); // this is required to make both formulations compatible by keeping kappa = 1
+//        rho = 1.0;
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
         return mat_data;
@@ -669,6 +671,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
     }
     
+    linear_solver<mesh_type> analysis;
     bool standar_Q = true;
     // Newmark process
     {
@@ -678,24 +681,38 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         RealType gamma = 0.5;
         if (!standar_Q) {
             RealType kappa = 0.25;
-            gamma = 0.75;
+            gamma = 0.6;
             beta = kappa*(gamma+0.5)*(gamma+0.5);
         }
         
         tc.tic();
         assembler.assemble(msh, rhs_fun);
-        SparseMatrix<double> Kg = assembler.LHS;
+        SparseMatrix<RealType> Kg = assembler.LHS;
         assembler.LHS *= beta*(dt*dt);
         assembler.LHS += assembler.MASS;
-        #ifdef HAVE_INTEL_MKL
-            PardisoLU<Eigen::SparseMatrix<double>>  analysis;
-        #else
-            SparseLU<SparseMatrix<RealType>> analysis;
-        #endif
-        analysis.analyzePattern(assembler.LHS);
-        analysis.factorize(assembler.LHS);
         tc.toc();
         std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
+        
+        if (sim_data.m_sc_Q) {
+            tc.tic();
+            analysis.SetKg(assembler.LHS,assembler.get_n_face_dof());
+            analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+            tc.toc();
+            std::cout << bold << cyan << "Equations condensed in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            tc.tic();
+            analysis.factorize();
+            tc.toc();
+            std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+        
+        }else{
+            analysis.SetKg(assembler.LHS);
+            tc.tic();
+            analysis.factorize();
+            tc.toc();
+            std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+        }
         
         for(size_t it = 1; it <= nt; it++){
 
@@ -706,10 +723,10 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             auto exact_scal_fun     = functions.Evaluate_u(t);
             auto exact_vel_fun      = functions.Evaluate_v(t);
             auto exact_flux_fun     = functions.Evaluate_q(t);
-            auto rhs_fun            = functions.Evaluate_f(t);
 
             assembler.get_bc_conditions().updateDirichletFunction(exact_scal_fun, 0);
-            assembler.assemble_rhs(msh, rhs_fun);
+            assembler.RHS.setZero(); // problem with zero rhs
+            assembler.apply_bc(msh);
 
             // Compute intermediate state for scalar and rate
             p_dof_n = p_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
@@ -745,7 +762,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             }
             
         }
-        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+        simulation_log << "Number of equations : " << analysis.n_equations() << std::endl;
         simulation_log << "Number of time steps =  " << nt << std::endl;
         simulation_log << "Step size =  " << dt << std::endl;
         simulation_log.flush();
@@ -857,7 +874,7 @@ void IHHOFirstOrder(int argc, char **argv){
     assembler.assemble(msh, rhs_fun);
     tc.toc();
     std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
-    dirk_hho_scheme dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
+    dirk_hho_scheme<mesh_type> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
     
     if (is_sdirk_Q) {
         double scale = a(0,0) * dt;
@@ -1001,7 +1018,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
         if (x < 0.5) {
-            vp = 100.0;
+            vp = 1.0;
         }else{
             vp = 1.0;
         }
@@ -1062,7 +1079,11 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     assembler.assemble(msh, rhs_fun);
     tc.toc();
     std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
-    dirk_hho_scheme dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
+    dirk_hho_scheme<mesh_type> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
+    
+    if (sim_data.m_sc_Q) {
+        dirk_an.set_static_condensation_data(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()), assembler.get_n_face_dof());
+    }
     
     if (is_sdirk_Q) {
         double scale = a(0,0) * dt;
@@ -1101,7 +1122,8 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
                     auto exact_vel_fun      = functions.Evaluate_v(t);
                     auto rhs_fun            = functions.Evaluate_f(t);
                     assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
-                    assembler.assemble_rhs(msh, rhs_fun);
+                    assembler.RHS.setZero();
+                    assembler.apply_bc(msh);
                     dirk_an.SetFg(assembler.RHS);
                     dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
                 }
@@ -1135,7 +1157,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
 
     }
     
-    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+    simulation_log << "Number of equations : " << dirk_an.DirkAnalysis().n_equations() << std::endl;
     simulation_log << "Number of DIRK steps =  " << s << std::endl;
     simulation_log << "Number of time steps =  " << nt << std::endl;
     simulation_log << "Step size =  " << dt << std::endl;
@@ -1562,7 +1584,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
         RealType rho, vp;
         rho = 1.0;
         if (y < 0.5) {
-            vp = 10.0;
+            vp = 1.0;
         }else{
             vp = 1.0;
         }
@@ -1618,7 +1640,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
     assembler.assemble(msh, null_fun);
     tc.toc();
     std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
-    dirk_hho_scheme dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
+    dirk_hho_scheme<mesh_type> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
     
     if (is_sdirk_Q) {
         double scale = a(0,0) * dt;
@@ -1800,7 +1822,7 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
         postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, ti, p_dof_n, v_dof_n, simulation_log);
     }
     
-    bool standar_Q = false;
+    bool standar_Q = true;
     // Newmark process
     {
         Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
