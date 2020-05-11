@@ -473,7 +473,7 @@ void EHHOFirstOrder(int argc, char **argv){
     RealType dt     = tf/nt;
     
     vec_analytic_functions functions;
-    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_sigma(t);

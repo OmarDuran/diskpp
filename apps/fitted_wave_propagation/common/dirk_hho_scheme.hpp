@@ -97,16 +97,14 @@ class dirk_hho_scheme
     
     void irk_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k, T dt, T a, bool is_sdirk_Q){
     
-        Matrix<T, Dynamic, 1> Fg = this->Fg();
-        Fg -= Kg()*y;
-        
+        m_Fg -= Kg()*y;
         if (is_sdirk_Q) {
-            k = DirkAnalysis().solve(Fg);
+            k = DirkAnalysis().solve(m_Fg);
         }else{
             T scale = a * dt;
             SetScale(scale);
             DecomposeMatrix();
-            k = DirkAnalysis().solve(Fg);
+            k = DirkAnalysis().solve(m_Fg);
         }
     }
     

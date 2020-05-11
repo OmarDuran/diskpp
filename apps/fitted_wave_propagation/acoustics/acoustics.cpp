@@ -45,6 +45,8 @@ using namespace Eigen;
 #include "../common/dirk_butcher_tableau.hpp"
 
 // explicit RK schemes
+#include "../common/erk_hho_scheme.hpp"
+#include "../common/erk_butcher_tableau.hpp"
 #include "../common/ssprk_hho_scheme.hpp"
 #include "../common/ssprk_shu_osher_tableau.hpp"
 
@@ -79,13 +81,13 @@ int main(int argc, char **argv)
     
 //    HeterogeneousEHHOFirstOrder(argc, argv);
 //
-    HeterogeneousIHHOFirstOrder(argc, argv);
+//    HeterogeneousIHHOFirstOrder(argc, argv);
 
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-//    EHHOFirstOrder(argc, argv);
-//
+    EHHOFirstOrder(argc, argv);
+
 //    IHHOFirstOrder(argc, argv);
     
 //    IHHOSecondOrder(argc, argv);
@@ -988,7 +990,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.5;
+    RealType tf = 0.25;
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
@@ -1018,7 +1020,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
         if (x < 0.5) {
-            vp = 1.0;
+            vp = 50.0;
         }else{
             vp = 1.0;
         }
@@ -1195,12 +1197,12 @@ void EHHOFirstOrder(int argc, char **argv){
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
-    RealType ti = 0.0;
-    RealType tf = 1.0;
-    RealType dt     = tf/nt;
+    RealType ti = 0.25;
+    RealType tf = 0.5;
+    RealType dt     = (tf-ti)/nt/512;
     
     scal_analytic_functions functions;
-    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_q(t);
@@ -1238,7 +1240,7 @@ void EHHOFirstOrder(int argc, char **argv){
     
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
-        std::string silo_file_name = "scalar_mixed_";
+        std::string silo_file_name = "e_scalar_mixed_";
         postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
     }
     
@@ -1249,17 +1251,18 @@ void EHHOFirstOrder(int argc, char **argv){
     }
     
     // Solving a first order equation HDG/HHO propagation problem
-    int s = 3;
-    Matrix<double, Dynamic, Dynamic> alpha;
-    Matrix<double, Dynamic, Dynamic> beta;
-    ssprk_shu_osher_tableau::OSSPRKSS(s, alpha, beta);
+    int s = 4;
+    Matrix<RealType, Dynamic, Dynamic> a;
+    Matrix<RealType, Dynamic, 1> b;
+    Matrix<RealType, Dynamic, 1> c;
+    erk_butcher_tableau::erk_tables(s, a, b, c);
 
     tc.tic();
     assembler.assemble(msh, rhs_fun);
     tc.toc();
     std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
     size_t n_face_dof = assembler.get_n_face_dof();
-    ssprk_hho_scheme ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+    erk_hho_scheme erk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
     tc.toc();
 
     Matrix<double, Dynamic, 1> x_dof_n;
@@ -1267,36 +1270,43 @@ void EHHOFirstOrder(int argc, char **argv){
 
         std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
         
-        {   // Updating rhs
-            RealType t = dt*(it)+ti;
-            auto rhs_fun            = functions.Evaluate_f(t);
-            assembler.assemble_rhs(msh, rhs_fun);
-            ssprk_an.SetFg(assembler.RHS);
-        }
         RealType tn = dt*(it-1)+ti;
+        // ERK step
         tc.tic();
         {
-            
             size_t n_dof = x_dof.rows();
-            Matrix<double, Dynamic, Dynamic> ys = Matrix<double, Dynamic, Dynamic>::Zero(n_dof, s+1);
-        
-            Matrix<double, Dynamic, 1> yn, ysi, yj;
-            ys.block(0, 0, n_dof, 1) = x_dof;
+            Matrix<double, Dynamic, Dynamic> k = Matrix<double, Dynamic, Dynamic>::Zero(n_dof, s);
+            Matrix<double, Dynamic, 1> Fg, Fg_c,xd;
+            xd = Matrix<double, Dynamic, 1>::Zero(n_dof, 1);
+            
+            Matrix<double, Dynamic, 1> yn, ki;
+
+            x_dof_n = x_dof;
             for (int i = 0; i < s; i++) {
-        
-                ysi = Matrix<double, Dynamic, 1>::Zero(n_dof, 1);
-                for (int j = 0; j <= i; j++) {
-                    yn = ys.block(0, j, n_dof, 1);
-                    ssprk_an.explicit_rk_weight(yn, yj, dt, alpha(i,j), beta(i,j));
-                    ysi += yj;
+                
+                yn = x_dof;
+                for (int j = 0; j < s - 1; j++) {
+                    yn += a(i,j) * dt * k.block(0, j, n_dof, 1);
                 }
-                ys.block(0, i+1, n_dof, 1) = ysi;
+                
+                {
+                    RealType t = tn + c(i,0) * dt;
+                    auto exact_vel_fun      = functions.Evaluate_v(t);
+                    auto rhs_fun            = functions.Evaluate_f(t);
+                    assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
+                    assembler.assemble_rhs(msh, rhs_fun);
+                    assembler.apply_bc(msh);
+                    erk_an.SetFg(assembler.RHS);
+                    erk_an.erk_weight(yn, ki);
+                }
+
+                // Accumulated solution
+                x_dof_n += dt*b(i,0)*ki;
+                k.block(0, i, n_dof, 1) = ki;
             }
-        
-            x_dof_n = ys.block(0, s, n_dof, 1);
         }
         tc.toc();
-        std::cout << bold << cyan << "SSPRK step completed: " << tc << " seconds" << reset << std::endl;
+        std::cout << bold << cyan << "ERK step completed: " << tc << " seconds" << reset << std::endl;
         x_dof = x_dof_n;
 
         t = tn + dt;
@@ -1304,7 +1314,7 @@ void EHHOFirstOrder(int argc, char **argv){
         auto exact_flux_fun = functions.Evaluate_q(t);
         
         if (sim_data.m_render_silo_files_Q) {
-            std::string silo_file_name = "scalar_mixed_";
+            std::string silo_file_name = "e_scalar_mixed_";
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
         }
         
@@ -1319,7 +1329,7 @@ void EHHOFirstOrder(int argc, char **argv){
     }
     
     simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
-    simulation_log << "Number of SSPRKSS steps =  " << s << std::endl;
+    simulation_log << "Number of ERK steps =  " << s << std::endl;
     simulation_log << "Number of time steps =  " << nt << std::endl;
     simulation_log << "Step size =  " << dt << std::endl;
     simulation_log.flush();

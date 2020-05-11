@@ -20,8 +20,10 @@ set(fitted_waves_headers ${fitted_waves_headers}
 	${CMAKE_CURRENT_SOURCE_DIR}/fitted_geometry_builders.hpp	
 	${CMAKE_CURRENT_SOURCE_DIR}/linear_solver.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/dirk_hho_scheme.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/erk_hho_scheme.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ssprk_hho_scheme.hpp
-	${CMAKE_CURRENT_SOURCE_DIR}/dirk_butcher_tableau.hpp	
+	${CMAKE_CURRENT_SOURCE_DIR}/dirk_butcher_tableau.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/erk_butcher_tableau.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ssprk_shu_osher_tableau.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/lsrk_butcher_tableau.hpp
 PARENT_SCOPE)
