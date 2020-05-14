@@ -22,6 +22,8 @@ public:
     
     bool m_hdg_stabilization_Q;
     
+    bool m_scaled_stabilization_Q;
+    
     bool m_sc_Q;
     
     size_t m_nt_divs;
@@ -32,7 +34,7 @@ public:
     
     bool m_quadratic_function_Q;
     
-    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_quadratic_function_Q(false){
+    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_scaled_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_quadratic_function_Q(false){
         
     }
     
@@ -41,6 +43,7 @@ public:
         m_k_degree              = other.m_k_degree;
         m_n_divs                = other.m_n_divs;
         m_hdg_stabilization_Q   = other.m_hdg_stabilization_Q;
+        m_scaled_stabilization_Q = other.m_scaled_stabilization_Q;
         m_sc_Q                  = other.m_sc_Q;
         m_nt_divs               = other.m_nt_divs;
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
@@ -58,6 +61,7 @@ public:
         m_k_degree              = other.m_k_degree;
         m_n_divs                = other.m_n_divs;
         m_hdg_stabilization_Q   = other.m_hdg_stabilization_Q;
+        m_scaled_stabilization_Q = other.m_scaled_stabilization_Q;
         m_sc_Q                  = other.m_sc_Q;
         m_nt_divs               = other.m_nt_divs;
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
@@ -75,6 +79,7 @@ public:
         std::cout << bold << red << "face degree : " << m_k_degree << reset << std::endl;
         std::cout << bold << red << "refinements : " << m_n_divs << reset << std::endl;
         std::cout << bold << red << "stabilization type Q? : " << m_hdg_stabilization_Q << reset << std::endl;
+        std::cout << bold << red << "scaled stabilization Q? : " << m_scaled_stabilization_Q << reset << std::endl;
         std::cout << bold << red << "condensation type Q? : " << m_sc_Q << reset << std::endl;
         std::cout << bold << red << "time refinements : " << m_nt_divs << reset << std::endl;
         std::cout << bold << red << "write silo files Q? : " << m_render_silo_files_Q << reset << std::endl;
@@ -96,6 +101,7 @@ public:
                 "-k <int>:  Face polynomial degree: default 0\n"
                 "-l <int>:  Number of uniform space refinements: default 0\n"
                 "-s <0-1>:  Stabilization type 0 -> HHO, 1 -> HDG-like: default 0 \n"
+                "-r <0-1>:  Scaled stabilization 0 -> without, 1 -> with: default 0 \n"
                 "-n <int>:  Number of uniform time refinements: default 0\n"
                 "-f <0-1>:  Write silo files: default 0\n"
                 "-e <0-1>:  Report (time,energy) pairs: default 0\n"
@@ -106,11 +112,12 @@ public:
 
     static simulation_data process_args(int argc, char** argv)
     {
-        const char* const short_opts = "k:l:s:n:c:f:e:";
+        const char* const short_opts = "k:l:s:h:n:c:f:e:";
         const option long_opts[] = {
                 {"degree", required_argument, nullptr, 'k'},
                 {"xref", required_argument, nullptr, 'l'},
                 {"stab", required_argument, nullptr, 's'},
+                {"scal", required_argument, nullptr, 'r'},
                 {"tref", required_argument, nullptr, 'n'},
                 {"c", optional_argument, nullptr, 'c'},
                 {"file", optional_argument, nullptr, 'f'},
@@ -123,6 +130,7 @@ public:
         size_t n_divs   = 0;
         size_t nt_divs   = 0;
         bool hdg_Q = false;
+        bool scaled_Q = false;
         bool sc_Q = false;
         bool silo_files_Q = false;
         bool report_energy_Q = false;
@@ -146,6 +154,10 @@ public:
 
             case 's':
                 hdg_Q = std::stoi(optarg);
+                break;
+                    
+            case 'r':
+                scaled_Q = std::stoi(optarg);
                 break;
                     
             case 'n':
@@ -178,6 +190,7 @@ public:
         sim_data.m_k_degree = k_degree;
         sim_data.m_n_divs = n_divs;
         sim_data.m_hdg_stabilization_Q = hdg_Q;
+        sim_data.m_scaled_stabilization_Q = scaled_Q;
         sim_data.m_sc_Q = sc_Q;
         sim_data.m_nt_divs = nt_divs;
         sim_data.m_render_silo_files_Q = silo_files_Q;
@@ -191,6 +204,7 @@ public:
                 "-k <int>:  Maximum Face polynomial degree: default 0\n"
                 "-l <int>:  Maximum Number of uniform space refinements: default 0\n"
                 "-s <0-1>:  Stabilization type 0 -> HHO, 1 -> HDG-like: default 0 \n"
+                "-r <0-1>:  Scaled stabilization 0 -> without, 1 -> with: default 0 \n"
                 "-q <0-1>:  Quadratic function type 0 -> non-polynomial, 1 -> quadratic: default 0 \n"
                 "-f <0-1>:  Write silo files : default 0\n"
                 "-c <0-1>:  Static Condensation (implicit schemes): default 0 \n"
@@ -200,11 +214,12 @@ public:
     
     static simulation_data process_convergence_test_args(int argc, char** argv)
     {
-        const char* const short_opts = "k:l:s:c:q:f:";
+        const char* const short_opts = "k:l:s:r:c:q:f:";
         const option long_opts[] = {
                 {"degree", required_argument, nullptr, 'k'},
                 {"xref", required_argument, nullptr, 'l'},
                 {"stab", required_argument, nullptr, 's'},
+                {"scal", required_argument, nullptr, 'r'},
                 {"file", optional_argument, nullptr, 'f'},
                 {"qfunc", optional_argument, nullptr, 'q'},
                 {"cond", optional_argument, nullptr, 'c'},
@@ -215,6 +230,7 @@ public:
         size_t k_degree = 0;
         size_t n_divs   = 0;
         bool hdg_Q = false;
+        bool scaled_Q = false;
         bool sc_Q = false;
         bool quadratic_func_Q = false;
         bool silo_files_Q = false;
@@ -238,6 +254,10 @@ public:
 
             case 's':
                 hdg_Q = std::stoi(optarg);
+                break;
+                    
+            case 'r':
+                scaled_Q = std::stoi(optarg);
                 break;
                     
             case 'c':
@@ -265,6 +285,7 @@ public:
         sim_data.m_k_degree = k_degree;
         sim_data.m_n_divs = n_divs;
         sim_data.m_hdg_stabilization_Q = hdg_Q;
+        sim_data.m_scaled_stabilization_Q = scaled_Q;
         sim_data.m_sc_Q = sc_Q;
         sim_data.m_render_silo_files_Q = silo_files_Q;
         sim_data.m_quadratic_function_Q = quadratic_func_Q;

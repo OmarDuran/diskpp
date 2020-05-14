@@ -212,7 +212,7 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
             Matrix<RealType, Dynamic, 1> x_dof;
             if (sim_data.m_sc_Q) {
                 tc.tic();
-                linear_solver<mesh_type> analysis(assembler.LHS,assembler.get_n_face_dof());
+                linear_solver<RealType> analysis(assembler.LHS,assembler.get_n_face_dof());
                 analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
@@ -229,7 +229,7 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
                 std::cout << bold << cyan << "Number of equations (SC) : " << analysis.n_equations() << reset << std::endl;
             }else{
                 tc.tic();
-                linear_solver<mesh_type> analysis(assembler.LHS);
+                linear_solver<RealType> analysis(assembler.LHS);
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
@@ -390,7 +390,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
             if (sim_data.m_sc_Q) {
                 tc.tic();
                 SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
-                linear_solver<mesh_type> analysis(Kg,assembler.get_n_face_dof());
+                linear_solver<RealType> analysis(Kg,assembler.get_n_face_dof());
                 analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
@@ -408,7 +408,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
             }else{
                 tc.tic();
                 SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
-                linear_solver<mesh_type> analysis(Kg);
+                linear_solver<RealType> analysis(Kg);
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 

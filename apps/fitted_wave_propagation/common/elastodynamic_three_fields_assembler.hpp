@@ -39,7 +39,8 @@ class elastodynamic_three_fields_assembler
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
     bool        m_hho_stabilization_Q;
-
+    bool        m_scaled_stabilization_Q;
+    
 public:
 
     SparseMatrix<T>         LHS;
@@ -301,7 +302,7 @@ public:
         
     }
             
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
+    void assemble_rhs(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun){
         
         RHS.setZero();
          
@@ -359,12 +360,12 @@ public:
         if(m_hho_stabilization_Q)
         {
             auto rec_for_stab   = make_vector_hho_symmetric_laplacian(msh, cell, m_hho_di);
-            auto stabilization_operator    = make_vector_hho_stabilization(msh, cell, rec_for_stab.first, m_hho_di);
+            auto stabilization_operator    = make_vector_hho_stabilization(msh, cell, rec_for_stab.first, m_hho_di, m_scaled_stabilization_Q);
             auto n_s_rows = stabilization_operator.rows();
             auto n_s_cols = stabilization_operator.cols();
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }else{
-            auto stabilization_operator    = make_vector_hdg_stabilization(msh, cell, m_hho_di);
+            auto stabilization_operator    = make_vector_hdg_stabilization(msh, cell, m_hho_di, m_scaled_stabilization_Q);
             auto n_s_rows = stabilization_operator.rows();
             auto n_s_cols = stabilization_operator.cols();
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
@@ -629,7 +630,7 @@ public:
     }
             
     void scatter_cell_dof_data(  const Mesh& msh, const typename Mesh::cell_type& cell,
-                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> & x_proj_dof) const
     {
         auto cell_ofs = disk::priv::offset(msh, cell);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
@@ -640,7 +641,7 @@ public:
     }
     
     void scatter_face_dof_data(  const Mesh& msh, const typename Mesh::face_type& face,
-                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> & x_proj_dof) const
     {
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_sca_cbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension);
@@ -776,7 +777,6 @@ public:
         auto n_rows = dr_rhs.cols() + ten_bs + sca_bs;
         auto n_cols = dr_rhs.cols() + ten_bs + sca_bs;
         matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
-//        data_mixed.block(ten_bs, ten_bs, sca_bs, sca_bs) = dr_lhs;
         data_mixed.block(ten_bs, (ten_bs + sca_bs), sca_bs, n_cols-(ten_bs + sca_bs)) = -dr_rhs;
         data_mixed.block((ten_bs + sca_bs), ten_bs, n_rows-(ten_bs + sca_bs), sca_bs) = dr_rhs.transpose();
 
@@ -785,7 +785,7 @@ public:
     }
             
     Matrix<typename Mesh::coordinate_type, Dynamic, 1>
-    mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun, size_t di = 0)
+    mixed_rhs(const Mesh& msh, const typename Mesh::cell_type& cell, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0)
     {
         auto recdeg = m_hho_di.grad_degree();
         auto celdeg = m_hho_di.cell_degree();
@@ -865,8 +865,13 @@ public:
             std::cout << "face degree = " << m_hho_di.face_degree() << std::endl;
         }
     }
+    
     void set_hho_stabilization(){
         m_hho_stabilization_Q = true;
+    }
+    
+    void set_scaled_stabilization(){
+        m_scaled_stabilization_Q = true;
     }
             
     boundary_type & get_bc_conditions(){
@@ -881,6 +886,15 @@ public:
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         size_t n_face_dof = (m_n_edges - m_n_essential_edges) * n_fbs;
         return n_face_dof;
+    }
+    
+    size_t get_n_faces(){
+        return m_n_edges - m_n_essential_edges;
+    }
+    
+    size_t get_face_basis_data(){
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        return n_fbs;
     }
     
     size_t get_cell_basis_data(){

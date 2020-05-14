@@ -806,7 +806,7 @@ make_hho_divergence_reconstruction_rhs(const Mesh& msh, const typename Mesh::cel
 // we compute the stabilisation 1/h_F(uF-pi^k_F(uT), vF-pi^k_F(vT))_F
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di, bool scaled_Q = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -856,7 +856,11 @@ make_scalar_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& c
         tr.block(0, 0, fbs, cbs) = trace;
 
         oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
-        data += oper.transpose() * tr * (1./h);
+        if (scaled_Q) {
+            data += oper.transpose() * tr / h;
+        }else{
+            data += oper.transpose() * tr;
+        }
     }
 
     return data;
@@ -1128,7 +1132,7 @@ Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_scalar_hho_stabilization(const Mesh&                                                     msh,
                               const typename Mesh::cell_type&                                 cl,
                               const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
-                              const hho_degree_info&                                          di)
+                              const hho_degree_info&                                          di, bool scaled_Q = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -1194,7 +1198,12 @@ make_scalar_hho_stabilization(const Mesh&                                       
         const matrix_type proj3 = piKF.solve(MR2 * proj1);
         const matrix_type BRF   = proj2 + proj3;
 
-        data += BRF.transpose() * face_mass_matrix * BRF / hf;
+        if (scaled_Q) {
+            data += BRF.transpose() * face_mass_matrix * BRF / hf;
+        }
+        else{
+            data += BRF.transpose() * face_mass_matrix * BRF;
+        }
     }
 
     return data;
@@ -1205,7 +1214,7 @@ Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
 make_vector_hho_stabilization(const Mesh&                                                     msh,
                               const typename Mesh::cell_type&                                 cl,
                               const Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>& reconstruction,
-                              const hho_degree_info&                                          di)
+                              const hho_degree_info&                                          di, bool scaled_Q = true)
 {
     using T = typename Mesh::coordinate_type;
     typedef Matrix<T, Dynamic, Dynamic> matrix_type;
@@ -1272,8 +1281,11 @@ make_vector_hho_stabilization(const Mesh&                                       
         const matrix_type MR2   = face_trace_matrix.block(0, 0, fbs, cbs);
         const matrix_type proj3 = piKF.solve(MR2 * proj1);
         const matrix_type BRF   = proj2 + proj3;
-
-        data += BRF.transpose() * face_mass_matrix * BRF / hf;
+        if (scaled_Q) {
+            data += BRF.transpose() * face_mass_matrix * BRF / hf;
+        }else{
+            data += BRF.transpose() * face_mass_matrix * BRF;
+        }
     }
 
     return data;
@@ -4543,9 +4555,9 @@ make_vector_hho_laplacian(const Mesh&                     msh,
 
 template<typename Mesh>
 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>
-make_vector_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di)
+make_vector_hdg_stabilization(const Mesh& msh, const typename Mesh::cell_type& cl, const hho_degree_info& di, bool scaled_Q = true)
 {
-    const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, di);
+    const auto hdg_scalar_stab = make_scalar_hdg_stabilization(msh, cl, di, scaled_Q);
 
     return priv::compute_lhs_vector(msh, cl, di, hdg_scalar_stab);
 }

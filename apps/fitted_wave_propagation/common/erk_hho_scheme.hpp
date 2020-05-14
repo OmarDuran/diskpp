@@ -12,30 +12,34 @@
 #include <Eigen/SparseCore>
 #include <Eigen/SparseLU>
 
+#define with_inverse_Q
+
+template<typename T>
 class erk_hho_scheme
 {
     private:
 
-    SparseMatrix<double> m_Mc;
-    SparseMatrix<double> m_Kcc;
-    SparseMatrix<double> m_Kcf;
-    SparseMatrix<double> m_Kfc;
-    SparseMatrix<double> m_Sff;
-    Matrix<double, Dynamic, 1> m_Fc;
+    SparseMatrix<T> m_Mc;
+    SparseMatrix<T> m_Kcc;
+    SparseMatrix<T> m_Kcf;
+    SparseMatrix<T> m_Kfc;
+    SparseMatrix<T> m_Sff;
+    SparseMatrix<T> m_Mc_inv;
+    SparseMatrix<T> m_Sff_inv;
+    Matrix<T, Dynamic, 1> m_Fc;
 
-    #ifdef HAVE_INTEL_MKL2
-        PardisoLU<Eigen::SparseMatrix<double>>  m_analysis_c;
-        PardisoLU<Eigen::SparseMatrix<double>>  m_analysis_f;
+    #ifdef HAVE_INTEL_MKL
+        PardisoLLT<Eigen::SparseMatrix<T>>  m_analysis_f;
     #else
-        SparseLU<SparseMatrix<double>> m_analysis_c;
-        SparseLU<SparseMatrix<double>> m_analysis_f;
+        SimplicialLLT<SparseMatrix<T>> m_analysis_f;
     #endif
     size_t m_n_c_dof;
     size_t m_n_f_dof;
+    bool m_sff_is_block_diagonal_Q;
     
     public:
     
-    erk_hho_scheme(SparseMatrix<double> & Kg, Matrix<double, Dynamic, 1> & Fg, SparseMatrix<double> & Mg, size_t n_f_dof){
+    erk_hho_scheme(SparseMatrix<T> & Kg, Matrix<T, Dynamic, 1> & Fg, SparseMatrix<T> & Mg, size_t n_f_dof){
         
         
         m_n_c_dof = Kg.rows() - n_f_dof;
@@ -48,91 +52,208 @@ class erk_hho_scheme
         m_Kfc = Kg.block(m_n_c_dof,0, n_f_dof, m_n_c_dof);
         m_Sff = Kg.block(m_n_c_dof,m_n_c_dof, n_f_dof, n_f_dof);
         m_Fc = Fg.block(0, 0, m_n_c_dof, 1);
-        DecomposeMassTerm();
-        DecomposeFaceTerm();
-    }
-    
-    void DecomposeMassTerm(){
-        m_analysis_c.analyzePattern(m_Mc);
-        m_analysis_c.factorize(m_Mc);
+        
     }
     
     void DecomposeFaceTerm(){
         m_analysis_f.analyzePattern(m_Sff);
         m_analysis_f.factorize(m_Sff);
+        m_sff_is_block_diagonal_Q = false;
     }
     
 
-    #ifdef HAVE_INTEL_MKL2
-        PardisoLU<Eigen::SparseMatrix<double>> & CellsAnalysis(){
-            return m_analysis_c;
-        }
-        
-        PardisoLU<Eigen::SparseMatrix<double>> & FacesAnalysis(){
+    #ifdef HAVE_INTEL_MKL
+        PardisoLLT<Eigen::SparseMatrix<T>> & FacesAnalysis(){
             return m_analysis_f;
         }
     #else
-        SparseLU<SparseMatrix<double>> & CellsAnalysis(){
-            return m_analysis_c;
-        }
-        
-        SparseLU<SparseMatrix<double>> & FacesAnalysis(){
+        SimplicialLLT<SparseMatrix<T>> & FacesAnalysis(){
             return m_analysis_f;
         }
     #endif
     
-    SparseMatrix<double> & Mc(){
+    SparseMatrix<T> & Mc(){
         return m_Mc;
     }
 
-    SparseMatrix<double> & Kcc(){
+    SparseMatrix<T> & Kcc(){
         return m_Kcc;
     }
     
-    SparseMatrix<double> & Kcf(){
+    SparseMatrix<T> & Kcf(){
         return m_Kcf;
     }
     
-    SparseMatrix<double> & Kfc(){
+    SparseMatrix<T> & Kfc(){
         return m_Kfc;
     }
     
-    SparseMatrix<double> & Sff(){
+    SparseMatrix<T> & Sff(){
         return m_Sff;
     }
     
-    Matrix<double, Dynamic, 1> & Fc(){
+    Matrix<T, Dynamic, 1> & Fc(){
         return m_Fc;
     }
     
-    void SetFg(Matrix<double, Dynamic, 1> & Fg){
+    void SetFg(Matrix<T, Dynamic, 1> & Fg){
         m_Fc = Fg.block(0, 0, m_n_c_dof, 1);
     }
     
-    void erk_weight(Matrix<double, Dynamic, 1> & y, Matrix<double, Dynamic, 1> & k){
+    void Kcc_inverse(std::pair<size_t,size_t> cell_basis_data){
+                
+        size_t n_cells = cell_basis_data.first;
+        size_t n_cbs   = cell_basis_data.second;
+        size_t nnz_cc = n_cbs*n_cbs*n_cells;
+        std::vector< Triplet<T> > triplets_cc;
+        triplets_cc.resize(nnz_cc);
+        m_Mc_inv = SparseMatrix<T>( m_n_c_dof, m_n_c_dof );
+        #ifdef HAVE_INTEL_TBB
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [this,&triplets_cc,&n_cbs] (size_t & cell_ind){
+                    
+                    size_t stride_eq = cell_ind * n_cbs;
+                    size_t stride_l = cell_ind * n_cbs * n_cbs;
+
+                    SparseMatrix<T> m_Mc_loc = m_Mc.block(stride_eq, stride_eq, n_cbs, n_cbs);
+                    SparseLU<SparseMatrix<T>> analysis_cc;
+                    analysis_cc.analyzePattern(m_Mc_loc);
+                    analysis_cc.factorize(m_Mc_loc);
+                    Matrix<T, Dynamic, Dynamic> m_Mc_inv_loc = analysis_cc.solve(Matrix<T, Dynamic, Dynamic>::Identity(n_cbs, n_cbs));
+            
+                    size_t l = 0;
+                    for (size_t i = 0; i < m_Mc_inv_loc.rows(); i++)
+                    {
+                        for (size_t j = 0; j < m_Mc_inv_loc.cols(); j++)
+                        {
+                            triplets_cc[stride_l+l] = Triplet<T>(stride_eq+i, stride_eq+j, m_Mc_inv_loc(i,j));
+                            l++;
+                        }
+                    }
+                }
+            );
+        #else
+
+            for (size_t cell_ind = 0; cell_ind < n_cells; cell_ind++)
+            {
+                size_t stride_eq = cell_ind * n_cbs;
+                size_t stride_l = cell_ind * n_cbs * n_cbs;
+                
+                SparseMatrix<T> m_Mc_loc = m_Mc.block(stride_eq, stride_eq, n_cbs, n_cbs);
+                SparseLU<SparseMatrix<T>> analysis_cc;
+                analysis_cc.analyzePattern(m_Mc_loc);
+                analysis_cc.factorize(m_Mc_loc);
+                Matrix<T, Dynamic, Dynamic> m_Mc_inv_loc = analysis_cc.solve(Matrix<T, Dynamic, Dynamic>::Identity(n_cbs, n_cbs));
         
-        Matrix<double, Dynamic, 1> y_c_dof = y.block(0, 0, m_n_c_dof, 1);
-        Matrix<double, Dynamic, 1> y_f_dof = y.block(m_n_c_dof, 0, m_n_f_dof, 1);
+                size_t l = 0;
+                for (size_t i = 0; i < m_Mc_inv_loc.rows(); i++)
+                {
+                    for (size_t j = 0; j < m_Mc_inv_loc.cols(); j++)
+                    {
+                        triplets_cc[stride_l+l] = Triplet<T>(stride_eq+i, stride_eq+j, m_Mc_inv_loc(i,j));
+                        l++;
+                    }
+                }
+
+            }
+        #endif
+        m_Mc_inv.setFromTriplets( triplets_cc.begin(), triplets_cc.end() );
+        triplets_cc.clear();
+        return;
+
+    }
     
-        // Faces update (last state)
-        {
-            Matrix<double, Dynamic, 1> RHSf = Kfc()*y_c_dof;
-            y_f_dof = -FacesAnalysis().solve(RHSf);
-        }
+    void Sff_inverse(std::pair<size_t,size_t> face_basis_data){
+                
+        size_t n_faces = face_basis_data.first;
+        size_t n_fbs   = face_basis_data.second;
+        size_t nnz_ff = n_fbs*n_fbs*n_faces;
+        std::vector< Triplet<T> > triplets_ff;
+        triplets_ff.resize(nnz_ff);
+        m_Sff_inv = SparseMatrix<T>( m_n_f_dof, m_n_f_dof );
+        #ifdef HAVE_INTEL_TBB
+                tbb::parallel_for(size_t(0), size_t(n_faces), size_t(1),
+                    [this,&triplets_ff,&n_fbs] (size_t & face_ind){
+                    
+                    size_t stride_eq = face_ind * n_fbs;
+                    size_t stride_l = face_ind * n_fbs * n_fbs;
+
+                    SparseMatrix<T> S_ff_loc = m_Sff.block(stride_eq, stride_eq, n_fbs, n_fbs);
+                    SparseLU<SparseMatrix<T>> analysis_ff;
+                    analysis_ff.analyzePattern(S_ff_loc);
+                    analysis_ff.factorize(S_ff_loc);
+                    Matrix<T, Dynamic, Dynamic> S_ff_inv_loc = analysis_ff.solve(Matrix<T, Dynamic, Dynamic>::Identity(n_fbs, n_fbs));
+            
+                    size_t l = 0;
+                    for (size_t i = 0; i < S_ff_inv_loc.rows(); i++)
+                    {
+                        for (size_t j = 0; j < S_ff_inv_loc.cols(); j++)
+                        {
+                            triplets_ff[stride_l+l] = Triplet<T>(stride_eq+i, stride_eq+j, S_ff_inv_loc(i,j));
+                            l++;
+                        }
+                    }
+                }
+            );
+        #else
+
+            for (size_t face_ind = 0; face_ind < n_faces; face_ind++)
+            {
+                size_t stride_eq = face_ind * n_fbs;
+                size_t stride_l = face_ind * n_fbs * n_fbs;
+
+                SparseMatrix<T> S_ff_loc = m_Sff.block(stride_eq, stride_eq, n_fbs, n_fbs);
+                SparseLU<SparseMatrix<T>> analysis_ff;
+                analysis_ff.analyzePattern(S_ff_loc);
+                analysis_ff.factorize(S_ff_loc);
+                Matrix<T, Dynamic, Dynamic> S_ff_inv_loc = analysis_ff.solve(Matrix<T, Dynamic, Dynamic>::Identity(n_fbs, n_fbs));
+                size_t l = 0;
+                for (size_t i = 0; i < S_ff_inv_loc.rows(); i++)
+                {
+                    for (size_t j = 0; j < S_ff_inv_loc.cols(); j++)
+                    {
+                        triplets_ff[stride_l+l] = Triplet<T>(stride_eq+i, stride_eq+j, S_ff_inv_loc(i,j));
+                        l++;
+                    }
+                }
+
+            }
+        #endif
+        m_Sff_inv.setFromTriplets( triplets_ff.begin(), triplets_ff.end() );
+        triplets_ff.clear();
+        m_sff_is_block_diagonal_Q = true;
+        return;
+
+    }
+    
+    void erk_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k){
+        
+        k=y;
+        Matrix<T, Dynamic, 1> y_c_dof = y.block(0, 0, m_n_c_dof, 1);
+        Matrix<T, Dynamic, 1> y_f_dof = y.block(m_n_c_dof, 0, m_n_f_dof, 1);
+    
+//        // Faces update (last state)
+//        {
+//            Matrix<T, Dynamic, 1> RHSf = Kfc()*y_c_dof;
+//            if (m_sff_is_block_diagonal_Q) {
+//                y_f_dof = - m_Sff_inv * RHSf;
+//            }else{
+//                y_f_dof = -FacesAnalysis().solve(RHSf); // new state
+//            }
+//        }
         
         // Cells update
-        Matrix<double, Dynamic, 1> RHSc = Fc() - Kcc()*y_c_dof - Kcf()*y_f_dof;
-        Matrix<double, Dynamic, 1> delta_y_c_dof = CellsAnalysis().solve(RHSc);
-        Matrix<double, Dynamic, 1> k_c_dof = delta_y_c_dof; // new state
-    
-        // Faces update
-        Matrix<double, Dynamic, 1> RHSf = Kfc()*k_c_dof;
-        Matrix<double, Dynamic, 1> k_f_dof = -FacesAnalysis().solve(RHSf); // new state
-    
-        // Composing the rk weight
-        k = y;
+        Matrix<T, Dynamic, 1> RHSc = Fc() - Kcc()*y_c_dof - Kcf()*y_f_dof;
+        Matrix<T, Dynamic, 1> k_c_dof = m_Mc_inv * RHSc;
         k.block(0, 0, m_n_c_dof, 1) = k_c_dof;
-        k.block(m_n_c_dof, 0, m_n_f_dof, 1) = k_f_dof;
+        
+        // Faces update
+        Matrix<T, Dynamic, 1> RHSf = Kfc()*k_c_dof;
+        if (m_sff_is_block_diagonal_Q) {
+            k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf;
+        }else{
+            k.block(m_n_c_dof, 0, m_n_f_dof, 1) = -FacesAnalysis().solve(RHSf); // new state
+        }
     
     }
     

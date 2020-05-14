@@ -14,10 +14,9 @@
 #include <tbb/parallel_for.h>
 #endif
 
-template<typename Mesh>
+template<typename T>
 class linear_solver
 {
-    using T = typename Mesh::coordinate_type;
     
     private:
 
@@ -147,7 +146,7 @@ class linear_solver
         std::vector< Triplet<T> > triplets_cc;
         triplets_cc.resize(nnz_cc);
         m_Kcc_inv = SparseMatrix<T>( m_n_c_dof, m_n_c_dof );
-        #ifdef HAVE_INTEL_TBB2
+        #ifdef HAVE_INTEL_TBB
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
                     [this,&triplets_cc,&n_cbs] (size_t & cell_ind){
                     

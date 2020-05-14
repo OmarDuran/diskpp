@@ -13,18 +13,16 @@
 #include <Eigen/SparseLU>
 #include "../common/linear_solver.hpp"
 
-template<typename Mesh>
+template<typename T>
 class dirk_hho_scheme
 {
-    using T = typename Mesh::coordinate_type;
-    
     private:
 
     T m_scale;
     SparseMatrix<T> m_Mg;
     SparseMatrix<T> m_Kg;
     Matrix<T, Dynamic, 1> m_Fg;
-    linear_solver<Mesh>  m_analysis;
+    linear_solver<T>  m_analysis;
     std::pair<size_t,size_t> m_cell_basis_data;
     size_t m_n_f_dof;
     bool m_global_sc_Q;
@@ -71,7 +69,7 @@ class dirk_hho_scheme
         m_analysis.factorize();
     }
 
-    linear_solver<Mesh> & DirkAnalysis(){
+    linear_solver<T> & DirkAnalysis(){
         return m_analysis;
     }
     
