@@ -1207,7 +1207,7 @@ void EHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.5;
+    RealType tf = 1.0;
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
