@@ -226,21 +226,25 @@ class erk_hho_scheme
 
     }
     
+    void refresh_faces_unknowns(Matrix<T, Dynamic, 1> & x){
+        
+        Matrix<T, Dynamic, 1> x_c_dof = x.block(0, 0, m_n_c_dof, 1);
+    
+        // Faces update from cells data
+        Matrix<T, Dynamic, 1> RHSf = Kfc()*x_c_dof;
+        if (m_sff_is_block_diagonal_Q) {
+            x.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf;
+        }else{
+            x.block(m_n_c_dof, 0, m_n_f_dof, 1) = -FacesAnalysis().solve(RHSf); // new state
+        }
+    
+    }
+    
     void erk_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k){
         
         k=y;
         Matrix<T, Dynamic, 1> y_c_dof = y.block(0, 0, m_n_c_dof, 1);
         Matrix<T, Dynamic, 1> y_f_dof = y.block(m_n_c_dof, 0, m_n_f_dof, 1);
-    
-//        // Faces update (last state)
-//        {
-//            Matrix<T, Dynamic, 1> RHSf = Kfc()*y_c_dof;
-//            if (m_sff_is_block_diagonal_Q) {
-//                y_f_dof = - m_Sff_inv * RHSf;
-//            }else{
-//                y_f_dof = -FacesAnalysis().solve(RHSf); // new state
-//            }
-//        }
         
         // Cells update
         Matrix<T, Dynamic, 1> RHSc = Fc() - Kcc()*y_c_dof - Kcf()*y_f_dof;

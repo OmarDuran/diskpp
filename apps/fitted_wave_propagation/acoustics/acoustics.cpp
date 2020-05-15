@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-//    EHHOFirstOrder(argc, argv);
+    EHHOFirstOrder(argc, argv);
 
 //    IHHOFirstOrder(argc, argv);
     
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 //    HHOOneFieldConvergenceExample(argc, argv);
 //
 //    // Dual HHO
-    HHOTwoFieldsConvergenceExample(argc, argv);
+//    HHOTwoFieldsConvergenceExample(argc, argv);
     
     return 0;
 }
@@ -835,6 +835,9 @@ void IHHOFirstOrder(int argc, char **argv){
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
+    }
     tc.toc();
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -867,7 +870,7 @@ void IHHOFirstOrder(int argc, char **argv){
     
     // DIRK(s) schemes
     int s = 3;
-    bool is_sdirk_Q = false;
+    bool is_sdirk_Q = true;
     
     if (is_sdirk_Q) {
         dirk_butcher_tableau::sdirk_tables(s, a, b, c);
@@ -1037,6 +1040,9 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
+    }
     tc.toc();
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -1201,11 +1207,11 @@ void EHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 1.0;
+    RealType tf = 0.5;
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
-    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_q(t);
@@ -1226,6 +1232,9 @@ void EHHOFirstOrder(int argc, char **argv){
     assembler.load_material_data(msh);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
+    }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
     }
     tc.toc();
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -1276,6 +1285,7 @@ void EHHOFirstOrder(int argc, char **argv){
     tc.toc();
     std::cout << bold << cyan << "ERK analysis created: " << tc << " seconds" << reset << std::endl;
     
+    erk_an.refresh_faces_unknowns(x_dof);
     Matrix<RealType, Dynamic, 1> x_dof_n;
     for(size_t it = 1; it <= nt; it++){
 
@@ -1305,7 +1315,7 @@ void EHHOFirstOrder(int argc, char **argv){
                     auto exact_vel_fun      = functions.Evaluate_v(t);
                     auto rhs_fun            = functions.Evaluate_f(t);
                     assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
-                    assembler.assemble_rhs(msh, rhs_fun,2);
+                    assembler.assemble_rhs(msh, rhs_fun);
                     assembler.apply_bc(msh);
                     erk_an.SetFg(assembler.RHS);
                     erk_an.erk_weight(yn, ki);

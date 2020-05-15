@@ -112,7 +112,7 @@ public:
 
     static simulation_data process_args(int argc, char** argv)
     {
-        const char* const short_opts = "k:l:s:h:n:c:f:e:";
+        const char* const short_opts = "k:l:s:r:n:c:f:e:";
         const option long_opts[] = {
                 {"degree", required_argument, nullptr, 'k'},
                 {"xref", required_argument, nullptr, 'l'},
