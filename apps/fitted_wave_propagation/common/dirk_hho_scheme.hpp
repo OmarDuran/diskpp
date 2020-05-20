@@ -26,6 +26,7 @@ class dirk_hho_scheme
     std::pair<size_t,size_t> m_cell_basis_data;
     size_t m_n_f_dof;
     bool m_global_sc_Q;
+    bool m_iteraive_solver_Q;
     
     public:
     
@@ -36,6 +37,7 @@ class dirk_hho_scheme
         m_Fg = Fg;
         m_scale = 0.0;
         m_global_sc_Q = false;
+        m_iteraive_solver_Q = false;
     }
     
     dirk_hho_scheme(SparseMatrix<T> & Kg, Matrix<T, Dynamic, 1> & Fg, SparseMatrix<T> & Mg, T scale){
@@ -44,6 +46,7 @@ class dirk_hho_scheme
         m_Fg = Fg;
         m_scale = scale;
         m_global_sc_Q = false;
+        m_iteraive_solver_Q = false;
     }
     
     void set_static_condensation_data(std::pair<size_t,size_t> cell_basis_data, size_t n_f_dof){
@@ -54,18 +57,26 @@ class dirk_hho_scheme
     
     void condense_equations(){
         SparseMatrix<T> K = m_Mg + m_scale * m_Kg;
-        m_analysis.SetKg(K,m_n_f_dof);
+        m_analysis.set_Kg(K,m_n_f_dof);
         m_analysis.condense_equations(m_cell_basis_data);
     }
     
-    void DecomposeMatrix(){
+    void ComposeMatrix(){
         if(m_global_sc_Q)
         {
             condense_equations();
         }else{
             SparseMatrix<T> K = m_Mg + m_scale * m_Kg;
-            m_analysis.SetKg(K);
+            m_analysis.set_Kg(K);
         }
+    }
+    
+    void setIterativeSolver(){
+        m_iteraive_solver_Q = true;
+        m_analysis.set_iterative_solver(false,1.0e-10);
+    }
+        
+    void DecomposeMatrix(){
         m_analysis.factorize();
     }
 
@@ -101,6 +112,10 @@ class dirk_hho_scheme
         }else{
             T scale = a * dt;
             SetScale(scale);
+            ComposeMatrix();
+            if (m_iteraive_solver_Q) {
+                DirkAnalysis().set_iterative_solver();
+            }
             DecomposeMatrix();
             k = DirkAnalysis().solve(m_Fg);
         }

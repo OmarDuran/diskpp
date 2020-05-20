@@ -390,6 +390,14 @@ public:
         m_y_t = y_t;
     }
             
+    size_t get_nx(){
+            return m_nx;
+    }
+            
+    size_t get_ny(){
+            return m_ny;
+    }
+            
     // Print in log file relevant mesh information
     void print_log_file(){
         fitted_geometry_builder<mesh_type>::m_n_elements = polygons.size();

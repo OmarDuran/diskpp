@@ -86,11 +86,11 @@ public:
             cell_i++;
         }
         tc.toc();
-        error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
+        error_file << std::endl;
         error_file.flush();
 
 
@@ -158,11 +158,11 @@ public:
         }
         tc.toc();
         
-        error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
+        error_file << std::endl;
         error_file.flush();
         
     }
@@ -495,11 +495,11 @@ public:
             cell_ind++;
         }
         tc.toc();
-        error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
+        error_file << std::endl;
         error_file.flush();
 
 
@@ -576,11 +576,11 @@ public:
             cell_i++;
         }
         tc.toc();
-        error_file << std::endl;
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
         error_file << "Characteristic h size = " << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
+        error_file << std::endl;
         error_file.flush();
 
     }
@@ -952,7 +952,7 @@ public:
     }
     
     /// Compute the discrete acoustic energy for one field approximation
-    static void compute_acoustic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & p_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
+    static double compute_acoustic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & p_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -1010,10 +1010,11 @@ public:
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+        return energy_h;
     }
     
     /// Compute the discrete acoustic energy for one field approximation
-    static void compute_acoustic_energy_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_two_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
+    static double compute_acoustic_energy_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, acoustic_two_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -1057,10 +1058,12 @@ public:
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+        
+        return energy_h;
     }
     
     /// Compute the discrete elastic energy for one field approximation
-    static void compute_elastic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & u_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
+    static double compute_elastic_energy_one_field(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_one_field_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & u_dof, Matrix<double, Dynamic, 1> & v_dof, std::ostream & energy_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -1117,10 +1120,11 @@ public:
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+        return energy_h;
     }
     
     /// Compute the discrete acoustic energy for one field approximation
-    static void compute_elastic_energy_three_fields(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_three_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
+    static double compute_elastic_energy_three_fields(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_three_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -1181,6 +1185,7 @@ public:
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
         energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+        return energy_h;
     }
     
     // Write a silo file with elastic properties as zonal variables

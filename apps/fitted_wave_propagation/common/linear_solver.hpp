@@ -9,6 +9,7 @@
 #ifndef linear_solver_hpp
 #define linear_solver_hpp
 
+#include "solvers/solver.hpp"
 
 #ifdef HAVE_INTEL_TBB
 #include <tbb/parallel_for.h>
@@ -36,11 +37,16 @@ class linear_solver
     #else
         SparseLU<SparseMatrix<T>> m_analysis;
     #endif
+    
+    ConjugateGradient<SparseMatrix<T>> m_analysis_cg;
+    BiCGSTAB<SparseMatrix<T>> m_analysis_bi_cg;
 
     size_t m_n_c_dof;
     size_t m_n_f_dof;
     bool m_global_sc_Q;
     bool m_is_decomposed_Q;
+    std::pair<bool,bool> m_iterative_solver_Q;
+    T m_tolerance;
     
     
     void DecomposeK(){
@@ -49,8 +55,21 @@ class linear_solver
     }
     
     Matrix<T, Dynamic, 1> solve_global(Matrix<T, Dynamic, 1> & Fg){
-        Matrix<T, Dynamic, 1> x_dof = m_analysis.solve(Fg);
-        return x_dof;
+        if (m_iterative_solver_Q.first) {
+            if (m_iterative_solver_Q.second) {
+                Matrix<T, Dynamic, 1> x_dof = m_analysis_cg.solve(Fg);
+                std::cout << "Number of iterations (CG): " << m_analysis_cg.iterations() << std::endl;
+                std::cout << "Estimated error: " << m_analysis_cg.error() << std::endl;
+                return x_dof;
+            }else{
+                Matrix<T, Dynamic, 1> x_dof = m_analysis_bi_cg.solve(Fg);
+                std::cout << "Number of iterations (BiCG): " << m_analysis_bi_cg.iterations() << std::endl;
+                std::cout << "Estimated error: " << m_analysis_bi_cg.error() << std::endl;
+                return x_dof;
+            }
+        }else{
+            return m_analysis.solve(Fg);
+        }
     }
     
     void scatter_segments(Matrix<T, Dynamic, 1> & Fg){
@@ -61,10 +80,29 @@ class linear_solver
     
     Matrix<T, Dynamic, 1> solve_sc(Matrix<T, Dynamic, 1> & Fg){
         
+        // Split vector into cells and faces dofs
         scatter_segments(Fg);
+        
+        // Condense vector
         Matrix<T, Dynamic, 1> delta_c = m_Kcc_inv*m_Fc;
         m_F = m_Ff - m_Kfc*delta_c;
-        Matrix<T, Dynamic, 1> x_n_f_dof = m_analysis.solve(m_F);
+        
+        // face linear solver step
+        Matrix<T, Dynamic, 1> x_n_f_dof;
+        if (m_iterative_solver_Q.first) {
+            if (m_iterative_solver_Q.second) {
+                x_n_f_dof = m_analysis_cg.solve(m_F);
+                std::cout << "Number of iterations (CG): " << m_analysis_cg.iterations() << std::endl;
+                std::cout << "Estimated error: " << m_analysis_cg.error() << std::endl;
+            }else{
+                x_n_f_dof = m_analysis_bi_cg.solve(m_F);
+                std::cout << "Number of iterations (BiCG): " << m_analysis_bi_cg.iterations() << std::endl;
+                std::cout << "Estimated error: " << m_analysis_bi_cg.error() << std::endl;
+            }
+        }else{
+            x_n_f_dof = m_analysis.solve(m_F);
+        }
+        
         
         Matrix<T, Dynamic, 1> Kcf_x_f_dof = m_Kcf*x_n_f_dof;
         Matrix<T, Dynamic, 1> delta_f = m_Kcc_inv*Kcf_x_f_dof;
@@ -93,11 +131,11 @@ class linear_solver
     public:
     
     linear_solver() : m_global_sc_Q(false), m_is_decomposed_Q(false)  {
-
+        m_iterative_solver_Q = std::make_pair(false,false);
     }
     
     linear_solver(SparseMatrix<T> & Kg) : m_K(Kg), m_global_sc_Q(false), m_is_decomposed_Q(false)  {
-
+        m_iterative_solver_Q = std::make_pair(false,false);
     }
     
     linear_solver(SparseMatrix<T> & Kg, size_t n_f_dof) :
@@ -107,15 +145,21 @@ class linear_solver
         scatter_blocks(Kg);
     }
     
-    void SetKg(SparseMatrix<T> & Kg){
+    void set_Kg(SparseMatrix<T> & Kg){
         m_global_sc_Q = false;
         m_K = Kg;
     }
 
-    void SetKg(SparseMatrix<T> & Kg, size_t n_f_dof){
+    void set_Kg(SparseMatrix<T> & Kg, size_t n_f_dof){
         m_global_sc_Q = true;
         m_n_f_dof = n_f_dof;
         scatter_blocks(Kg);
+    }
+    
+    void set_iterative_solver(bool symmetric_matrix_Q = false, T tolerance = 1.0e-11){
+        m_iterative_solver_Q = std::make_pair(true,symmetric_matrix_Q);
+        m_is_decomposed_Q    = true;
+        m_tolerance = tolerance;
     }
     
     SparseMatrix<T> & Kcc(){
@@ -206,6 +250,17 @@ class linear_solver
         
     void factorize(){
         if (m_is_decomposed_Q) {
+            if (m_iterative_solver_Q.first) {
+                if (m_iterative_solver_Q.second) {
+                    m_analysis_cg.compute(m_K);
+                    m_analysis_cg.setTolerance(m_tolerance);
+                    m_analysis_cg.setMaxIterations(m_K.rows());
+                }else{
+                    m_analysis_bi_cg.compute(m_K);
+                    m_analysis_bi_cg.setTolerance(m_tolerance);
+                    m_analysis_bi_cg.setMaxIterations(m_K.rows());
+                }
+            }
             return;
         }
         DecomposeK();

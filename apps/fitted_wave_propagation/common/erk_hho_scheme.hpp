@@ -33,9 +33,13 @@ class erk_hho_scheme
     #else
         SimplicialLLT<SparseMatrix<T>> m_analysis_f;
     #endif
+    
+    ConjugateGradient<SparseMatrix<T>> m_analysis_cg;
+    
     size_t m_n_c_dof;
     size_t m_n_f_dof;
     bool m_sff_is_block_diagonal_Q;
+    bool m_iterative_solver_Q;
     
     public:
     
@@ -55,9 +59,20 @@ class erk_hho_scheme
         
     }
     
+    void setIterativeSolver(T tolerance = 1.0e-11){
+        m_iterative_solver_Q = true;
+        m_analysis_cg.setTolerance(tolerance);
+    }
+        
     void DecomposeFaceTerm(){
-        m_analysis_f.analyzePattern(m_Sff);
-        m_analysis_f.factorize(m_Sff);
+        
+        if (m_iterative_solver_Q) {
+            m_analysis_cg.compute(m_Sff);
+            m_analysis_cg.setMaxIterations(m_Sff.rows());
+        }else{
+            m_analysis_f.analyzePattern(m_Sff);
+            m_analysis_f.factorize(m_Sff);
+        }
         m_sff_is_block_diagonal_Q = false;
     }
     
@@ -235,7 +250,11 @@ class erk_hho_scheme
         if (m_sff_is_block_diagonal_Q) {
             x.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf;
         }else{
-            x.block(m_n_c_dof, 0, m_n_f_dof, 1) = -FacesAnalysis().solve(RHSf); // new state
+            if (m_iterative_solver_Q) {
+                x.block(m_n_c_dof, 0, m_n_f_dof, 1) = -m_analysis_cg.solve(RHSf); // new state
+            }else{
+                x.block(m_n_c_dof, 0, m_n_f_dof, 1) = -FacesAnalysis().solve(RHSf); // new state
+            }
         }
     
     }
@@ -256,7 +275,13 @@ class erk_hho_scheme
         if (m_sff_is_block_diagonal_Q) {
             k.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf;
         }else{
-            k.block(m_n_c_dof, 0, m_n_f_dof, 1) = -FacesAnalysis().solve(RHSf); // new state
+            if (m_iterative_solver_Q) {
+                k.block(m_n_c_dof, 0, m_n_f_dof, 1) = -m_analysis_cg.solve(RHSf); // new state
+                std::cout << "Number of iterations (CG): " << m_analysis_cg.iterations() << std::endl;
+                std::cout << "Estimated error: " << m_analysis_cg.error() << std::endl;
+            }else{
+                k.block(m_n_c_dof, 0, m_n_f_dof, 1) = -FacesAnalysis().solve(RHSf); // new state
+            }
         }
     
     }

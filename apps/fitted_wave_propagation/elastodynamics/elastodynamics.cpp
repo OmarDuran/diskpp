@@ -68,7 +68,6 @@ int main(int argc, char **argv)
 //    HeterogeneousIHHOSecondOrder(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
-    
 //    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
     
@@ -76,7 +75,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-//    HHOThreeFieldsConvergenceExample(argc, argv);
+    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
 }
@@ -377,6 +376,9 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
             auto assembler = elastodynamic_three_fields_assembler<mesh_type>(msh, hho_di, bnd);
             if(sim_data.m_hdg_stabilization_Q){
                 assembler.set_hdg_stabilization();
+            }
+            if(sim_data.m_scaled_stabilization_Q){
+                assembler.set_scaled_stabilization();
             }
             assembler.load_material_data(msh,material);
             assembler.assemble(msh, rhs_fun);
@@ -697,7 +699,7 @@ void IHHOFirstOrder(int argc, char **argv){
     assembler.assemble(msh, rhs_fun);
     tc.toc();
     std::cout << bold << cyan << "First stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
-    dirk_hho_scheme dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
+    dirk_hho_scheme<RealType> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
 
     if (is_sdirk_Q) {
         double scale = a(0,0) * dt;
@@ -1294,7 +1296,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     assembler.assemble(msh, null_fun);
     tc.toc();
     std::cout << bold << cyan << "First stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
-    dirk_hho_scheme dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
+    dirk_hho_scheme<RealType> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
 
     if (is_sdirk_Q) {
         double scale = a(0,0) * dt;

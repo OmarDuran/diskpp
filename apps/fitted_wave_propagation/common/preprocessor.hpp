@@ -78,13 +78,13 @@ public:
     void print_simulation_data(){
         std::cout << bold << red << "face degree : " << m_k_degree << reset << std::endl;
         std::cout << bold << red << "refinements : " << m_n_divs << reset << std::endl;
-        std::cout << bold << red << "stabilization type Q? : " << m_hdg_stabilization_Q << reset << std::endl;
-        std::cout << bold << red << "scaled stabilization Q? : " << m_scaled_stabilization_Q << reset << std::endl;
-        std::cout << bold << red << "condensation type Q? : " << m_sc_Q << reset << std::endl;
+        std::cout << bold << red << "stabilization type ? : " << m_hdg_stabilization_Q << reset << std::endl;
+        std::cout << bold << red << "scaled stabilization ? : " << m_scaled_stabilization_Q << reset << std::endl;
+        std::cout << bold << red << "condensation  ? : " << m_sc_Q << reset << std::endl;
         std::cout << bold << red << "time refinements : " << m_nt_divs << reset << std::endl;
-        std::cout << bold << red << "write silo files Q? : " << m_render_silo_files_Q << reset << std::endl;
-        std::cout << bold << red << "report energy file Q? : " << m_report_energy_Q << reset << std::endl;
-        std::cout << bold << red << "quadratic spatial function Q? : " << m_quadratic_function_Q << reset << std::endl;
+        std::cout << bold << red << "write silo files ? : " << m_render_silo_files_Q << reset << std::endl;
+        std::cout << bold << red << "report energy file ? : " << m_report_energy_Q << reset << std::endl;
+        std::cout << bold << red << "quadratic spatial function ? : " << m_quadratic_function_Q << reset << std::endl;
     }
     
 };

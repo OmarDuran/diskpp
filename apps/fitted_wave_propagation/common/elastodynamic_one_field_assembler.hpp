@@ -248,7 +248,7 @@ public:
 
     }
             
-    void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
+    void assemble(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> rhs_fun){
         
         LHS.setZero();
         RHS.setZero();
@@ -288,7 +288,7 @@ public:
         
     }
             
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
+    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> & rhs_fun){
         
         RHS.setZero();
         #ifdef HAVE_INTEL_TBB
@@ -381,7 +381,7 @@ public:
         }
     }
             
-    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun){
         size_t n_dof = MASS.rows();
         x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
         for (auto& cell : msh)
@@ -391,7 +391,7 @@ public:
         }
     }
             
-    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun){
 
         for (auto& cell : msh)
         {
@@ -490,13 +490,13 @@ public:
         }
     }
             
-    void load_material_data(const Mesh& msh, std::function<std::vector<double>(const typename Mesh::point_type& )> elastic_mat_fun){
+    void load_material_data(const Mesh& msh, std::function<std::vector<T>(const typename Mesh::point_type& )> elastic_mat_fun){
         m_material.clear();
         m_material.reserve(msh.cells_size());
         for (auto& cell : msh)
         {
             auto bar = barycenter(msh, cell);
-            std::vector<double> mat_data = elastic_mat_fun(bar);
+            std::vector<T> mat_data = elastic_mat_fun(bar);
             T rho = mat_data[0];
             T vp = mat_data[1];
             T vs = mat_data[2];
