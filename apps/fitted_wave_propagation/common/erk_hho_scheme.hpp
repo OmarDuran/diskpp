@@ -12,8 +12,6 @@
 #include <Eigen/SparseCore>
 #include <Eigen/SparseLU>
 
-#define with_inverse_Q
-
 template<typename T>
 class erk_hho_scheme
 {
