@@ -36,11 +36,12 @@ public:
         RealType scalar_l2_error = 0.0;
         RealType flux_l2_error = 0.0;
         size_t cell_i = 0;
-        RealType h;
+        RealType h = 10.0;
         for (auto& cell : msh)
         {
-            if(cell_i == 0){
-                h = diameter(msh, cell);
+            RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
             }
 
             Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(cell_i*cell_dof, 0, cell_dof, 1);
@@ -110,11 +111,12 @@ public:
         RealType scalar_l2_error = 0.0;
         RealType flux_l2_error = 0.0;
         size_t cell_i = 0;
-        RealType h;
+        RealType h = 10.0;
         for (auto& cell : msh)
         {
-            if(cell_i == 0){
-                h = diameter(msh, cell);
+             RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
             }
 
             // scalar evaluation
@@ -434,12 +436,13 @@ public:
         
         RealType vector_l2_error = 0.0;
         RealType flux_l2_error = 0.0;
-        RealType h;
+        RealType h = 10.0;
         size_t cell_ind = 0;
         for (auto& cell : msh)
         {
-            if(cell_ind == 0){
-                h = diameter(msh, cell);
+            RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
             }
 
             Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
@@ -521,11 +524,12 @@ public:
         RealType vector_l2_error = 0.0;
         RealType flux_l2_error = 0.0;
         size_t cell_i = 0;
-        RealType h;
+        RealType h = 10.0;
         for (auto& cell : msh)
         {
-            if(cell_i == 0){
-                h = diameter(msh, cell);
+            RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
             }
 
             Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(cell_i*cell_dof+n_ten_cbs+n_sca_cbs, 0, n_vec_cbs, 1);
