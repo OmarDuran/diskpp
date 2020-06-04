@@ -13,6 +13,7 @@
 #include "../common/acoustic_two_fields_assembler.hpp"
 #include "../common/elastodynamic_one_field_assembler.hpp"
 #include "../common/elastodynamic_three_fields_assembler.hpp"
+#include "../common/elastoacoustic_two_fields_assembler.hpp"
 
 #ifdef HAVE_INTEL_TBB
 #include <tbb/parallel_for.h>
