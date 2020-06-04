@@ -60,8 +60,8 @@ int main(int argc, char **argv)
 
     RealType lx = 2.0;
     RealType ly = 1.0;
-    size_t nx = 4;
-    size_t ny = 2;
+    size_t nx = 2;
+    size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
     typedef disk::BoundaryConditions<mesh_type, false> e_boundary_type;
     typedef disk::BoundaryConditions<mesh_type, true> a_boundary_type;
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
-    RealType ti = 0.0;
+    RealType ti = 0.5;
     RealType tf = 1.0;
     RealType dt     = (tf-ti)/nt;
     
@@ -138,18 +138,18 @@ int main(int argc, char **argv)
     std::set<size_t> elastic_bc_face_indexes, acoustic_bc_face_indexes, interface_face_indexes;
     
     RealType eps = 1.0e-10;
-    size_t cell_id = 0;
+    size_t cell_ind = 0;
     for (auto & cell : msh ) {
         
         mesh_type::point_type bar = barycenter(msh, cell);
         if (bar.x() > 0) {
             acoustic_material_data<RealType> material = acoustic_mat_fun(bar);
-            a_material.insert(std::make_pair(cell_id,material));
+            a_material.insert(std::make_pair(cell_ind,material));
         }else{
             elastic_material_data<RealType> material = elastic_mat_fun(bar);
-            e_material.insert(std::make_pair(cell_id,material));
+            e_material.insert(std::make_pair(cell_ind,material));
         }
-        cell_id++;
+        cell_ind++;
     }
     
     for (auto face_it = msh.faces_begin(); face_it != msh.faces_end(); face_it++)
@@ -209,20 +209,18 @@ int main(int argc, char **argv)
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
     
 //    std::cout << "M = " << assembler.MASS.toDense() << std::endl;
-    
-    int aka = 0;
 
     // Projecting initial scalar, velocity and acceleration
     Matrix<RealType, Dynamic, 1> u_dof_n, v_dof_n, a_dof_n;
-//    assembler.project_over_cells(msh, u_dof_n, exact_scal_fun);
-//    assembler.project_over_cells(msh, v_dof_n, exact_vel_fun);
-//    assembler.project_over_cells(msh, a_dof_n, exact_accel_fun);
-//
-//    if (sim_data.m_render_silo_files_Q) {
-//        size_t it = 0;
-//        std::string silo_file_name = "scalar_";
-//        postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, exact_scal_fun, false);
-//    }
+    assembler.project_over_cells(msh, u_dof_n, u_fun, s_u_fun);
+    assembler.project_over_cells(msh, v_dof_n, v_fun, s_v_fun);
+    assembler.project_over_cells(msh, a_dof_n, a_fun, s_a_fun);
+        
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "elasto_acoustic_two_fields_";
+        postprocessor<mesh_type>::write_silo_two_fields_elastoacoustic(silo_file_name, it, msh, hho_di, u_dof_n, u_fun, s_u_fun, e_material, a_material, true);
+    }
 //
 //    std::ofstream simulation_log("acoustic_one_field.txt");
 //
@@ -245,7 +243,7 @@ int main(int argc, char **argv)
 //
 //        tc.tic();
         assembler.assemble(msh, f_fun, s_f_fun);
-        std::cout << "K = " << assembler.LHS.toDense() << std::endl;
+//        std::cout << "K = " << assembler.LHS.toDense() << std::endl;
         int oko = 0;
 //        SparseMatrix<double> Kg = assembler.LHS;
 //        assembler.LHS *= beta*(dt*dt);

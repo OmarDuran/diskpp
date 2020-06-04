@@ -422,36 +422,48 @@ public:
         return (1.0/material.rho())*(R_operator + S_operator);
     }
             
-    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> sca_fun){
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
+        
+        auto storage = msh.backend_storage();
         size_t n_dof = MASS.rows();
         x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
-        
-        // elastic
-        for (auto& cell : msh)
-        {
-            Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, cell, m_hho_di.cell_degree(), vec_fun);
-            scatter_cell_dof_data(msh, cell, x_glob, x_proj_dof);
-        }
-    }
-            
-    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun){
 
-//        for (auto& cell : msh)
-//        {
-//            auto fcs = faces(msh, cell);
-//            for (size_t i = 0; i < fcs.size(); i++)
-//            {
-//                auto face = fcs[i];
-//                auto fc_id = msh.lookup(face);
-//                bool is_dirichlet_Q = m_bnd.is_dirichlet_face(fc_id);
-//                if (is_dirichlet_Q)
-//                {
-//                    continue;
-//                }
-//                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
-//                scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
-//            }
-//        }
+        // elastic block
+        size_t e_cell_ind = 0;
+        for (auto e_chunk : m_e_material) {
+            auto& cell = storage->surfaces[e_chunk.first];
+            Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, cell, m_hho_di.cell_degree(), vec_fun);
+            scatter_e_cell_dof_data(e_cell_ind, msh, cell, x_glob, x_proj_dof);
+            e_cell_ind++;
+        }
+        
+        // acoustic block
+        size_t a_cell_ind = 0;
+        for (auto a_chunk : m_a_material) {
+            auto& cell = storage->surfaces[a_chunk.first];
+            Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, cell, m_hho_di.cell_degree(), scal_fun);
+            scatter_a_cell_dof_data(a_cell_ind, msh, cell, x_glob, x_proj_dof);
+            a_cell_ind++;
+        }
+    
+    }
+    
+    void
+    scatter_e_cell_dof_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell,
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+    {
+        size_t n_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        auto cell_ofs = e_cell_ind * n_cbs;
+        x_glob.block(cell_ofs, 0, n_cbs, 1) = x_proj_dof;
+    }
+    
+    void
+    scatter_a_cell_dof_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell,
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+    {
+        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        auto cell_ofs = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
+        x_glob.block(cell_ofs, 0, n_cbs, 1) = x_proj_dof;
     }
             
     void finalize(void)
