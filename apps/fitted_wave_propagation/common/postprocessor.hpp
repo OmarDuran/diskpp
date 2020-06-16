@@ -1359,7 +1359,6 @@ public:
                         approx_ux.push_back(uh(0,0));
                         approx_uy.push_back(uh(1,0));
                     }
-//                    e_cell_ind++;
                 }else{
                     
                     exact_u.push_back( scal_fun(bar));
@@ -1378,7 +1377,6 @@ public:
                         RealType uh = scalar_cell_dof.dot( t_phi );
                         approx_u.push_back(uh);
                     }
-//                    a_cell_ind++;
                 }
 
             }
@@ -1422,6 +1420,157 @@ public:
         tc.toc();
         std::cout << std::endl;
         std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
+    
+//    two_fields_elastoacoustic(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,
+    
+//    std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<double(const typename Mesh::point_type& )> scal_fun, std::map<size_t,elastic_material_data<double>> & e_material, std::map<size_t,acoustic_material_data<double>> & a_material, bool cell_centered_Q)
+    
+    /// Compute L2 and H1 errors for two fields elastoacoustic approximation
+    static void compute_errors_two_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        
+        RealType scalar_l2_error = 0.0;
+        RealType flux_l2_error = 0.0;
+        RealType vector_l2_error = 0.0;
+        RealType sigma_l2_error = 0.0;
+        RealType h = 10.0;
+        size_t e_cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+        size_t a_cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
+        auto storage = msh.backend_storage();
+        
+        size_t e_cell_ind = 0;
+        for (auto& e_chunk : assembler.get_e_material_data()) {
+            
+            auto& cell = storage->surfaces[e_chunk.first];
+            
+            RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
+            }
+
+            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(e_cell_ind*e_cell_dof, 0, e_cell_dof, 1);
+
+            // scalar evaluation
+            {
+                auto cell_basis = disk::make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, vec_fun);
+                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
+                Matrix<RealType, Dynamic, 1> diff = real_dofs - vec_cell_dof;
+                vector_l2_error += diff.dot(mass*diff);
+
+            }
+
+            elastic_material_data<RealType> material = e_chunk.second;
+            RealType mu = material.rho()*material.vs()*material.vs();
+            RealType lambda = material.rho()*material.vp()*material.vp() - 2.0*mu;
+            
+            // sigma evaluation
+            {
+                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
+                Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_e_dof_data(e_cell_ind, msh, cell, x_dof);
+                
+                auto           sgr = make_vector_hho_symmetric_laplacian(msh, cell, hho_di);
+                dynamic_vector<RealType> GTu = sgr.first * all_dofs;
+
+                auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+                dynamic_vector<RealType> divu = dr.first * all_dofs;
+
+                auto cbas_v = disk::make_vector_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+                auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+
+                auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+
+                // Error integrals
+                for (auto & point_pair : int_rule) {
+
+                    RealType omega = point_pair.weight();
+                    
+                    auto t_dphi = rec_basis.eval_gradients( point_pair.point() );
+                    auto gphi   = cbas_v.eval_sgradients(point_pair.point());
+                    auto epsilon = disk::eval(GTu, gphi, dim);
+                    auto divphi   = cbas_s.eval_functions(point_pair.point());
+                    auto trace_epsilon = disk::eval(divu, divphi);
+                    auto sigma = 2.0 * mu * epsilon + lambda * trace_epsilon * static_matrix<RealType, 2, 2>::Identity();
+                    auto flux_diff = (sigma_fun(point_pair.point()) - sigma).eval();
+                    sigma_l2_error += omega * flux_diff.squaredNorm();
+
+                }
+            }
+
+            e_cell_ind++;
+        }
+        
+        size_t n_elastic_cell_dof = assembler.get_e_material_data().size() * e_cell_dof;
+        size_t a_cell_ind = 0;
+        for (auto& a_chunk : assembler.get_a_material_data()) {
+            
+            auto& cell = storage->surfaces[a_chunk.first];
+            
+            RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
+            }
+
+            Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(a_cell_ind*a_cell_dof+n_elastic_cell_dof, 0, a_cell_dof, 1);
+
+            // scalar evaluation
+            {
+                auto cell_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, scal_fun);
+                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
+                Matrix<RealType, Dynamic, 1> diff = real_dofs - scalar_cell_dof;
+                scalar_l2_error += diff.dot(mass*diff);
+
+            }
+
+            // flux evaluation
+            {
+                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
+                auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+                auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
+                Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_a_dof_data(a_cell_ind, msh, cell, x_dof);
+                Matrix<RealType, Dynamic, 1> recdofs = gr.first * all_dofs;
+
+                // Error integrals
+                for (auto & point_pair : int_rule) {
+
+                    RealType omega = point_pair.weight();
+                    auto t_dphi = rec_basis.eval_gradients( point_pair.point() );
+                    Matrix<RealType, 1, 2> grad_uh = Matrix<RealType, 1, 2>::Zero();
+
+                    for (size_t i = 1; i < t_dphi.rows(); i++){
+                        grad_uh = grad_uh + recdofs(i-1)*t_dphi.block(i, 0, 1, 2);
+                    }
+
+                    Matrix<RealType, 1, 2> grad_u_exact = Matrix<RealType, 1, 2>::Zero();
+                    grad_u_exact(0,0) =  flux_fun(point_pair.point())[0];
+                    grad_u_exact(0,1) =  flux_fun(point_pair.point())[1];
+                    flux_l2_error += omega * (grad_u_exact - grad_uh).dot(grad_u_exact - grad_uh);
+
+                }
+            }
+            a_cell_ind++;
+        }
+        
+        tc.toc();
+        std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
+        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "Elastic region : " << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(sigma_l2_error) << std::endl;
+        error_file << "Acoustic region : " << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
+        error_file << std::endl;
+        error_file.flush();
     }
     
 };

@@ -80,7 +80,7 @@ int main(int argc, char **argv)
         nt *= 2;
     }
     RealType ti = 0.5;
-    RealType tf = 1.0;
+    RealType tf = 1.0;//0.515625;
     RealType dt     = (tf-ti)/nt;
     
     scal_vec_analytic_functions functions;
@@ -225,8 +225,6 @@ int main(int argc, char **argv)
     assembler.assemble_coupling_terms(msh);
     tc.toc();
     std::cout << bold << cyan << "Coupling Assembly completed: " << tc << " seconds" << reset << std::endl;
-    
-//    std::cout << "C = " << assembler.COUPLING.toDense() << std::endl;
 
     // Projecting initial scalar, velocity and acceleration
     Matrix<RealType, Dynamic, 1> u_dof_n, v_dof_n, a_dof_n;
@@ -240,7 +238,7 @@ int main(int argc, char **argv)
         postprocessor<mesh_type>::write_silo_two_fields_elastoacoustic(silo_file_name, it, msh, hho_di, u_dof_n, u_fun, s_u_fun, e_material, a_material, false);
     }
 
-    std::ofstream simulation_log("acoustic_one_field.txt");
+    std::ofstream simulation_log("elasto_acoustic_two_fields.txt");
 
 //    if (sim_data.m_report_energy_Q) {
 //        postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
@@ -288,8 +286,10 @@ int main(int argc, char **argv)
             RealType t = dt*it+ti;
             auto u_fun      = functions.Evaluate_u(t);
             auto f_fun      = functions.Evaluate_f(t);
+            auto flux_fun   = functions.Evaluate_sigma(t);
             auto s_u_fun    = functions.Evaluate_s_u(t);
             auto s_f_fun    = functions.Evaluate_s_f(t);
+            auto s_flux_fun  = functions.Evaluate_s_q(t);
             
 
             tc.tic();
@@ -326,9 +326,10 @@ int main(int argc, char **argv)
 //                postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);
 //            }
 
-//            if(it == nt){
+            if(it == nt){
 //                postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, p_dof_n, exact_scal_fun, exact_flux_fun, simulation_log);
-//            }
+                postprocessor<mesh_type>::compute_errors_two_fields_elastoacoustic(msh, hho_di, assembler, u_dof_n, u_fun, flux_fun, s_u_fun, s_flux_fun, simulation_log);
+            }
 
         }
         simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
