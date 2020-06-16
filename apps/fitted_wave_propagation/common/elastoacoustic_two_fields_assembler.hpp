@@ -38,11 +38,12 @@ class elastoacoustic_two_fields_assembler
     e_boundary_type                     m_e_bnd;
     a_boundary_type                     m_a_bnd;
     std::vector< Triplet<T> >           m_triplets;
+    std::vector< Triplet<T> >           m_c_triplets;
     std::vector< Triplet<T> >           m_mass_triplets;
     std::map<size_t,elastic_material_data<T>> m_e_material;
     std::map<size_t,acoustic_material_data<T>> m_a_material;
     std::vector< size_t >               m_elements_with_bc_eges;
-    std::set<size_t>                    m_interface_face_indexes;
+    std::map<size_t,std::pair<size_t,size_t>>   m_interface_cell_indexes;
 
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
@@ -57,6 +58,7 @@ public:
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
     SparseMatrix<T>         MASS;
+    SparseMatrix<T>         COUPLING;
 
     elastoacoustic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const e_boundary_type& e_bnd, const a_boundary_type& a_bnd, std::map<size_t,elastic_material_data<T>> e_material, std::map<size_t,acoustic_material_data<T>> a_material)
         : m_hho_di(hho_di), m_e_bnd(e_bnd), m_a_bnd(a_bnd), m_e_material(e_material), m_a_material(a_material), m_hho_stabilization_Q(true)
@@ -150,6 +152,7 @@ public:
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
         MASS = SparseMatrix<T>( system_size, system_size );
+        COUPLING = SparseMatrix<T>( system_size, system_size );
             
 //        classify_cells(msh);
     }
@@ -310,6 +313,43 @@ public:
 
     }
     
+    void scatter_e_interface_data(const Mesh& msh, const typename Mesh::face_type& face,
+             const Matrix<T, Dynamic, Dynamic>& interface_matrix)
+    {
+        auto vfbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        auto sfbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+
+        std::vector<assembly_index> asm_map_e, asm_map_a;
+        asm_map_e.reserve(vfbs);
+        asm_map_a.reserve(sfbs);
+        
+        auto fc_id = msh.lookup(face);
+        
+        auto e_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*vfbs;
+        bool e_dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
+        for (size_t i = 0; i < vfbs; i++){
+            asm_map_e.push_back( assembly_index(e_face_LHS_offset+i, !e_dirichlet) );
+        }
+            
+        auto a_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*sfbs;
+        bool a_dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
+        for (size_t i = 0; i < sfbs; i++){
+            asm_map_a.push_back( assembly_index(a_face_LHS_offset+i, !a_dirichlet) );
+        }
+        
+        assert( asm_map_e.size() == interface_matrix.rows() && asm_map_a.size() == interface_matrix.cols() );
+
+        for (size_t i = 0; i < interface_matrix.rows(); i++)
+        {
+            for (size_t j = 0; j < interface_matrix.cols(); j++)
+            {
+                    m_c_triplets.push_back( Triplet<T>(asm_map_e[i], asm_map_a[j], interface_matrix(i,j)) );
+                    m_c_triplets.push_back( Triplet<T>(asm_map_a[j], asm_map_e[i], - interface_matrix(i,j)) );
+            }
+        }
+
+    }
+    
     void assemble(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun){
         
         auto storage = msh.backend_storage();
@@ -338,8 +378,23 @@ public:
             scatter_a_data(a_cell_ind, msh, cell, laplacian_operator_loc, f_loc);
             a_cell_ind++;
         }
-
         finalize();
+    }
+    
+
+    void assemble_coupling_terms(const Mesh& msh){
+        
+        auto storage = msh.backend_storage();
+        COUPLING.setZero();
+        // coupling blocks
+        for (auto chunk : m_interface_cell_indexes) {
+            auto& face = storage->edges[chunk.first];
+            auto& e_cell = storage->surfaces[chunk.second.first];
+            auto& a_cell = storage->surfaces[chunk.second.second];
+            Matrix<T, Dynamic, Dynamic> interface_operator_loc = e_interface_operator(msh, face, e_cell, a_cell);
+            scatter_e_interface_data(msh, face, interface_operator_loc);
+        }
+        finalize_coupling();
     }
 
     void assemble_mass(const Mesh& msh){
@@ -421,7 +476,34 @@ public:
         }
         return (1.0/material.rho())*(R_operator + S_operator);
     }
-            
+    
+    Matrix<T, Dynamic, Dynamic> e_interface_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell){
+
+        Matrix<T, Dynamic, Dynamic> interface_operator;
+        auto facdeg = m_hho_di.face_degree();
+        auto vfbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        auto sfbs = disk::scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+        interface_operator = Matrix<T, Dynamic, Dynamic>::Zero(vfbs, sfbs);
+        
+        auto vfb = make_vector_monomial_basis(msh, face, facdeg);
+        auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
+        const auto qps = integrate(msh, face, facdeg);
+        const auto n      = disk::normal(msh, e_cell, face);
+        for (auto& qp : qps)
+        {
+            const auto v_f_phi = vfb.eval_functions(qp.point());
+            const auto s_f_phi = sfb.eval_functions(qp.point());
+
+            assert(v_f_phi.rows() == vfbs);
+            assert(s_f_phi.rows() == sfbs);
+            const auto n_dot_v_f_phi = disk::priv::inner_product(v_f_phi,disk::priv::inner_product(qp.weight(), n));
+            const auto result = disk::priv::outer_product(n_dot_v_f_phi, s_f_phi);
+            interface_operator += result;
+        }
+        return interface_operator;
+    }
+    
     void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
         
         auto storage = msh.backend_storage();
@@ -466,18 +548,23 @@ public:
         x_glob.block(cell_ofs, 0, n_cbs, 1) = x_proj_dof;
     }
             
-    void finalize(void)
+    void finalize()
     {
         LHS.setFromTriplets( m_triplets.begin(), m_triplets.end() );
         m_triplets.clear();
     }
             
-    void finalize_mass(void)
+    void finalize_mass()
     {
         MASS.setFromTriplets( m_mass_triplets.begin(), m_mass_triplets.end() );
         m_mass_triplets.clear();
     }
 
+    void finalize_coupling()
+    {
+        COUPLING.setFromTriplets( m_c_triplets.begin(), m_c_triplets.end() );
+        m_c_triplets.clear();
+    }
             
     void set_hdg_stabilization(){
         if(m_hho_di.cell_degree() > m_hho_di.face_degree())
@@ -493,8 +580,8 @@ public:
         }
     }
     
-    void set_interface_face_indexes(std::set<size_t> & interface_face_indexes){
-        m_interface_face_indexes = interface_face_indexes;
+    void set_interface_cell_indexes(std::map<size_t,std::pair<size_t,size_t>> & interface_cell_indexes){
+        m_interface_cell_indexes = interface_cell_indexes;
     }
             
     void set_hho_stabilization(){

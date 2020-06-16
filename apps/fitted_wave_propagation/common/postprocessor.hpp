@@ -1337,8 +1337,10 @@ public:
 //            {
 //                auto bar = *std::next(msh.points_begin(), pt_id.first);
 //                cell_i = pt_id.second;
-//                auto cell = *std::next(msh.cells_begin(), cell_i);
+//                auto& cell = storage->surfaces[cell_i];
 //
+//                
+//                
 //                exact_ux.push_back( vec_fun(bar)(0,0) );
 //                exact_uy.push_back( vec_fun(bar)(1,0) );
 //
