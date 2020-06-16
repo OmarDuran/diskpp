@@ -1303,9 +1303,6 @@ public:
                 }
                 a_cell_ind++;
             }
-            
-
-            
 
 
         }else{
@@ -1316,45 +1313,75 @@ public:
             approx_ux.reserve( num_points );
             approx_uy.reserve( num_points );
             approx_u.reserve( num_points );
-            
-            
-//            // scan for selected cells, common cells are discardable
-//            std::map<size_t, size_t> point_to_cell;
-//            size_t cell_i = 0;
-//            for (auto& cell : msh)
-//            {
-//                auto points = cell.point_ids();
-//                size_t n_p = points.size();
-//                for (size_t l = 0; l < n_p; l++)
-//                {
-//                    auto pt_id = points[l];
-//                    point_to_cell[pt_id] = cell_i;
-//                }
-//                cell_i++;
-//            }
-//
-//            for (auto& pt_id : point_to_cell)
-//            {
-//                auto bar = *std::next(msh.points_begin(), pt_id.first);
-//                cell_i = pt_id.second;
-//                auto& cell = storage->surfaces[cell_i];
-//
-//                
-//                
-//                exact_ux.push_back( vec_fun(bar)(0,0) );
-//                exact_uy.push_back( vec_fun(bar)(1,0) );
-//
-//                // vector evaluation
-//                {
-//                    auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
-//                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, cell_dof, 1);
-//                    auto t_phi = cell_basis.eval_functions( bar );
-//                    assert(t_phi.rows() == cell_basis.size());
-//                    auto uh = disk::eval(vec_x_cell_dof, t_phi);
-//                    approx_ux.push_back(uh(0,0));
-//                    approx_uy.push_back(uh(1,0));
-//                }
-//            }
+                        
+            // scan for selected cells, common cells are discardable
+            std::map<size_t, size_t> point_to_cell;
+            size_t cell_ind = 0;
+            for (auto& cell : msh)
+            {
+                auto points = cell.point_ids();
+                size_t n_p = points.size();
+                for (size_t l = 0; l < n_p; l++)
+                {
+                    auto pt_id = points[l];
+                    point_to_cell[pt_id] = cell_ind;
+                }
+                cell_ind++;
+            }
+
+            std::map<size_t,elastic_material_data<double>>::iterator it;
+            size_t n_elastic_cell_dof = e_material.size() * e_cell_dof;
+            size_t e_cell_ind = 0;
+            size_t a_cell_ind = 0;
+            for (auto& pt_id : point_to_cell)
+            {
+                auto bar = *std::next(msh.points_begin(), pt_id.first);
+                cell_ind = pt_id.second;
+                auto& cell = storage->surfaces[cell_ind];
+                
+                it = e_material.find(cell_ind);
+                if (it != e_material.end())
+                {
+                    exact_ux.push_back( vec_fun(bar)(0,0) );
+                    exact_uy.push_back( vec_fun(bar)(1,0) );
+                    
+                    exact_u.push_back( 0.0 / 0.0 );
+                    approx_u.push_back( 0.0/ 0.0);
+                    
+                    e_cell_ind = std::distance(std::begin(e_material), e_material.find(cell_ind));
+                    // vector evaluation
+                    {
+                        auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                        Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(e_cell_ind*e_cell_dof, 0, e_cell_dof, 1);
+                        auto t_phi = cell_basis.eval_functions( bar );
+                        assert(t_phi.rows() == cell_basis.size());
+                        auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                        approx_ux.push_back(uh(0,0));
+                        approx_uy.push_back(uh(1,0));
+                    }
+//                    e_cell_ind++;
+                }else{
+                    
+                    exact_u.push_back( scal_fun(bar));
+                    
+                    exact_ux.push_back( 0.0/0.0 );
+                    exact_uy.push_back( 0.0/0.0 );
+                    approx_ux.push_back( 0.0/0.0 );
+                    approx_uy.push_back( 0.0/0.0 );
+                    
+                    a_cell_ind = std::distance(std::begin(a_material), a_material.find(cell_ind));
+                    // scalar evaluation
+                    {
+                        auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
+                        Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(a_cell_ind*a_cell_dof + n_elastic_cell_dof, 0, a_cell_dof, 1);
+                        auto t_phi = cell_basis.eval_functions( bar );
+                        RealType uh = scalar_cell_dof.dot( t_phi );
+                        approx_u.push_back(uh);
+                    }
+//                    a_cell_ind++;
+                }
+
+            }
 
         }
 
@@ -1378,12 +1405,17 @@ public:
         }else{
             disk::silo_nodal_variable<double> vx_silo("vx", exact_ux);
             disk::silo_nodal_variable<double> vy_silo("vy", exact_uy);
-//            disk::silo_nodal_variable<double> vhx_silo("vhx", approx_ux);
-//            disk::silo_nodal_variable<double> vhy_silo("vhy", approx_uy);
+            disk::silo_nodal_variable<double> v_silo("v", exact_u);
+            disk::silo_nodal_variable<double> vhx_silo("vhx", approx_ux);
+            disk::silo_nodal_variable<double> vhy_silo("vhy", approx_uy);
+            disk::silo_nodal_variable<double> vh_silo("vh", approx_u);
             silo.add_variable("mesh", vx_silo);
             silo.add_variable("mesh", vy_silo);
-//            silo.add_variable("mesh", vhx_silo);
-//            silo.add_variable("mesh", vhy_silo);
+            silo.add_variable("mesh", v_silo);
+            silo.add_variable("mesh", vhx_silo);
+            silo.add_variable("mesh", vhy_silo);
+            silo.add_variable("mesh", vh_silo);
+            
         }
 
         silo.close();

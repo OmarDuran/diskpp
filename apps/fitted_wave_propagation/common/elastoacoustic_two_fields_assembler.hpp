@@ -351,6 +351,52 @@ public:
 
     }
     
+    void scatter_e_rhs_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
+             const Matrix<T, Dynamic, 1>& rhs)
+    {
+    
+        size_t n_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs);
+
+        auto cell_LHS_offset    = e_cell_ind * n_cbs;
+
+        for (size_t i = 0; i < n_cbs; i++)
+            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+
+        assert( asm_map.size() == rhs.rows() );
+
+        for (size_t i = 0; i < rhs.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+            RHS(asm_map[i]) += rhs(i);
+        }
+
+    }
+    
+    void scatter_a_rhs_data(size_t a_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
+             const Matrix<T, Dynamic, 1>& rhs)
+    {
+        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        std::vector<assembly_index> asm_map;
+        asm_map.reserve(n_cbs);
+
+        auto cell_LHS_offset    = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
+
+        for (size_t i = 0; i < n_cbs; i++)
+            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
+
+        assert( asm_map.size() == rhs.rows());
+
+        for (size_t i = 0; i < rhs.rows(); i++)
+        {
+            if (!asm_map[i].assemble())
+                continue;
+            RHS(asm_map[i]) += rhs(i);
+        }
+
+    }
     
     void scatter_e_bc_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
              const Matrix<T, Dynamic, Dynamic>& lhs)
@@ -533,6 +579,43 @@ public:
         }
         
         finalize_mass();
+    }
+    
+    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_rhs_fun, std::function<T(const typename Mesh::point_type& )> a_rhs_fun){
+        
+        RHS.setZero();
+        #ifdef HAVE_INTEL_TBB2
+                size_t n_cells = msh.cells_size();
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [this,&msh,&rhs_fun] (size_t & cell_ind){
+                        auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                        auto cell_basis   = make_vector_monomial_basis(msh, cell, m_hho_di.cell_degree());
+                        Matrix<T, Dynamic, 1> f_loc = make_rhs(msh, cell, cell_basis, rhs_fun);
+                        this->scatter_rhs_data(msh, cell, f_loc);
+                }
+            );
+        #else
+            auto storage = msh.backend_storage();
+            size_t e_cell_ind = 0;
+             for (auto e_chunk : m_e_material) {
+                 auto& cell = storage->surfaces[e_chunk.first];
+                 auto cell_basis   = make_vector_monomial_basis(msh, cell, m_hho_di.cell_degree());
+                 Matrix<T, Dynamic, 1> f_loc = make_rhs(msh, cell, cell_basis, e_rhs_fun);
+                 scatter_e_rhs_data(e_cell_ind, msh, cell, f_loc);
+                 e_cell_ind++;
+             }
+        
+            size_t a_cell_ind = 0;
+            for (auto a_chunk : m_a_material) {
+                auto& cell = storage->surfaces[a_chunk.first];
+                auto cell_basis   = make_scalar_monomial_basis(msh, cell, m_hho_di.cell_degree());
+                Matrix<T, Dynamic, 1> f_loc = make_rhs(msh, cell, cell_basis, a_rhs_fun);
+                scatter_a_rhs_data(a_cell_ind, msh, cell, f_loc);
+                a_cell_ind++;
+            }
+        
+        #endif
+        apply_bc(msh);
     }
     
     void apply_bc(const Mesh& msh){

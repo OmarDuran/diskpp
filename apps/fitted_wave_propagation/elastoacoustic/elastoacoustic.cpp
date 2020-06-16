@@ -237,7 +237,7 @@ int main(int argc, char **argv)
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
         std::string silo_file_name = "elasto_acoustic_two_fields_";
-        postprocessor<mesh_type>::write_silo_two_fields_elastoacoustic(silo_file_name, it, msh, hho_di, u_dof_n, u_fun, s_u_fun, e_material, a_material, true);
+        postprocessor<mesh_type>::write_silo_two_fields_elastoacoustic(silo_file_name, it, msh, hho_di, u_dof_n, u_fun, s_u_fun, e_material, a_material, false);
     }
 
     std::ofstream simulation_log("acoustic_one_field.txt");
@@ -275,7 +275,7 @@ int main(int argc, char **argv)
         }else{
             analysis.set_Kg(assembler.LHS);
         }
-        analysis.set_iterative_solver();
+//        analysis.set_iterative_solver();
         analysis.factorize();
         tc.toc();
         std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
@@ -295,11 +295,7 @@ int main(int argc, char **argv)
             tc.tic();
             assembler.get_e_bc_conditions().updateDirichletFunction(u_fun, 0);
             assembler.get_a_bc_conditions().updateDirichletFunction(s_u_fun, 0);
-            assembler.assemble(msh, f_fun, s_f_fun);
-            assembler.apply_bc(msh);
-//            assembler.assemble_rhs(msh, rhs_fun);
-
-//            std::cout << "r = " << assembler.RHS << std::endl;
+            assembler.assemble_rhs(msh, f_fun, s_f_fun);
             
             // Compute intermediate state for scalar and rate
             u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
@@ -323,7 +319,7 @@ int main(int argc, char **argv)
 
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "elasto_acoustic_two_fields_";
-                postprocessor<mesh_type>::write_silo_two_fields_elastoacoustic(silo_file_name, it, msh, hho_di, u_dof_n, u_fun, s_u_fun, e_material, a_material, true);
+                postprocessor<mesh_type>::write_silo_two_fields_elastoacoustic(silo_file_name, it, msh, hho_di, u_dof_n, u_fun, s_u_fun, e_material, a_material, false);
             }
 
 //            if (sim_data.m_report_energy_Q) {
