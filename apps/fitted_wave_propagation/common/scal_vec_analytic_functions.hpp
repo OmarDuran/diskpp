@@ -267,7 +267,7 @@ class scal_vec_analytic_functions
             case EFunctionNonPolynomial:
                 {
                     return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> double {
-                            return 0;                            double x,y,f;
+                            double x,y,f;
                             x = pt.x();
                             y = pt.y();
                             f = -2*std::sin(std::sqrt(2)*M_PI*t)*(2*M_PI*x*std::cos(M_PI*x) + std::sin(M_PI*x))*std::sin(M_PI*y);

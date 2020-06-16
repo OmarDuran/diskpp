@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
-    RealType ti = 0.0;
+    RealType ti = 0.5;
     RealType tf = 1.0;
     RealType dt     = (tf-ti)/nt;
     
@@ -218,8 +218,15 @@ int main(int argc, char **argv)
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+
+    //    std::cout << "M = " << assembler.MASS.toDense() << std::endl;
     
-//    std::cout << "M = " << assembler.MASS.toDense() << std::endl;
+    tc.tic();
+    assembler.assemble_coupling_terms(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Coupling Assembly completed: " << tc << " seconds" << reset << std::endl;
+    
+//    std::cout << "C = " << assembler.COUPLING.toDense() << std::endl;
 
     // Projecting initial scalar, velocity and acceleration
     Matrix<RealType, Dynamic, 1> u_dof_n, v_dof_n, a_dof_n;
@@ -259,7 +266,7 @@ int main(int argc, char **argv)
         SparseMatrix<RealType> Kg = assembler.LHS;
         SparseMatrix<RealType> C = assembler.COUPLING;
         assembler.LHS *= beta*(dt*dt);
-        assembler.LHS += gamma*dt*assembler.COUPLING;
+        assembler.LHS += gamma*dt*C;
         assembler.LHS += assembler.MASS;
         linear_solver<RealType> analysis;
         if (sim_data.m_sc_Q) {
@@ -289,8 +296,11 @@ int main(int argc, char **argv)
             assembler.get_e_bc_conditions().updateDirichletFunction(u_fun, 0);
             assembler.get_a_bc_conditions().updateDirichletFunction(s_u_fun, 0);
             assembler.assemble(msh, f_fun, s_f_fun);
+            assembler.apply_bc(msh);
 //            assembler.assemble_rhs(msh, rhs_fun);
 
+//            std::cout << "r = " << assembler.RHS << std::endl;
+            
             // Compute intermediate state for scalar and rate
             u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
             v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
