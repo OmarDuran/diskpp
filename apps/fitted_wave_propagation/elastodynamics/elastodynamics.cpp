@@ -73,9 +73,9 @@ int main(int argc, char **argv)
     
 //    // Examples using main app objects for solving a linear elastic problem with optimal convergence rates
     // Primal HHO
-    HHOOneFieldConvergenceExample(argc, argv);
+//    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-//    HHOThreeFieldsConvergenceExample(argc, argv);
+    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
 }
@@ -292,7 +292,9 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
 
     // Manufactured exact solution
     bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
-    auto exact_vec_fun = [quadratic_function_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+    bool Nonzero_Dirichlet_Q = false;
+    RealType lambda = 10000.0;
+    auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
         RealType x,y;
         x = pt.x();
         y = pt.y();
@@ -301,14 +303,21 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
             RealType uy = (1 - x)*x*(1 - y)*y;
             return static_vector<RealType, 2>{ux, uy};
         }else{
-            RealType ux = std::sin(2.0 * M_PI * pt.x()) * std::sin(2.0 * M_PI * pt.y());
-            RealType uy = std::sin(3.0 * M_PI * pt.x()) * std::sin(3.0 * M_PI * pt.y());
-            return static_vector<RealType, 2>{ux, uy};
+            if (Nonzero_Dirichlet_Q) {
+                RealType ux = - std::sin(M_PI * pt.x()) * std::cos(M_PI * pt.y());
+                RealType uy = + std::cos(M_PI * pt.x()) * std::sin(M_PI * pt.y());
+                return static_vector<RealType, 2>{ux, uy};
+            }else{
+                RealType ux = std::sin(2.0 * M_PI * pt.x()) * std::sin(2.0 * M_PI * pt.y());
+                RealType uy = std::sin(3.0 * M_PI * pt.x()) * std::sin(3.0 * M_PI * pt.y());
+                return static_vector<RealType, 2>{ux, uy};
+            }
+
         }
         
     };
 
-    auto exact_flux_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> static_matrix<RealType,2,2> {
+    auto exact_flux_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q,lambda](const typename mesh_type::point_type& pt) -> static_matrix<RealType,2,2> {
         double x,y;
         x = pt.x();
         y = pt.y();
@@ -324,22 +333,30 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
             return sigma;
         }else{
             static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
-             RealType sxx = 3.0 * M_PI * std::sin(3.0 * M_PI * x) * std::cos(3.0 * M_PI * y)
-                          + 6.0 * M_PI * std::cos(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y);
-             RealType sxy = 2.0 * M_PI * std::sin(2.0 * M_PI * x) * std::cos(2.0 * M_PI * y)
-                          + 3.0 * M_PI * std::cos(3.0 * M_PI * x) * std::sin(3.0 * M_PI * y);
-             RealType syy = 9.0 * M_PI * std::sin(3.0 * M_PI * x) * std::cos(3.0 * M_PI * y)
-                          + 2.0 * M_PI * std::cos(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y);
-             sigma(0,0) = sxx;
-             sigma(0,1) = sxy;
-             sigma(1,0) = sxy;
-             sigma(1,1) = syy;
-             return sigma;
+            if (Nonzero_Dirichlet_Q) {
+                RealType sxx = - 2.0 * M_PI * std::cos(M_PI * x) * std::cos(M_PI * y);
+                RealType syy = + 2.0 * M_PI * std::cos(M_PI * x) * std::cos(M_PI * y);
+                sigma(0,0) = sxx;
+                sigma(1,1) = syy;
+                return sigma;
+            }else{
+                RealType sxx = 4*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y)
+                            + lambda*(3*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x) + 2*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y));
+                RealType sxy = 2*M_PI*std::cos(2*M_PI*y)*std::sin(2*M_PI*x)
+                            + 3*M_PI*std::cos(3*M_PI*x)*std::sin(3*M_PI*y);
+                RealType syy = 6*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x)
+                            + lambda*(3*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x) + 2*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y));
+                sigma(0,0) = sxx;
+                sigma(0,1) = sxy;
+                sigma(1,0) = sxy;
+                sigma(1,1) = syy;
+                return sigma;
+            }
         }
 
     };
 
-    auto rhs_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+    auto rhs_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q,lambda](const typename mesh_type::point_type& pt) -> static_vector<RealType, 2> {
         double x,y;
         x = pt.x();
         y = pt.y();
@@ -348,25 +365,32 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
             RealType fy = 2*(1 + 3*x*x + (-3 + y)*y + x*(-5 + 4*y));
             return static_vector<RealType, 2>{-fx, -fy};
         }else{
-            RealType fx = 2.0 * M_PI * M_PI * (
-                          9.0 * std::cos(3.0 * M_PI * x) * std::cos(3.0 * M_PI * y)
-                        - 8.0 * std::sin(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y));
-            RealType fy = 4.0 * M_PI * M_PI * (
-                          2.0 * std::cos(2.0 * M_PI * x) * std::cos(2.0 * M_PI * y)
-                        - 9.0 * std::sin(3.0 * M_PI * x) * std::sin(3.0 * M_PI * y));
-            return static_vector<RealType, 2>{-fx, -fy};
+            if (Nonzero_Dirichlet_Q) {
+                RealType fx = + 2.0 * M_PI * M_PI * ( std::sin(M_PI * x) * std::cos( M_PI * y));
+                RealType fy = - 2.0 * M_PI * M_PI * ( std::cos(M_PI * x) * std::sin( M_PI * y));
+                return static_vector<RealType, 2>{-fx, -fy};
+            }else{
+                RealType fx = M_PI*M_PI*(9*(1 + lambda)*std::cos(3*M_PI*x)*std::cos(3*M_PI*y) - 4*(3 + lambda)*std::sin(2*M_PI*x)*std::sin(2*M_PI*y));
+                RealType fy = M_PI*M_PI*(4*(1 + lambda)*std::cos(2*M_PI*x)*std::cos(2*M_PI*y) - 9*(3 + lambda)*std::sin(3*M_PI*x)*std::sin(3*M_PI*y));
+                return static_vector<RealType, 2>{-fx, -fy};
+            }
         }
     };
 
     // simple material
     RealType rho = 1.0;
-    RealType vp = std::sqrt(3.0);
+    RealType vp;
+    if (Nonzero_Dirichlet_Q || quadratic_function_Q) {
+        vp = std::sqrt(3.0);
+    }else{
+        vp = std::sqrt(2.0 + lambda);
+    }
     RealType vs = 1.0;
     elastic_material_data<RealType> material(rho,vp,vs);
     
     std::ofstream error_file("steady_vector_mixed_error.txt");
     
-    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+    for(size_t k = 1; k <= sim_data.m_k_degree; k++){
         std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
         error_file << "Approximation with k : " << k << std::endl;
         for(size_t l = 0; l <= sim_data.m_n_divs; l++){
