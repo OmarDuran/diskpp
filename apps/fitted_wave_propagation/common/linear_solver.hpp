@@ -35,7 +35,13 @@ class linear_solver
     #ifdef HAVE_INTEL_MKL
         PardisoLU<Eigen::SparseMatrix<T>>  m_analysis;
     #else
-        SparseLU<SparseMatrix<T>> m_analysis;
+        SparseLU<Eigen::SparseMatrix<T>> m_analysis;
+    #endif
+    
+    #ifdef HAVE_INTEL_MKL
+        PardisoLLT<Eigen::SparseMatrix<T>>  m_symm_analysis;
+    #else
+        SimplicialLDLT<Eigen::SparseMatrix<T>> m_symm_analysis;
     #endif
     
     ConjugateGradient<SparseMatrix<T>> m_analysis_cg;
@@ -50,8 +56,15 @@ class linear_solver
     
     
     void DecomposeK(){
-        m_analysis.analyzePattern(m_K);
-        m_analysis.factorize(m_K);
+        if (!m_iterative_solver_Q.first) {
+            if (m_iterative_solver_Q.second) {
+                m_symm_analysis.analyzePattern(m_K);
+                m_symm_analysis.factorize(m_K);
+            }else{
+                m_analysis.analyzePattern(m_K);
+                m_analysis.factorize(m_K);
+            }
+        }
     }
     
     Matrix<T, Dynamic, 1> solve_global(Matrix<T, Dynamic, 1> & Fg){
@@ -68,7 +81,11 @@ class linear_solver
                 return x_dof;
             }
         }else{
-            return m_analysis.solve(Fg);
+            if (m_iterative_solver_Q.second) {
+                return m_symm_analysis.solve(Fg);
+            }else{
+                return m_analysis.solve(Fg);
+            }
         }
     }
     
@@ -100,7 +117,11 @@ class linear_solver
                 std::cout << "Estimated error: " << m_analysis_bi_cg.error() << std::endl;
             }
         }else{
-            x_n_f_dof = m_analysis.solve(m_F);
+            if (m_iterative_solver_Q.second) {
+                x_n_f_dof = m_symm_analysis.solve(m_F);
+            }else{
+                x_n_f_dof = m_analysis.solve(m_F);
+            }
         }
         
         
@@ -154,6 +175,10 @@ class linear_solver
         m_global_sc_Q = true;
         m_n_f_dof = n_f_dof;
         scatter_blocks(Kg);
+    }
+    
+    void set_direct_solver(bool symmetric_matrix_Q = false){
+        m_iterative_solver_Q = std::make_pair(false,symmetric_matrix_Q);
     }
     
     void set_iterative_solver(bool symmetric_matrix_Q = false, T tolerance = 1.0e-11){

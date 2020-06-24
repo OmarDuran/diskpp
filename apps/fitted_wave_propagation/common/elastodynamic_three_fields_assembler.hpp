@@ -48,7 +48,7 @@ public:
     SparseMatrix<T>         MASS;
 
     elastodynamic_three_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd)
-        : m_hho_di(hho_di), m_bnd(bnd), m_hho_stabilization_Q(true)
+        : m_hho_di(hho_di), m_bnd(bnd), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
@@ -302,7 +302,7 @@ public:
         
     }
             
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> & rhs_fun){
+    void assemble_rhs(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )>  rhs_fun){
         
         RHS.setZero();
          

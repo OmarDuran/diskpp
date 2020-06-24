@@ -73,9 +73,9 @@ int main(int argc, char **argv)
     
 //    // Examples using main app objects for solving a linear elastic problem with optimal convergence rates
     // Primal HHO
-//    HHOOneFieldConvergenceExample(argc, argv);
+    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-    HHOThreeFieldsConvergenceExample(argc, argv);
+//    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
 }
@@ -91,7 +91,9 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
 
     // Manufactured exact solution
     bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
-    auto exact_vec_fun = [quadratic_function_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+    bool Nonzero_Dirichlet_Q = false;
+    RealType lambda = 10000.0;
+    auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
         RealType x,y;
         x = pt.x();
         y = pt.y();
@@ -100,14 +102,21 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
             RealType uy = (1 - x)*x*(1 - y)*y;
             return static_vector<RealType, 2>{ux, uy};
         }else{
-            RealType ux = std::sin(2.0 * M_PI * pt.x()) * std::sin(2.0 * M_PI * pt.y());
-            RealType uy = std::sin(3.0 * M_PI * pt.x()) * std::sin(3.0 * M_PI * pt.y());
-            return static_vector<RealType, 2>{ux, uy};
+            if (Nonzero_Dirichlet_Q) {
+                RealType ux = - std::sin(M_PI * pt.x()) * std::cos(M_PI * pt.y());
+                RealType uy = + std::cos(M_PI * pt.x()) * std::sin(M_PI * pt.y());
+                return static_vector<RealType, 2>{ux, uy};
+            }else{
+                RealType ux = std::sin(2.0 * M_PI * pt.x()) * std::sin(2.0 * M_PI * pt.y());
+                RealType uy = std::sin(3.0 * M_PI * pt.x()) * std::sin(3.0 * M_PI * pt.y());
+                return static_vector<RealType, 2>{ux, uy};
+            }
+
         }
         
     };
 
-    auto exact_flux_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> static_matrix<RealType,2,2> {
+    auto exact_flux_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q,lambda](const typename mesh_type::point_type& pt) -> static_matrix<RealType,2,2> {
         double x,y;
         x = pt.x();
         y = pt.y();
@@ -123,22 +132,30 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
             return sigma;
         }else{
             static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
-             RealType sxx = 3.0 * M_PI * std::sin(3.0 * M_PI * x) * std::cos(3.0 * M_PI * y)
-                          + 6.0 * M_PI * std::cos(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y);
-             RealType sxy = 2.0 * M_PI * std::sin(2.0 * M_PI * x) * std::cos(2.0 * M_PI * y)
-                          + 3.0 * M_PI * std::cos(3.0 * M_PI * x) * std::sin(3.0 * M_PI * y);
-             RealType syy = 9.0 * M_PI * std::sin(3.0 * M_PI * x) * std::cos(3.0 * M_PI * y)
-                          + 2.0 * M_PI * std::cos(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y);
-             sigma(0,0) = sxx;
-             sigma(0,1) = sxy;
-             sigma(1,0) = sxy;
-             sigma(1,1) = syy;
-             return sigma;
+            if (Nonzero_Dirichlet_Q) {
+                RealType sxx = - 2.0 * M_PI * std::cos(M_PI * x) * std::cos(M_PI * y);
+                RealType syy = + 2.0 * M_PI * std::cos(M_PI * x) * std::cos(M_PI * y);
+                sigma(0,0) = sxx;
+                sigma(1,1) = syy;
+                return sigma;
+            }else{
+                RealType sxx = 4*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y)
+                            + lambda*(3*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x) + 2*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y));
+                RealType sxy = 2*M_PI*std::cos(2*M_PI*y)*std::sin(2*M_PI*x)
+                            + 3*M_PI*std::cos(3*M_PI*x)*std::sin(3*M_PI*y);
+                RealType syy = 6*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x)
+                            + lambda*(3*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x) + 2*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y));
+                sigma(0,0) = sxx;
+                sigma(0,1) = sxy;
+                sigma(1,0) = sxy;
+                sigma(1,1) = syy;
+                return sigma;
+            }
         }
 
     };
 
-    auto rhs_fun = [quadratic_function_Q](const typename mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+    auto rhs_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q,lambda](const typename mesh_type::point_type& pt) -> static_vector<RealType, 2> {
         double x,y;
         x = pt.x();
         y = pt.y();
@@ -147,25 +164,32 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
             RealType fy = 2*(1 + 3*x*x + (-3 + y)*y + x*(-5 + 4*y));
             return static_vector<RealType, 2>{-fx, -fy};
         }else{
-            RealType fx = 2.0 * M_PI * M_PI * (
-                          9.0 * std::cos(3.0 * M_PI * x) * std::cos(3.0 * M_PI * y)
-                        - 8.0 * std::sin(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y));
-            RealType fy = 4.0 * M_PI * M_PI * (
-                          2.0 * std::cos(2.0 * M_PI * x) * std::cos(2.0 * M_PI * y)
-                        - 9.0 * std::sin(3.0 * M_PI * x) * std::sin(3.0 * M_PI * y));
-            return static_vector<RealType, 2>{-fx, -fy};
+            if (Nonzero_Dirichlet_Q) {
+                RealType fx = + 2.0 * M_PI * M_PI * ( std::sin(M_PI * x) * std::cos( M_PI * y));
+                RealType fy = - 2.0 * M_PI * M_PI * ( std::cos(M_PI * x) * std::sin( M_PI * y));
+                return static_vector<RealType, 2>{-fx, -fy};
+            }else{
+                RealType fx = M_PI*M_PI*(9*(1 + lambda)*std::cos(3*M_PI*x)*std::cos(3*M_PI*y) - 4*(3 + lambda)*std::sin(2*M_PI*x)*std::sin(2*M_PI*y));
+                RealType fy = M_PI*M_PI*(4*(1 + lambda)*std::cos(2*M_PI*x)*std::cos(2*M_PI*y) - 9*(3 + lambda)*std::sin(3*M_PI*x)*std::sin(3*M_PI*y));
+                return static_vector<RealType, 2>{-fx, -fy};
+            }
         }
     };
 
     // simple material
     RealType rho = 1.0;
-    RealType vp = std::sqrt(3.0);
+    RealType vp;
+    if (Nonzero_Dirichlet_Q || quadratic_function_Q) {
+        vp = std::sqrt(3.0);
+    }else{
+        vp = std::sqrt(2.0 + lambda);
+    }
     RealType vs = 1.0;
     elastic_material_data<RealType> material(rho,vp,vs);
     
     std::ofstream error_file("steady_vector_error.txt");
     
-    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+    for(size_t k = 1; k <= sim_data.m_k_degree; k++){
         std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
         error_file << "Approximation with k : " << k << std::endl;
         for(size_t l = 0; l <= sim_data.m_n_divs; l++){
@@ -851,12 +875,11 @@ void IHHOSecondOrder(int argc, char **argv){
     tc.tic();
     Matrix<RealType, Dynamic, 1> u_dof_n, v_dof_n, a_dof_n;
     assembler.project_over_cells(msh, u_dof_n, exact_vec_fun);
-    assembler.project_over_faces(msh, u_dof_n, exact_vec_fun);
-    
     assembler.project_over_cells(msh, v_dof_n, exact_vel_fun);
-    assembler.project_over_faces(msh, v_dof_n, exact_vel_fun);
-    
     assembler.project_over_cells(msh, a_dof_n, exact_accel_fun);
+    
+    assembler.project_over_faces(msh, u_dof_n, exact_vec_fun);
+    assembler.project_over_faces(msh, v_dof_n, exact_vel_fun);
     assembler.project_over_faces(msh, a_dof_n, exact_accel_fun);
     tc.toc();
     std::cout << bold << cyan << "Initialization completed: " << tc << " seconds" << reset << std::endl;
@@ -873,7 +896,7 @@ void IHHOSecondOrder(int argc, char **argv){
         postprocessor<mesh_type>::compute_elastic_energy_one_field(msh, hho_di, assembler, t, u_dof_n, v_dof_n, simulation_log);
     }
     
-    bool standar_Q = false;
+    bool standar_Q = true;
     // Newmark process
     {
         Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
@@ -888,12 +911,19 @@ void IHHOSecondOrder(int argc, char **argv){
         
         tc.tic();
         assembler.assemble(msh, rhs_fun);
-        SparseMatrix<double> Kg = assembler.LHS;
+        SparseMatrix<RealType> Kg = assembler.LHS;
         assembler.LHS *= beta*(dt*dt);
         assembler.LHS += assembler.MASS;
-        SparseLU<SparseMatrix<RealType>> analysis;
-        analysis.analyzePattern(assembler.LHS);
-        analysis.factorize(assembler.LHS);
+        linear_solver<RealType> analysis;
+        if (sim_data.m_sc_Q) {
+            analysis.set_Kg(assembler.LHS, assembler.get_n_face_dof());
+            analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+        }else{
+            analysis.set_Kg(assembler.LHS);
+        }
+        analysis.set_direct_solver(true);
+//        analysis.set_iterative_solver(true);
+        analysis.factorize();
         tc.toc();
         std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
         
@@ -902,17 +932,20 @@ void IHHOSecondOrder(int argc, char **argv){
             std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
 
             // Manufactured solution
-            RealType t = dt*it+ti;
+            RealType t = dt*(it)+ti;
             auto exact_vec_fun      = functions.Evaluate_u(t);
+            auto exact_vel_fun      = functions.Evaluate_v(t);
+            auto exact_accel_fun    = functions.Evaluate_a(t);
             auto exact_flux_fun     = functions.Evaluate_sigma(t);
             auto rhs_fun            = functions.Evaluate_f(t);
             assembler.get_bc_conditions().updateDirichletFunction(exact_vec_fun, 0);
             assembler.assemble_rhs(msh, rhs_fun);
 
             // Compute intermediate state for scalar and rate
-            u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
-            v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
+            u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1.0-2.0*beta)*a_dof_n;
+            v_dof_n = v_dof_n + dt*(1.0-gamma)*a_dof_n;
             Matrix<RealType, Dynamic, 1> res = Kg*u_dof_n;
+            Matrix<RealType, Dynamic, 1> res_c = assembler.RHS;
 
             assembler.RHS -= res;
             tc.toc();
@@ -935,6 +968,15 @@ void IHHOSecondOrder(int argc, char **argv){
             
             if (sim_data.m_report_energy_Q) {
                 postprocessor<mesh_type>::compute_elastic_energy_one_field(msh, hho_di, assembler, t, u_dof_n, v_dof_n, simulation_log);
+                Matrix<RealType, Dynamic, 1> cell_mass_tested = assembler.MASS * v_dof_n;
+                Matrix<RealType, 1, 1> term_1 = v_dof_n.transpose() * cell_mass_tested;
+
+                Matrix<RealType, Dynamic, 1> cell_stiff_tested = Kg * u_dof_n;
+                Matrix<RealType, 1, 1> term_2 = u_dof_n.transpose() * cell_stiff_tested;
+                
+                Matrix<RealType, 1, 1> term_3 = u_dof_n.transpose() * res_c;
+                RealType energy_h = 0.5*term_1(0,0) + 0.5*term_2(0,0) - 0.5*term_3(0,0);
+//                simulation_log << t << "   " << std::setprecision(16) << energy_h << std::endl;
             }
 
             if(it == nt){
@@ -942,7 +984,7 @@ void IHHOSecondOrder(int argc, char **argv){
             }
 
         }
-        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+        simulation_log << "Number of equations : " << analysis.n_equations() << std::endl;
         simulation_log << "Number of time steps =  " << nt << std::endl;
         simulation_log << "Step size =  " << dt << std::endl;
         simulation_log.flush();
@@ -998,6 +1040,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             static_vector<RealType, 2> f{0,0};
             return f;
     };
+    
     
     auto vec_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
             RealType x,y,xc,yc,r,wave,vx,vy;
@@ -1182,7 +1225,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.25;
+    RealType tf = 1.0;
     RealType dt     = (tf-ti)/nt;
     
     auto null_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
@@ -1206,7 +1249,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
             x = pt.x();
             y = pt.y();
             xc = 0.5;
-            yc = 0.25;
+            yc = 0.75;
             r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
             wave = (-4*std::sqrt(10.0/3.0)*(-1 + 1600.0*r*r))/(std::exp(800*r*r)*std::pow(M_PI,0.25));
             vx = wave*(x-xc);
@@ -1236,8 +1279,8 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         RealType rho, vp, vs;
         rho = 1.0;
         if (y < 0.5) {
-            vp = 5.0*std::sqrt(3.0);
-            vs  = 5.0;
+            vp = 1.0*std::sqrt(3.0);
+            vs  = 1.0;
         }else{
             vp = std::sqrt(3.0);
             vs  = 1;
@@ -1251,6 +1294,9 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     assembler.load_material_data(msh,elastic_mat_fun);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
+    }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
     }
     tc.toc();
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -1297,15 +1343,22 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     tc.toc();
     std::cout << bold << cyan << "First stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
     dirk_hho_scheme<RealType> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
-
+    
+    if (sim_data.m_sc_Q) {
+        dirk_an.set_static_condensation_data(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()), assembler.get_n_face_dof());
+    }
+    
     if (is_sdirk_Q) {
         double scale = a(0,0) * dt;
         dirk_an.SetScale(scale);
         tc.tic();
+        dirk_an.ComposeMatrix();
+//        dirk_an.setIterativeSolver();
         dirk_an.DecomposeMatrix();
         tc.toc();
-        std::cout << bold << cyan << "First stiffness decomposition completed: " << tc << " seconds" << reset << std::endl;
+        std::cout << bold << cyan << "Matrix decomposed: " << tc << " seconds" << reset << std::endl;
     }
+    
     Matrix<double, Dynamic, 1> x_dof_n;
     for(size_t it = 1; it <= nt; it++){
 

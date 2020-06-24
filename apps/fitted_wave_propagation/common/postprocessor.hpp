@@ -1110,15 +1110,15 @@ public:
                 energy_vec[cell_ind] = term_1(0,0);
 
                 Matrix<RealType, Dynamic, Dynamic> laplacian_loc = assembler.laplacian_operator(cell_ind, msh, cell);
-                Matrix<RealType, Dynamic, 1> cell_p_dofs = assembler.gather_dof_data(msh, cell, u_dof);
-                Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_p_dofs;
-                Matrix<RealType, 1, 1> term_2 = cell_p_dofs.transpose() * cell_stiff_tested;
+                Matrix<RealType, Dynamic, 1> cell_u_dofs = assembler.gather_dof_data(msh, cell, u_dof);
+                Matrix<RealType, Dynamic, 1> cell_stiff_tested = laplacian_loc * cell_u_dofs;
+                Matrix<RealType, 1, 1> term_2 = cell_u_dofs.transpose() * cell_stiff_tested;
 
                 energy_vec[cell_ind] += term_2(0,0);
         
             }
         #endif
-
+        
         RealType energy_h = std::accumulate(energy_vec.begin(), energy_vec.end(),0.0);
         energy_h *= 0.5;
         

@@ -327,7 +327,6 @@ int main(int argc, char **argv)
 //            }
 
             if(it == nt){
-//                postprocessor<mesh_type>::compute_errors_one_field(msh, hho_di, assembler, p_dof_n, exact_scal_fun, exact_flux_fun, simulation_log);
                 postprocessor<mesh_type>::compute_errors_two_fields_elastoacoustic(msh, hho_di, assembler, u_dof_n, u_fun, flux_fun, s_u_fun, s_flux_fun, simulation_log);
             }
 

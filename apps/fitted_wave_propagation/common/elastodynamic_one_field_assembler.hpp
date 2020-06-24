@@ -266,18 +266,18 @@ public:
             
     void apply_bc(const Mesh& msh){
         
-        #ifdef HAVE_INTEL_TBB
+        auto storage = msh.backend_storage();
+        #ifdef HAVE_INTEL_TBB2
                 size_t n_cells = m_elements_with_bc_eges.size();
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
-                    [this,&msh] (size_t & i){
+                    [this,&msh,&storage] (size_t & i){
                         size_t cell_ind = m_elements_with_bc_eges[i];
-                        auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                        auto& cell = storage->surfaces[cell_ind];
                         Matrix<T, Dynamic, Dynamic> laplacian_operator_loc = laplacian_operator(cell_ind, msh, cell);
                         scatter_bc_data(msh, cell, laplacian_operator_loc);
                 }
             );
         #else
-            auto storage = msh.backend_storage();
             for (auto& cell_ind : m_elements_with_bc_eges)
             {
                 auto& cell = storage->surfaces[cell_ind];
@@ -288,10 +288,10 @@ public:
         
     }
             
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> & rhs_fun){
+    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> rhs_fun){
         
         RHS.setZero();
-        #ifdef HAVE_INTEL_TBB
+        #ifdef HAVE_INTEL_TBB2
                 size_t n_cells = msh.cells_size();
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
                     [this,&msh,&rhs_fun] (size_t & cell_ind){
@@ -347,7 +347,7 @@ public:
             auto stabilization_operator    = make_vector_hdg_stabilization(msh, cell, m_hho_di);
             S_operator = stabilization_operator;
         }
-        return 2.0*mu*(R_operator + S_operator)+lambda * divergence_operator.second;
+        return 2.0 * mu * (R_operator + S_operator) + lambda * divergence_operator.second;
     }
     
     Matrix<T, Dynamic, Dynamic> mass_operator(size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell){

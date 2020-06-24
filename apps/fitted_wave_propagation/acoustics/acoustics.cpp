@@ -845,7 +845,7 @@ void IHHOSecondOrder(int argc, char **argv){
         
         tc.tic();
         assembler.assemble(msh, rhs_fun);
-        SparseMatrix<double> Kg = assembler.LHS;
+        SparseMatrix<RealType> Kg = assembler.LHS;
         assembler.LHS *= beta*(dt*dt);
         assembler.LHS += assembler.MASS;
         linear_solver<RealType> analysis;
@@ -1274,7 +1274,8 @@ void IHHOFirstOrder(int argc, char **argv){
                     auto exact_vel_fun      = functions.Evaluate_v(t);
                     auto rhs_fun            = functions.Evaluate_f(t);
                     assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
-                    assembler.assemble_rhs(msh, rhs_fun);
+                    assembler.RHS.setZero();
+                    assembler.apply_bc(msh);
                     dirk_an.SetFg(assembler.RHS);
                     dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
                 }
