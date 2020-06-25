@@ -102,7 +102,7 @@ int main(int argc, char **argv)
 
 //    IHHOFirstOrder(argc, argv);
     
-//    IHHOSecondOrder(argc, argv);
+    IHHOSecondOrder(argc, argv);
     
 //    // Examples using main app objects for solving the laplacian with optimal convergence rates
 //    // Primal HHO

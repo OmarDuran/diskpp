@@ -290,15 +290,16 @@ public:
         finalize();
     }
             
-    void apply_bc(const Mesh& msh){
+    void apply_bc(const Mesh& msh, T scale = T(1.0)){
         
         #ifdef HAVE_INTEL_TBB
                 size_t n_cells = m_elements_with_bc_eges.size();
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
-                    [this,&msh] (size_t & i){
+                    [this,&msh,&scale] (size_t & i){
                         size_t cell_ind = m_elements_with_bc_eges[i];
                         auto& cell = msh.backend_storage()->surfaces[cell_ind];
                         Matrix<T, Dynamic, Dynamic> laplacian_operator_loc = laplacian_operator(cell_ind, msh, cell);
+                        laplacian_operator_loc *= scale;
                         scatter_bc_data(msh, cell, laplacian_operator_loc);
                 }
             );
@@ -308,6 +309,7 @@ public:
             {
                 auto& cell = storage->surfaces[cell_ind];
                 Matrix<T, Dynamic, Dynamic> laplacian_operator_loc = laplacian_operator(cell_ind, msh, cell);
+                laplacian_operator_loc *= scale;
                 scatter_bc_data(msh, cell, laplacian_operator_loc);
             }
         #endif

@@ -69,13 +69,13 @@ int main(int argc, char **argv)
     
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
-//    IHHOSecondOrder(argc, argv);
+    IHHOSecondOrder(argc, argv);
     
 //    // Examples using main app objects for solving a linear elastic problem with optimal convergence rates
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-    HHOThreeFieldsConvergenceExample(argc, argv);
+//    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
 }
@@ -858,7 +858,7 @@ void IHHOSecondOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 1.0;
+    RealType tf = 0.125;
     RealType dt     = (tf-ti)/nt;
 
     vec_analytic_functions functions;
@@ -964,12 +964,11 @@ void IHHOSecondOrder(int argc, char **argv){
             auto rhs_fun            = functions.Evaluate_f(t);
             assembler.get_bc_conditions().updateDirichletFunction(exact_vec_fun, 0);
             assembler.assemble_rhs(msh, rhs_fun);
-
+            
             // Compute intermediate state for scalar and rate
             u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1.0-2.0*beta)*a_dof_n;
             v_dof_n = v_dof_n + dt*(1.0-gamma)*a_dof_n;
             Matrix<RealType, Dynamic, 1> res = Kg*u_dof_n;
-            Matrix<RealType, Dynamic, 1> res_c = assembler.RHS;
 
             assembler.RHS -= res;
             tc.toc();
@@ -984,7 +983,7 @@ void IHHOSecondOrder(int argc, char **argv){
             u_dof_n += beta*dt*dt*a_dof_np;
             v_dof_n += gamma*dt*a_dof_np;
             a_dof_n  = a_dof_np;
-
+            
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "vec_";
                 postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, u_dof_n, exact_vec_fun, false);
@@ -992,15 +991,6 @@ void IHHOSecondOrder(int argc, char **argv){
             
             if (sim_data.m_report_energy_Q) {
                 postprocessor<mesh_type>::compute_elastic_energy_one_field(msh, hho_di, assembler, t, u_dof_n, v_dof_n, simulation_log);
-                Matrix<RealType, Dynamic, 1> cell_mass_tested = assembler.MASS * v_dof_n;
-                Matrix<RealType, 1, 1> term_1 = v_dof_n.transpose() * cell_mass_tested;
-
-                Matrix<RealType, Dynamic, 1> cell_stiff_tested = Kg * u_dof_n;
-                Matrix<RealType, 1, 1> term_2 = u_dof_n.transpose() * cell_stiff_tested;
-                
-                Matrix<RealType, 1, 1> term_3 = u_dof_n.transpose() * res_c;
-                RealType energy_h = 0.5*term_1(0,0) + 0.5*term_2(0,0) - 0.5*term_3(0,0);
-//                simulation_log << t << "   " << std::setprecision(16) << energy_h << std::endl;
             }
 
             if(it == nt){

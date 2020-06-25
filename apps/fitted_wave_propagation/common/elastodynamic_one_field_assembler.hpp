@@ -264,7 +264,7 @@ public:
         finalize();
     }
             
-    void apply_bc(const Mesh& msh){
+    void apply_bc(const Mesh& msh, T scale = T(1.0)){
         
         auto storage = msh.backend_storage();
         #ifdef HAVE_INTEL_TBB2
@@ -274,6 +274,7 @@ public:
                         size_t cell_ind = m_elements_with_bc_eges[i];
                         auto& cell = storage->surfaces[cell_ind];
                         Matrix<T, Dynamic, Dynamic> laplacian_operator_loc = laplacian_operator(cell_ind, msh, cell);
+                        laplacian_operator_loc *= scale;
                         scatter_bc_data(msh, cell, laplacian_operator_loc);
                 }
             );
@@ -282,13 +283,14 @@ public:
             {
                 auto& cell = storage->surfaces[cell_ind];
                 Matrix<T, Dynamic, Dynamic> laplacian_operator_loc = laplacian_operator(cell_ind, msh, cell);
+                laplacian_operator_loc *= scale;
                 scatter_bc_data(msh, cell, laplacian_operator_loc);
             }
         #endif
         
     }
             
-    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> rhs_fun){
+    void assemble_rhs(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> rhs_fun, T scale = T(1.0)){
         
         RHS.setZero();
         #ifdef HAVE_INTEL_TBB2
@@ -312,7 +314,7 @@ public:
                 contribute(cell);
             }
         #endif
-        apply_bc(msh);
+        apply_bc(msh,scale);
     }
             
     void assemble_mass(const Mesh& msh){
