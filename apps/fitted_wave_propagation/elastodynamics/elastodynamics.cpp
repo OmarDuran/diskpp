@@ -64,12 +64,11 @@ int main(int argc, char **argv)
 {
 
 //    HeterogeneousIHHOFirstOrder(argc, argv);
-    
-//    HeterogeneousIHHOSecondOrder(argc, argv);
+    HeterogeneousIHHOSecondOrder(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
-    IHHOSecondOrder(argc, argv);
+//    IHHOSecondOrder(argc, argv);
     
 //    // Examples using main app objects for solving a linear elastic problem with optimal convergence rates
     // Primal HHO
@@ -681,7 +680,7 @@ void IHHOFirstOrder(int argc, char **argv){
     RealType dt     = (tf-ti)/nt;
     
     vec_analytic_functions functions;
-    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    functions.set_function_type(vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_sigma(t);
@@ -702,6 +701,9 @@ void IHHOFirstOrder(int argc, char **argv){
     assembler.load_material_data(msh);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
+    }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
     }
     tc.toc();
     std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -734,7 +736,7 @@ void IHHOFirstOrder(int argc, char **argv){
     Matrix<RealType, Dynamic, 1> c;
 
     // DIRK(s) schemes
-    int s = 3;
+    int s = 1;
     bool is_sdirk_Q = true;
 
     if (is_sdirk_Q) {
@@ -748,16 +750,22 @@ void IHHOFirstOrder(int argc, char **argv){
     tc.toc();
     std::cout << bold << cyan << "First stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
     dirk_hho_scheme<RealType> dirk_an(assembler.LHS,assembler.RHS,assembler.MASS);
-
+    
+    if (sim_data.m_sc_Q) {
+        dirk_an.set_static_condensation_data(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()), assembler.get_n_face_dof());
+    }
+    
     if (is_sdirk_Q) {
         double scale = a(0,0) * dt;
         dirk_an.SetScale(scale);
         tc.tic();
+        dirk_an.ComposeMatrix();
+//        dirk_an.setIterativeSolver();
         dirk_an.DecomposeMatrix();
         tc.toc();
-        std::cout << bold << cyan << "First stiffness decomposition completed: " << tc << " seconds" << reset << std::endl;
+        std::cout << bold << cyan << "Matrix decomposed: " << tc << " seconds" << reset << std::endl;
     }
-    Matrix<double, Dynamic, 1> x_dof_n;
+    Matrix<RealType, Dynamic, 1> x_dof_n;
     for(size_t it = 1; it <= nt; it++){
 
         std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
@@ -819,7 +827,7 @@ void IHHOFirstOrder(int argc, char **argv){
 
     }
     
-    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+    simulation_log << "Number of equations : " << dirk_an.DirkAnalysis().n_equations() << std::endl;
     simulation_log << "Number of DIRK steps =  " << s << std::endl;
     simulation_log << "Number of time steps =  " << nt << std::endl;
     simulation_log << "Step size =  " << dt << std::endl;
@@ -925,8 +933,8 @@ void IHHOSecondOrder(int argc, char **argv){
     {
         Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
 
-        RealType beta = 0.25;
-        RealType gamma = 0.5;
+        RealType beta = 0.275;
+        RealType gamma = 0.55;
         if (!standar_Q) {
             RealType kappa = 0.25;
             gamma = 1.5;

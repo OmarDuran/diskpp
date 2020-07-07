@@ -351,6 +351,62 @@ public:
 
     }
     
+    void scatter_e_interface_neumann_data(const Mesh& msh, const typename Mesh::face_type& face,
+             const Matrix<T, Dynamic, 1>& interface_bc_data)
+    {
+        auto vfbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+
+        std::vector<assembly_index> asm_map_e;
+        asm_map_e.reserve(vfbs);
+        
+        auto fc_id = msh.lookup(face);
+        
+        auto e_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*vfbs;
+        bool e_dirichlet = m_e_bnd.is_dirichlet_face(fc_id);
+        for (size_t i = 0; i < vfbs; i++){
+            asm_map_e.push_back( assembly_index(e_face_LHS_offset+i, !e_dirichlet) );
+        }
+                    
+        assert( asm_map_e.size() == interface_bc_data.rows());
+
+        for (size_t i = 0; i < interface_bc_data.rows(); i++)
+        {
+            if (!asm_map_e[i].assemble())
+                 continue;
+             RHS(asm_map_e[i]) += interface_bc_data(i,0);
+        }
+
+    }
+    
+    
+    void scatter_a_interface_neumann_data(const Mesh& msh, const typename Mesh::face_type& face,
+             const Matrix<T, Dynamic, 1>& interface_bc_data)
+    {
+
+        auto sfbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+
+        std::vector<assembly_index> asm_map_a;
+        asm_map_a.reserve(sfbs);
+        
+        auto fc_id = msh.lookup(face);
+        
+        auto a_face_LHS_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*sfbs;
+        bool a_dirichlet = m_a_bnd.is_dirichlet_face(fc_id);
+        for (size_t i = 0; i < sfbs; i++){
+            asm_map_a.push_back( assembly_index(a_face_LHS_offset+i, !a_dirichlet) );
+        }
+        
+        assert( asm_map_a.size() == interface_bc_data.rows() );
+
+        for (size_t i = 0; i < interface_bc_data.rows(); i++)
+        {
+            if (!asm_map_a[i].assemble())
+                 continue;
+             RHS(asm_map_a[i]) += interface_bc_data(i,0);
+        }
+
+    }
+    
     void scatter_e_rhs_data(size_t e_cell_ind, const Mesh& msh, const typename Mesh::cell_type& cl,
              const Matrix<T, Dynamic, 1>& rhs)
     {
@@ -554,6 +610,24 @@ public:
         }
         finalize_coupling();
     }
+    
+    void apply_bc_conditions_on_interface(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun, std::function<T(const typename Mesh::point_type& )> a_vel_fun){
+        
+        auto storage = msh.backend_storage();
+        // Applying transmission conditions as neumann data for the case of uncoupled problems
+        for (auto chunk : m_interface_cell_indexes) {
+            auto& face = storage->edges[chunk.first];
+            auto& e_cell = storage->surfaces[chunk.second.first];
+            auto& a_cell = storage->surfaces[chunk.second.second];
+            
+            Matrix<T, Dynamic, 1> e_neumann_operator_loc = e_neumman_bc_operator(msh, face, e_cell, a_cell, a_vel_fun);
+            scatter_e_interface_neumann_data(msh, face, e_neumann_operator_loc);
+            
+            Matrix<T, Dynamic, 1> a_neumann_operator_loc = a_neumman_bc_operator(msh, face, e_cell, a_cell, e_vel_fun);
+            scatter_a_interface_neumann_data(msh, face, a_neumann_operator_loc);
+            
+        }
+    }
 
     void assemble_mass(const Mesh& msh){
         
@@ -718,7 +792,7 @@ public:
         auto vfb = make_vector_monomial_basis(msh, face, facdeg);
         auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
         const auto qps = integrate(msh, face, facdeg);
-        const auto n      = disk::normal(msh, e_cell, face);
+        const auto n = disk::normal(msh, e_cell, face);
         for (auto& qp : qps)
         {
             const auto v_f_phi = vfb.eval_functions(qp.point());
@@ -731,6 +805,57 @@ public:
             interface_operator += result;
         }
         return interface_operator;
+    }
+    
+    Matrix<T, Dynamic, 1> e_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<T(const typename Mesh::point_type& )> a_vel_fun){
+
+        Matrix<T, Dynamic, Dynamic> neumann_operator;
+        auto facdeg = m_hho_di.face_degree();
+        auto vfbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+
+        neumann_operator = Matrix<T, Dynamic, Dynamic>::Zero(vfbs, 1);
+        
+        auto vfb = make_vector_monomial_basis(msh, face, facdeg);
+        auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
+        const auto qps = integrate(msh, face, facdeg);
+        const auto n = disk::normal(msh, e_cell, face);
+        for (auto& qp : qps)
+        {
+            const auto v_f_phi = vfb.eval_functions(qp.point());
+            const auto s_f_phi = sfb.eval_functions(qp.point());
+
+            assert(v_f_phi.rows() == vfbs);
+            const auto n_dot_v_f_phi = disk::priv::inner_product(v_f_phi,disk::priv::inner_product(qp.weight(), n));
+            const auto result = disk::priv::outer_product(n_dot_v_f_phi, a_vel_fun(qp.point()));
+            neumann_operator += result;
+            
+        }
+        return neumann_operator;
+        }
+    
+    Matrix<T, Dynamic, Dynamic> a_neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& e_cell, const typename Mesh::cell_type& a_cell, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> e_vel_fun){
+
+        Matrix<T, Dynamic, Dynamic> neumann_operator;
+        auto facdeg = m_hho_di.face_degree();
+        auto sfbs = disk::scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+        neumann_operator = Matrix<T, Dynamic, Dynamic>::Zero(sfbs, 1);
+        
+        auto vfb = make_vector_monomial_basis(msh, face, facdeg);
+        auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
+        const auto qps = integrate(msh, face, facdeg);
+        const auto n = disk::normal(msh, a_cell, face);
+        for (auto& qp : qps)
+        {
+            const auto v_f_phi = vfb.eval_functions(qp.point());
+            const auto s_f_phi = sfb.eval_functions(qp.point());
+
+            assert(s_f_phi.rows() == sfbs);
+            const auto n_dot_v_f = disk::priv::inner_product(e_vel_fun(qp.point()),disk::priv::inner_product(qp.weight(), n));
+            const auto result = disk::priv::inner_product(n_dot_v_f, s_f_phi);
+            neumann_operator += result;
+        }
+        return neumann_operator;
     }
     
     void classify_cells(const Mesh& msh){

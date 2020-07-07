@@ -96,13 +96,11 @@ int main(int argc, char **argv)
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-//     EHHOFirstOrderCFL(argc, argv);
+     EHHOFirstOrderCFL(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
-
 //    IHHOFirstOrder(argc, argv);
-    
-    IHHOSecondOrder(argc, argv);
+//    IHHOSecondOrder(argc, argv);
     
 //    // Examples using main app objects for solving the laplacian with optimal convergence rates
 //    // Primal HHO
@@ -116,7 +114,7 @@ int main(int argc, char **argv)
 //    HHOOneFieldConvergenceExamplePolyMesh(argc, argv);
 
     // Dual HHO
-    HHOTwoFieldsConvergenceExamplePolyMesh(argc, argv);
+//    HHOTwoFieldsConvergenceExamplePolyMesh(argc, argv);
     
     return 0;
 }
@@ -1720,7 +1718,7 @@ void EHHOFirstOrderCFL(int argc, char **argv){
     sim_data.print_simulation_data();
     
     RealType ti = 0.0;
-    RealType tf = 0.25;
+    RealType tf = 0.125*2;
     int s = 1;
     int t_increment = 1;
     
@@ -1746,14 +1744,14 @@ void EHHOFirstOrderCFL(int argc, char **argv){
 
         RealType lx = 1.0;
         RealType ly = 1.0;
-        size_t nx = 4;
-        size_t ny = 4;
+        size_t nx = 4+l;
+        size_t ny = 4+l;
         typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
         typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
         mesh_type msh;
 
         cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-        mesh_builder.refine_mesh(l);
+//        mesh_builder.refine_mesh(l);
         mesh_builder.build_mesh();
         mesh_builder.move_to_mesh_storage(msh);
         std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -1796,10 +1794,7 @@ void EHHOFirstOrderCFL(int argc, char **argv){
                 postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
             }
             
-            RealType energy_0;
-            if (sim_data.m_report_energy_Q) {
-                energy_0 = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
-            }
+            RealType energy_0 = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
             
             // Solving a first order equation HDG/HHO propagation problem
             Matrix<RealType, Dynamic, Dynamic> a;
@@ -1827,6 +1822,7 @@ void EHHOFirstOrderCFL(int argc, char **argv){
             erk_an.refresh_faces_unknowns(x_dof);
             Matrix<RealType, Dynamic, 1> x_dof_n;
             bool approx_fail_check_Q = false;
+            RealType energy = energy_0;;
             for(size_t it = 1; it <= nt; it++){
 
                 std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
@@ -1878,18 +1874,17 @@ void EHHOFirstOrderCFL(int argc, char **argv){
                     std::string silo_file_name = "e_scalar_mixed_";
                     postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
                 }
-                RealType energy;
-                if (sim_data.m_report_energy_Q) {
-                    energy = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
-                }
+                RealType energy_n = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
                 
-                RealType relative_energy = (energy - energy_0) / energy_0;
-                bool energy_check_Q = relative_energy >= 0.01;
+                RealType relative_energy = (energy_n - energy) / energy;
+                RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
+//                bool energy_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
+                bool energy_check_Q = (relative_energy_0 >= 1.0e-2);
                 if (energy_check_Q) { // energy is increasing
                     approx_fail_check_Q = true;
                     break;
                 }
-
+                energy = energy_n;
                 if(it == nt){
                     // Computing errors
                     postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);

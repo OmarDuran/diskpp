@@ -80,8 +80,8 @@ int main(int argc, char **argv)
         nt *= 2;
     }
     RealType ti = 0.5;
-    RealType tf = 1.0;//0.515625;
-    RealType dt     = (tf-ti)/nt;
+    RealType tf = 0.515625;
+    RealType dt = (tf-ti)/nt;
     
     scal_vec_analytic_functions functions;
     functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
@@ -219,7 +219,7 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
 
-    //    std::cout << "M = " << assembler.MASS.toDense() << std::endl;
+//        std::cout << "M = " << assembler.MASS.toDense() << std::endl;
     
     tc.tic();
     assembler.assemble_coupling_terms(msh);
@@ -262,7 +262,11 @@ int main(int argc, char **argv)
 //        std::cout << "K = " << assembler.LHS.toDense() << std::endl;
     
         SparseMatrix<RealType> Kg = assembler.LHS;
+        
+//        assembler.COUPLING.setZero();
+        
         SparseMatrix<RealType> C = assembler.COUPLING;
+        std::cout << "C = " << assembler.COUPLING.toDense() << std::endl;
         assembler.LHS *= beta*(dt*dt);
         assembler.LHS += gamma*dt*C;
         assembler.LHS += assembler.MASS;
@@ -285,9 +289,11 @@ int main(int argc, char **argv)
             // Manufactured solution
             RealType t = dt*it+ti;
             auto u_fun      = functions.Evaluate_u(t);
+            auto v_fun      = functions.Evaluate_v(t);
             auto f_fun      = functions.Evaluate_f(t);
             auto flux_fun   = functions.Evaluate_sigma(t);
             auto s_u_fun    = functions.Evaluate_s_u(t);
+            auto s_v_fun    = functions.Evaluate_s_v(t);
             auto s_f_fun    = functions.Evaluate_s_f(t);
             auto s_flux_fun  = functions.Evaluate_s_q(t);
             
@@ -296,6 +302,7 @@ int main(int argc, char **argv)
             assembler.get_e_bc_conditions().updateDirichletFunction(u_fun, 0);
             assembler.get_a_bc_conditions().updateDirichletFunction(s_u_fun, 0);
             assembler.assemble_rhs(msh, f_fun, s_f_fun);
+            assembler.apply_bc_conditions_on_interface(msh, v_fun, s_v_fun);
             
             // Compute intermediate state for scalar and rate
             u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
