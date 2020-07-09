@@ -1717,14 +1717,15 @@ void EHHOFirstOrderCFL(int argc, char **argv){
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
     
-    int s = 4;
+    int s = 2;
     int k_ind = sim_data.m_k_degree;
-    std::vector<RealType> tf_vec = {0.25,0.125,0.0625,0.03125};  // s0r0 (ok)
-//    std::vector<RealType> tf_vec = {0.5,0.25,0.125,0.0625};  // s1r0 (ok)
+//    std::vector<RealType> tf_vec = {0.25,0.125,0.0625,0.03125};  // s0r0 (ok)
+//    std::vector<RealType> tf_vec = {0.25,0.125,0.0625,0.03125};  // s1r0 (ok)
+    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r0 {s1}
     
     RealType ti = 0.0;
     RealType tf = tf_vec[k_ind];
-    int nt_base = 640;
+    int nt_base = sim_data.m_nt_divs;
     
     scal_analytic_functions functions;
     functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
@@ -1748,8 +1749,8 @@ void EHHOFirstOrderCFL(int argc, char **argv){
 
         RealType lx = 1.0;
         RealType ly = 1.0;
-        size_t nx = 15+l;
-        size_t ny = 15+l;
+        size_t nx = 9+l;
+        size_t ny = 9+l;
         typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
         typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
         mesh_type msh;
@@ -1881,7 +1882,7 @@ void EHHOFirstOrderCFL(int argc, char **argv){
                 
                 RealType relative_energy = (energy_n - energy) / energy;
                 RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
-                bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-3);
+                bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
 //                bool energy_check_Q = (relative_energy_0 >= 1.0e-3);
                 if (unstable_check_Q) { // energy is increasing
                     approx_fail_check_Q = true;
@@ -1918,7 +1919,7 @@ void EHHOFirstOrderCFL(int argc, char **argv){
                 simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
                 simulation_log << std::endl;
                 simulation_log.flush();
-                nt -= 10;
+                nt -= 5;
                 continue;
             }
         }
