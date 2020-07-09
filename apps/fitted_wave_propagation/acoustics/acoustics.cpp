@@ -1717,11 +1717,10 @@ void EHHOFirstOrderCFL(int argc, char **argv){
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
     
-    int s = 2;
+    int s = 3;
     int k_ind = sim_data.m_k_degree;
-//    std::vector<RealType> tf_vec = {0.25,0.125,0.0625,0.03125};  // s0r0 (ok)
-//    std::vector<RealType> tf_vec = {0.25,0.125,0.0625,0.03125};  // s1r0 (ok)
-    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r0 {s1}
+    std::vector<RealType> tf_vec = {0.25,0.25,0.25,0.25};  // s0r0 {s1,s2}  (ok)
+//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r0 {s1,s2,s3,s4}  (ok)
     
     RealType ti = 0.0;
     RealType tf = tf_vec[k_ind];
