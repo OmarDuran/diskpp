@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-     EHHOFirstOrderCFL_II(argc, argv);
+     EHHOFirstOrderCFL(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
