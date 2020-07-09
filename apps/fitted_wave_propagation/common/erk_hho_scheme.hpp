@@ -54,6 +54,8 @@ class erk_hho_scheme
         m_Kfc = Kg.block(m_n_c_dof,0, n_f_dof, m_n_c_dof);
         m_Sff = Kg.block(m_n_c_dof,m_n_c_dof, n_f_dof, n_f_dof);
         m_Fc = Fg.block(0, 0, m_n_c_dof, 1);
+        m_sff_is_block_diagonal_Q   = false;
+        m_iterative_solver_Q        = false;
         
     }
     
