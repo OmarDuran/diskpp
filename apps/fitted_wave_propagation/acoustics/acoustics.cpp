@@ -89,14 +89,14 @@ int main(int argc, char **argv)
 
     
     
-//    HeterogeneousEHHOFirstOrder(argc, argv);
+    HeterogeneousEHHOFirstOrder(argc, argv);
 //
 //    HeterogeneousIHHOFirstOrder(argc, argv);
 
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-     EHHOFirstOrderCFL(argc, argv);
+//     EHHOFirstOrderCFL(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
@@ -1719,8 +1719,11 @@ void EHHOFirstOrderCFL(int argc, char **argv){
     
     int s = 4;
     int k_ind = sim_data.m_k_degree;
-    std::vector<RealType> tf_vec = {0.25,0.25,0.25,0.25};  // s0r0 {s1,s2,s3}  (ok)
+//    std::vector<RealType> tf_vec = {0.25,0.25,0.25,0.25};  // s0r0 {s1,s2,s3,s4}  (ok)
 //    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r0 {s1,s2,s3,s4}  (ok)
+    
+//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s0r1 {s1,s2,s3,s4}  (ok)
+    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r1 {s1}  (ok)
     
     RealType ti = 0.0;
     RealType tf = tf_vec[k_ind];
@@ -1882,7 +1885,6 @@ void EHHOFirstOrderCFL(int argc, char **argv){
                 RealType relative_energy = (energy_n - energy) / energy;
                 RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
                 bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
-//                bool energy_check_Q = (relative_energy_0 >= 1.0e-3);
                 if (unstable_check_Q) { // energy is increasing
                     approx_fail_check_Q = true;
                     // Computing errors
@@ -1937,7 +1939,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     tc.tic();
 
     RealType lx = 1.0;
-    RealType ly = 0.25;
+    RealType ly = 0.2;
     size_t nx = 10;
     size_t ny = 1;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
@@ -1958,7 +1960,7 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.5;
+    RealType tf = 0.25;
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
@@ -1987,12 +1989,12 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
         y = pt.y();
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
-        rho = 1.0;
         if (x < 0.5) {
-            vp = 2.0;
+            vp = 10.0;
         }else{
             vp = 1.0;
         }
+        rho = 1.0/(vp*vp); // this is required to make both formulations compatible by keeping kappa = 1
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
         return mat_data;
@@ -2017,88 +2019,105 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
-        std::string silo_file_name = "scalar_mixed_";
+        std::string silo_file_name = "e_scalar_mixed_";
         postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
     }
     
     std::ofstream simulation_log("acoustic_two_fields_explicit.txt");
     
     if (sim_data.m_report_energy_Q) {
-        postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+            postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
     }
     
     // Solving a first order equation HDG/HHO propagation problem
-    int s = 3;
-    Matrix<double, Dynamic, Dynamic> alpha;
-    Matrix<double, Dynamic, Dynamic> beta;
-    ssprk_shu_osher_tableau::OSSPRKSS(s, alpha, beta);
+    int s = 4;
+    Matrix<RealType, Dynamic, Dynamic> a;
+    Matrix<RealType, Dynamic, 1> b;
+    Matrix<RealType, Dynamic, 1> c;
+    erk_butcher_tableau::erk_tables(s, a, b, c);
 
     tc.tic();
     assembler.assemble(msh, rhs_fun);
     tc.toc();
     std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
     size_t n_face_dof = assembler.get_n_face_dof();
-    ssprk_hho_scheme ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+    tc.tic();
+    erk_hho_scheme<RealType> erk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+    erk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+    if(sim_data.m_hdg_stabilization_Q){
+        erk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
+    }else{
+        erk_an.setIterativeSolver();
+        erk_an.DecomposeFaceTerm();
+    }
     tc.toc();
-
-    Matrix<double, Dynamic, 1> x_dof_n;
+    std::cout << bold << cyan << "ERK analysis created: " << tc << " seconds" << reset << std::endl;
+    
+    erk_an.refresh_faces_unknowns(x_dof);
+    Matrix<RealType, Dynamic, 1> x_dof_n;
+    timecounter simulation_tc;
+    simulation_tc.tic();
     for(size_t it = 1; it <= nt; it++){
 
         std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
         
-        {   // Updating rhs
-            RealType t = dt*(it)+ti;
-            auto rhs_fun            = functions.Evaluate_f(t);
-            assembler.assemble_rhs(msh, rhs_fun);
-            ssprk_an.SetFg(assembler.RHS);
-        }
         RealType tn = dt*(it-1)+ti;
+        // ERK step
         tc.tic();
         {
-            
             size_t n_dof = x_dof.rows();
-            Matrix<double, Dynamic, Dynamic> ys = Matrix<double, Dynamic, Dynamic>::Zero(n_dof, s+1);
-        
-            Matrix<double, Dynamic, 1> yn, ysi, yj;
-            ys.block(0, 0, n_dof, 1) = x_dof;
+            Matrix<RealType, Dynamic, Dynamic> k = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof, s);
+            Matrix<RealType, Dynamic, 1> Fg, Fg_c,xd;
+            xd = Matrix<RealType, Dynamic, 1>::Zero(n_dof, 1);
+            
+            Matrix<RealType, Dynamic, 1> yn, ki;
+
+            x_dof_n = x_dof;
             for (int i = 0; i < s; i++) {
-        
-                ysi = Matrix<double, Dynamic, 1>::Zero(n_dof, 1);
-                for (int j = 0; j <= i; j++) {
-                    yn = ys.block(0, j, n_dof, 1);
-                    ssprk_an.explicit_rk_weight(yn, yj, dt, alpha(i,j), beta(i,j));
-                    ysi += yj;
+                
+                yn = x_dof;
+                for (int j = 0; j < s - 1; j++) {
+                    yn += a(i,j) * dt * k.block(0, j, n_dof, 1);
                 }
-                ys.block(0, i+1, n_dof, 1) = ysi;
+                
+                {
+                    RealType t = tn + c(i,0) * dt;
+                    auto exact_vel_fun      = functions.Evaluate_v(t);
+                    auto rhs_fun            = functions.Evaluate_f(t);
+                    assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
+//                    assembler.assemble_rhs(msh, rhs_fun);
+                    assembler.RHS.setZero();
+                    assembler.apply_bc(msh);
+                    erk_an.SetFg(assembler.RHS);
+                    erk_an.erk_weight(yn, ki);
+                }
+
+                // Accumulated solution
+                x_dof_n += dt*b(i,0)*ki;
+                k.block(0, i, n_dof, 1) = ki;
             }
-        
-            x_dof_n = ys.block(0, s, n_dof, 1);
         }
         tc.toc();
-        std::cout << bold << cyan << "SSPRK step completed: " << tc << " seconds" << reset << std::endl;
+        std::cout << bold << cyan << "ERK step completed: " << tc << " seconds" << reset << std::endl;
         x_dof = x_dof_n;
 
-        t = tn + dt;
+        RealType t = tn + dt;
         auto exact_vel_fun = functions.Evaluate_v(t);
         auto exact_flux_fun = functions.Evaluate_q(t);
         
         if (sim_data.m_render_silo_files_Q) {
-            std::string silo_file_name = "scalar_mixed_";
+            std::string silo_file_name = "e_inhomogeneous_scalar_mixed_";
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
         }
         
         if (sim_data.m_report_energy_Q) {
             postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
         }
-
-        if(it == nt){
-            // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
-        }
     }
-    
+    simulation_tc.toc();
+    simulation_log << "Simulation time : " << simulation_tc << " seconds" << std::endl;
     simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
-    simulation_log << "Number of SSPRKSS steps =  " << s << std::endl;
+    simulation_log << "Number of ERK steps =  " << s << std::endl;
     simulation_log << "Number of time steps =  " << nt << std::endl;
     simulation_log << "Step size =  " << dt << std::endl;
     simulation_log.flush();
@@ -2135,7 +2154,7 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.25/128;
+    RealType tf = 0.25;
     RealType dt     = tf/nt;
     
     auto null_fun = [](const mesh_type::point_type& pt) -> RealType {
@@ -2244,7 +2263,7 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
     if(sim_data.m_hdg_stabilization_Q){
         erk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
     }else{
-//        erk_an.setIterativeSolver();
+        erk_an.setIterativeSolver();
         erk_an.DecomposeFaceTerm();
     }
     tc.toc();
