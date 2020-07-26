@@ -39,7 +39,7 @@ class linear_solver
     #endif
     
     #ifdef HAVE_INTEL_MKL
-        PardisoLLT<Eigen::SparseMatrix<T>>  m_symm_analysis;
+        PardisoLDLT<Eigen::SparseMatrix<T>>  m_symm_analysis;
     #else
         SimplicialLDLT<Eigen::SparseMatrix<T>> m_symm_analysis;
     #endif

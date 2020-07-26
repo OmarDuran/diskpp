@@ -27,9 +27,9 @@ class erk_hho_scheme
     Matrix<T, Dynamic, 1> m_Fc;
 
     #ifdef HAVE_INTEL_MKL
-        PardisoLLT<Eigen::SparseMatrix<T>>  m_analysis_f;
+        PardisoLDLT<Eigen::SparseMatrix<T>>  m_analysis_f;
     #else
-        SimplicialLLT<SparseMatrix<T>> m_analysis_f;
+        SimplicialLDLT<SparseMatrix<T>> m_analysis_f;
     #endif
     
     ConjugateGradient<SparseMatrix<T>> m_analysis_cg;
@@ -56,7 +56,6 @@ class erk_hho_scheme
         m_Fc = Fg.block(0, 0, m_n_c_dof, 1);
         m_sff_is_block_diagonal_Q   = false;
         m_iterative_solver_Q        = false;
-        
     }
     
     void setIterativeSolver(T tolerance = 1.0e-11){
@@ -78,11 +77,11 @@ class erk_hho_scheme
     
 
     #ifdef HAVE_INTEL_MKL
-        PardisoLLT<Eigen::SparseMatrix<T>> & FacesAnalysis(){
+        PardisoLDLT<Eigen::SparseMatrix<T>> & FacesAnalysis(){
             return m_analysis_f;
         }
     #else
-        SimplicialLLT<SparseMatrix<T>> & FacesAnalysis(){
+        SimplicialLDLT<SparseMatrix<T>> & FacesAnalysis(){
             return m_analysis_f;
         }
     #endif

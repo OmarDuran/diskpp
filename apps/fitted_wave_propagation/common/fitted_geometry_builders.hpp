@@ -606,6 +606,10 @@ public:
                   }
             }
         }
+          
+        // Duplicated facets are eliminated
+        std::sort( facets.begin(), facets.end() );
+        facets.erase( std::unique( facets.begin(), facets.end() ), facets.end() );
         
         return true;
     }

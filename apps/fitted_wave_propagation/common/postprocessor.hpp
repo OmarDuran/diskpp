@@ -89,7 +89,7 @@ public:
         }
         tc.toc();
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
-        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "Characteristic h size = " << std::setprecision(16) << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file << std::endl;
@@ -162,7 +162,7 @@ public:
         tc.toc();
         
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
-        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "Characteristic h size = " << std::setprecision(16) << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file << std::endl;
@@ -500,7 +500,7 @@ public:
         }
         tc.toc();
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
-        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "Characteristic h size = " << std::setprecision(16) << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file << std::endl;
@@ -582,7 +582,7 @@ public:
         }
         tc.toc();
         std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
-        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "Characteristic h size = " << std::setprecision(16) << h << std::endl;
         error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
         error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
         error_file << std::endl;
