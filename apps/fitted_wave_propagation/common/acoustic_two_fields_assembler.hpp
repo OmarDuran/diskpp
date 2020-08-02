@@ -499,7 +499,9 @@ public:
     {
         auto num_faces = howmany_faces(msh, cl);
         auto cell_ofs = disk::priv::offset(msh, cl);
-        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_cbs = n_scal_cbs + n_vec_cbs;
         size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
         
         Matrix<T, Dynamic, 1> x_el(n_cbs + num_faces * n_fbs );

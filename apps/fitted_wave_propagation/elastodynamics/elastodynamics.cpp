@@ -64,10 +64,10 @@ int main(int argc, char **argv)
 {
 
 //    HeterogeneousIHHOFirstOrder(argc, argv);
-    HeterogeneousIHHOSecondOrder(argc, argv);
+//    HeterogeneousIHHOSecondOrder(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
-//    IHHOFirstOrder(argc, argv);
+    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
     
 //    // Examples using main app objects for solving a linear elastic problem with optimal convergence rates

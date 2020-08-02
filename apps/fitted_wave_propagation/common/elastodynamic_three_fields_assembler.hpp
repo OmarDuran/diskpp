@@ -344,8 +344,8 @@ public:
             
         elastic_material_data<T> & material = m_material[cell_ind];
         T rho = material.rho();
-//        T vs = material.vs();
-//        T mu = rho * vs * vs;
+        T vs = material.vs();
+        T mu = rho * vs * vs;
         
         auto reconstruction_operator   = strain_tensor_reconstruction(msh, cell);
         Matrix<T, Dynamic, Dynamic> R_operator = reconstruction_operator.second;
@@ -371,7 +371,8 @@ public:
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }
             
-        return R_operator + D_operator + (rho)*S_operator;
+        return R_operator + D_operator + ((rho)/(vs))*S_operator;
+//        return R_operator + D_operator + (rho)*S_operator;
     }
             
     Matrix<T, Dynamic, Dynamic>

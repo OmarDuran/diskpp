@@ -83,9 +83,9 @@ int main(int argc, char **argv)
     
 //    HeterogeneousPulseEHHOFirstOrder(argc, argv);
     
-//    HeterogeneousPulseIHHOFirstOrder(argc, argv);
+    HeterogeneousPulseIHHOFirstOrder(argc, argv);
 //
-    HeterogeneousPulseIHHOSecondOrder(argc, argv);
+//    HeterogeneousPulseIHHOSecondOrder(argc, argv);
 
     
     
@@ -379,7 +379,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver();
+//                analysis.set_iterative_solver();
                 
                 tc.tic();
                 analysis.factorize();
@@ -398,7 +398,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver();
+//                analysis.set_iterative_solver();
                 
                 tc.tic();
                 analysis.factorize();
@@ -413,7 +413,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             }
             
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, error_file);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun, error_file, true);
             
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "steady_scalar_mixed_k" + std::to_string(k) + "_";
@@ -693,7 +693,7 @@ void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver();
+//                analysis.set_iterative_solver();
                 
                 tc.tic();
                 analysis.factorize();
@@ -712,7 +712,7 @@ void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver();
+//                analysis.set_iterative_solver();
                 
                 tc.tic();
                 analysis.factorize();
@@ -727,7 +727,7 @@ void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv){
             }
             
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_scal_fun, exact_flux_fun, error_file);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_scal_fun, exact_flux_fun, error_file);
             
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "steady_scalar_mixed_k" + std::to_string(k) + "_";
@@ -1342,7 +1342,7 @@ void IHHOFirstOrder(int argc, char **argv){
         
         if(it == nt){
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
         }
 
     }
@@ -1557,7 +1557,7 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
         
         if(it == nt){
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
         }
 
     }
@@ -1759,7 +1759,7 @@ void EHHOFirstOrder(int argc, char **argv){
 
         if(it == nt){
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
         }
     }
     
@@ -1947,13 +1947,13 @@ void EHHOFirstOrderCFL(int argc, char **argv){
                 if (unstable_check_Q) { // energy is increasing
                     approx_fail_check_Q = true;
                     // Computing errors
-                      postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                      postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
                     break;
                 }
                 energy = energy_n;
                 if(it == nt){
                     // Computing errors
-                    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
                 }
             }
 
@@ -2204,6 +2204,18 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
     mesh_builder.refine_mesh(sim_data.m_n_divs);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
+    
+//    size_t l = sim_data.m_n_divs;
+//    polygon_2d_mesh_reader<RealType> mesh_builder;
+//    std::vector<std::string> mesh_files;
+//    mesh_files.push_back("mexican_hat_polymesh_nel_5120.txt");
+//    mesh_files.push_back("mexican_hat_polymesh_nel_10240.txt");
+//
+//    // Reading the polygonal mesh
+//    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
+    
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Time controls : Final time value 0.25
@@ -2298,6 +2310,16 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
     }
     
     std::ofstream simulation_log("inhomogeneous_acoustic_two_fields_explicit.txt");
+        
+    std::ofstream sensor_top_log("top_sensor_e_acoustic_two_fields.csv");
+    std::ofstream sensor_bot_log("bot_sensor_e_acoustic_two_fields.csv");
+    typename mesh_type::point_type top_pt(0.5, 2.0/3.0);
+    typename mesh_type::point_type bot_pt(0.5, 1.0/3.0);
+    std::pair<typename mesh_type::point_type,size_t> top_pt_cell = std::make_pair(top_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> bot_pt_cell = std::make_pair(bot_pt, -1);
+    
+    postprocessor<mesh_type>::record_data_acoustic_two_fields(0, top_pt_cell, msh, hho_di, x_dof, sensor_top_log);
+    postprocessor<mesh_type>::record_data_acoustic_two_fields(0, bot_pt_cell, msh, hho_di, x_dof, sensor_bot_log);
     
     if (sim_data.m_report_energy_Q) {
         postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
@@ -2321,7 +2343,7 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
     if(sim_data.m_hdg_stabilization_Q){
         erk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
     }else{
-        erk_an.setIterativeSolver();
+//        erk_an.setIterativeSolver();
         erk_an.DecomposeFaceTerm();
     }
     tc.toc();
@@ -2381,6 +2403,9 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, vel_fun, null_flux_fun, false);
         }
         
+        postprocessor<mesh_type>::record_data_acoustic_two_fields(it, top_pt_cell, msh, hho_di, x_dof, sensor_top_log);
+        postprocessor<mesh_type>::record_data_acoustic_two_fields(it, bot_pt_cell, msh, hho_di, x_dof, sensor_bot_log);
+        
         if (sim_data.m_report_energy_Q) {
             postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
         }
@@ -2412,10 +2437,23 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
 
-    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh(sim_data.m_n_divs);
+//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+//    mesh_builder.refine_mesh(sim_data.m_n_divs);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
+    
+    size_t l = sim_data.m_n_divs;
+    polygon_2d_mesh_reader<RealType> mesh_builder;
+    std::vector<std::string> mesh_files;
+    mesh_files.push_back("mexican_hat_polymesh_nel_4096.txt");
+    mesh_files.push_back("mexican_hat_polymesh_nel_16384.txt");
+        mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
+
+    // Reading the polygonal mesh
+    mesh_builder.set_poly_mesh_file(mesh_files[l]);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
+    
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Time controls : Final time value 0.25
@@ -2473,7 +2511,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
         RealType rho, vp;
         rho = 1.0;
         if (y < 0.5) {
-            vp = 1.0;
+            vp = 10.0;
         }else{
             vp = 1.0;
         }
@@ -2509,6 +2547,16 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
     
     std::ofstream simulation_log("inhomogeneous_acoustic_two_fields.txt");
     
+    std::ofstream sensor_top_log("top_sensor_acoustic_two_fields.csv");
+    std::ofstream sensor_bot_log("bot_sensor_acoustic_two_fields.csv");
+    typename mesh_type::point_type top_pt(0.5, 2.0/3.0);
+    typename mesh_type::point_type bot_pt(0.5, 1.0/3.0);
+    std::pair<typename mesh_type::point_type,size_t> top_pt_cell = std::make_pair(top_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> bot_pt_cell = std::make_pair(bot_pt, -1);
+    
+    postprocessor<mesh_type>::record_data_acoustic_two_fields(0, top_pt_cell, msh, hho_di, x_dof, sensor_top_log);
+    postprocessor<mesh_type>::record_data_acoustic_two_fields(0, bot_pt_cell, msh, hho_di, x_dof, sensor_bot_log);
+    
     if (sim_data.m_report_energy_Q) {
         postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
     }
@@ -2543,7 +2591,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
         dirk_an.SetScale(scale);
         tc.tic();
         dirk_an.ComposeMatrix();
-        dirk_an.setIterativeSolver();
+//        dirk_an.setIterativeSolver();
         dirk_an.DecomposeMatrix();
         tc.toc();
         std::cout << bold << cyan << "Matrix decomposed: " << tc << " seconds" << reset << std::endl;
@@ -2575,7 +2623,11 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
                     yn += a(i,j) * dt * k.block(0, j, n_dof, 1);
                 }
                 
-                dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
+                {
+                    assembler.RHS.setZero();
+                    dirk_an.SetFg(assembler.RHS);
+                    dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
+                }
 
                 // Accumulated solution
                 x_dof_n += dt*b(i,0)*ki;
@@ -2592,6 +2644,9 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
             std::string silo_file_name = "inhomogeneous_scalar_mixed_";
             postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, vel_fun, null_flux_fun, false);
         }
+        
+        postprocessor<mesh_type>::record_data_acoustic_two_fields(it, top_pt_cell, msh, hho_di, x_dof, sensor_top_log);
+        postprocessor<mesh_type>::record_data_acoustic_two_fields(it, bot_pt_cell, msh, hho_di, x_dof, sensor_bot_log);
         
         if (sim_data.m_report_energy_Q) {
             postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
@@ -2635,9 +2690,10 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
     size_t l = sim_data.m_n_divs;
     polygon_2d_mesh_reader<RealType> mesh_builder;
     std::vector<std::string> mesh_files;
-    mesh_files.push_back("mexican_hat_polymesh_nel_5120.txt");
-    mesh_files.push_back("mexican_hat_polymesh_nel_10240.txt");
-    
+    mesh_files.push_back("mexican_hat_polymesh_nel_4096.txt");
+    mesh_files.push_back("mexican_hat_polymesh_nel_16384.txt");
+    mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
+
     // Reading the polygonal mesh
     mesh_builder.set_poly_mesh_file(mesh_files[l]);
     mesh_builder.build_mesh();
@@ -2731,6 +2787,16 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
     
     std::ofstream simulation_log("inhomogeneous_acoustic_one_field.txt");
     
+    std::ofstream sensor_top_log("top_sensor_acoustic_one_field.csv");
+    std::ofstream sensor_bot_log("bot_sensor_acoustic_one_field.csv");
+    typename mesh_type::point_type top_pt(0.5, 2.0/3.0);
+    typename mesh_type::point_type bot_pt(0.5, 1.0/3.0);
+    std::pair<typename mesh_type::point_type,size_t> top_pt_cell = std::make_pair(top_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> bot_pt_cell = std::make_pair(bot_pt, -1);
+    
+    postprocessor<mesh_type>::record_data_acoustic_one_field(0, top_pt_cell, msh, hho_di, v_dof_n, sensor_top_log);
+    postprocessor<mesh_type>::record_data_acoustic_one_field(0, bot_pt_cell, msh, hho_di, v_dof_n, sensor_bot_log);
+    
     if (sim_data.m_report_energy_Q) {
         postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, ti, p_dof_n, v_dof_n, simulation_log);
     }
@@ -2765,7 +2831,8 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
             tc.toc();
             std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
             
-            analysis.set_iterative_solver(true, 1.0e-10);
+//            analysis.set_iterative_solver(true, 1.0e-10);
+            analysis.set_direct_solver(true);
             
             tc.tic();
             analysis.factorize();
@@ -2817,6 +2884,9 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
                 std::string silo_file_name = "inhomogeneous_scalar_";
                 postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, v_dof_n, vel_fun, false);
             }
+            
+            postprocessor<mesh_type>::record_data_acoustic_one_field(it, top_pt_cell, msh, hho_di, v_dof_n, sensor_top_log);
+            postprocessor<mesh_type>::record_data_acoustic_one_field(it, bot_pt_cell, msh, hho_di, v_dof_n, sensor_bot_log);
             
             if (sim_data.m_report_energy_Q) {
                 postprocessor<mesh_type>::compute_acoustic_energy_one_field(msh, hho_di, assembler, t, p_dof_n, v_dof_n, simulation_log);

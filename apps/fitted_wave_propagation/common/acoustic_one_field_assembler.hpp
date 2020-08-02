@@ -446,7 +446,7 @@ public:
         size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
             
         size_t first_ind = 0;
-        size_t last_ind;
+        size_t last_ind = 0;
         for (auto& cell : msh)
         {
             auto fcs = faces(msh, cell);
