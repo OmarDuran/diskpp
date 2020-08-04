@@ -62,6 +62,8 @@ void EHHOFirstOrderCFL(int argc, char **argv);
 
 void EHHOFirstOrder(int argc, char **argv);
 
+void SSPHHOFirstOrder(int argc, char **argv);
+
 void HeterogeneousIHHOFirstOrder(int argc, char **argv);
 
 void IHHOFirstOrder(int argc, char **argv);
@@ -83,9 +85,9 @@ int main(int argc, char **argv)
     
 //    HeterogeneousPulseEHHOFirstOrder(argc, argv);
     
-    HeterogeneousPulseIHHOFirstOrder(argc, argv);
+//    HeterogeneousPulseIHHOFirstOrder(argc, argv);
 //
-//    HeterogeneousPulseIHHOSecondOrder(argc, argv);
+    HeterogeneousPulseIHHOSecondOrder(argc, argv);
 
     
     
@@ -98,6 +100,7 @@ int main(int argc, char **argv)
     
 //     EHHOFirstOrderCFL(argc, argv);
     
+//    SSPHHOFirstOrder(argc, argv);
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
@@ -1770,6 +1773,175 @@ void EHHOFirstOrder(int argc, char **argv){
     simulation_log.flush();
 }
 
+void SSPHHOFirstOrder(int argc, char **argv){
+    
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+    
+    // Building a cartesian mesh
+    timecounter tc;
+    tc.tic();
+
+    RealType lx = 1.0;
+    RealType ly = 1.0;
+    size_t nx = 2;
+    size_t ny = 2;
+    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    mesh_type msh;
+
+//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+//    mesh_builder.refine_mesh(sim_data.m_n_divs);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
+    
+    size_t l = sim_data.m_n_divs;
+    polygon_2d_mesh_reader<RealType> mesh_builder;
+    std::vector<std::string> mesh_files;
+    mesh_files.push_back("unit_square_polymesh_nel_20.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_40.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_80.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_160.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_320.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_640.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_1280.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_2560.txt");
+    mesh_files.push_back("unit_square_polymesh_nel_5120.txt");
+    
+    // Reading the polygonal mesh
+    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
+    
+    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    // Time controls : Final time value 1.0
+    size_t nt = 10;
+    for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+        nt *= 2;
+    }
+    RealType ti = 0.0;
+    RealType tf = 1.0;
+    RealType dt     = (tf-ti)/nt;
+    
+    scal_analytic_functions functions;
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+    RealType t = ti;
+    auto exact_vel_fun      = functions.Evaluate_v(t);
+    auto exact_flux_fun     = functions.Evaluate_q(t);
+    auto rhs_fun            = functions.Evaluate_f(t);
+    
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t cell_k_degree = sim_data.m_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+
+    // Solving a primal HHO mixed problem
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(exact_vel_fun);
+    tc.tic();
+    auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+    assembler.load_material_data(msh);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
+    }
+    tc.toc();
+    std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    assembler.assemble_mass(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+    
+    // Projecting initial data
+    Matrix<RealType, Dynamic, 1> x_dof;
+    assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
+    assembler.project_over_faces(msh, x_dof, exact_vel_fun);
+    
+    
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "e_ssprk_scalar_mixed_";
+        postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+    }
+    
+    std::ofstream simulation_log("acoustic_two_fields_explicit_ssprk.txt");
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+    }
+    
+    // Solving a first order equation HDG/HHO propagation problem
+    int s = 5;
+    Matrix<RealType, Dynamic, Dynamic> alpha;
+    Matrix<RealType, Dynamic, Dynamic> beta;
+    ssprk_shu_osher_tableau::ossprk_tables(s, alpha, beta);
+
+    tc.tic();
+    assembler.assemble(msh, rhs_fun);
+    tc.toc();
+    std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
+    size_t n_face_dof = assembler.get_n_face_dof();
+    tc.tic();
+    ssprk_hho_scheme<RealType> ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+    ssprk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+    if(sim_data.m_hdg_stabilization_Q){
+        ssprk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
+    }else{
+//        ssprk_an.setIterativeSolver();
+        ssprk_an.DecomposeFaceTerm();
+    }
+    tc.toc();
+    std::cout << bold << cyan << "SSPRK analysis created: " << tc << " seconds" << reset << std::endl;
+    
+    ssprk_an.refresh_faces_unknowns(x_dof);
+    Matrix<RealType, Dynamic, 1> x_dof_n;
+    assembler.RHS.setZero();
+    ssprk_an.SetFg(assembler.RHS);
+    for(size_t it = 1; it <= nt; it++){
+
+        std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+        
+        RealType tn = dt*(it-1)+ti;
+        // SSPRK step
+        tc.tic();
+        ssprk_an.ssprk_step(s, alpha, beta, dt, x_dof, x_dof_n);
+        tc.toc();
+        std::cout << bold << cyan << "SSPRK step completed: " << tc << " seconds" << reset << std::endl;
+        x_dof = x_dof_n;
+
+        t = tn + dt;
+        auto exact_vel_fun = functions.Evaluate_v(t);
+        auto exact_flux_fun = functions.Evaluate_q(t);
+        
+        if (sim_data.m_render_silo_files_Q) {
+            std::string silo_file_name = "e_ssprk_scalar_mixed_";
+            postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+        }
+        
+        if (sim_data.m_report_energy_Q) {
+            postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+        }
+
+        if(it == nt){
+            // Computing errors
+            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+        }
+    }
+    
+    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+    simulation_log << "Number of SSPRK steps =  " << s << std::endl;
+    simulation_log << "Number of time steps =  " << nt << std::endl;
+    simulation_log << "Step size =  " << dt << std::endl;
+    simulation_log.flush();
+}
+
 void EHHOFirstOrderCFL(int argc, char **argv){
     
     using RealType = double;
@@ -2200,21 +2372,21 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
 
-    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh(sim_data.m_n_divs);
-    mesh_builder.build_mesh();
-    mesh_builder.move_to_mesh_storage(msh);
-    
-//    size_t l = sim_data.m_n_divs;
-//    polygon_2d_mesh_reader<RealType> mesh_builder;
-//    std::vector<std::string> mesh_files;
-//    mesh_files.push_back("mexican_hat_polymesh_nel_5120.txt");
-//    mesh_files.push_back("mexican_hat_polymesh_nel_10240.txt");
-//
-//    // Reading the polygonal mesh
-//    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+//    mesh_builder.refine_mesh(sim_data.m_n_divs);
 //    mesh_builder.build_mesh();
 //    mesh_builder.move_to_mesh_storage(msh);
+    
+    size_t l = sim_data.m_n_divs;
+    polygon_2d_mesh_reader<RealType> mesh_builder;
+    std::vector<std::string> mesh_files;
+    mesh_files.push_back("mexican_hat_polymesh_nel_5120.txt");
+    mesh_files.push_back("mexican_hat_polymesh_nel_10240.txt");
+
+    // Reading the polygonal mesh
+    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
     
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -2273,7 +2445,7 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
         RealType rho, vp;
         rho = 1.0;
         if (y < 0.5) {
-            vp = 10.0;
+            vp = 5.0;
         }else{
             vp = 1.0;
         }
@@ -2447,7 +2619,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
     std::vector<std::string> mesh_files;
     mesh_files.push_back("mexican_hat_polymesh_nel_4096.txt");
     mesh_files.push_back("mexican_hat_polymesh_nel_16384.txt");
-        mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
+    mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
 
     // Reading the polygonal mesh
     mesh_builder.set_poly_mesh_file(mesh_files[l]);
@@ -2511,7 +2683,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
         RealType rho, vp;
         rho = 1.0;
         if (y < 0.5) {
-            vp = 10.0;
+            vp = 5.0;
         }else{
             vp = 1.0;
         }
@@ -2681,23 +2853,23 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
 
-//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-//    mesh_builder.refine_mesh(sim_data.m_n_divs);
-//    mesh_builder.set_translation_data(0.0, 0.0);
-//    mesh_builder.build_mesh();
-//    mesh_builder.move_to_mesh_storage(msh);
-    
-    size_t l = sim_data.m_n_divs;
-    polygon_2d_mesh_reader<RealType> mesh_builder;
-    std::vector<std::string> mesh_files;
-    mesh_files.push_back("mexican_hat_polymesh_nel_4096.txt");
-    mesh_files.push_back("mexican_hat_polymesh_nel_16384.txt");
-    mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
-
-    // Reading the polygonal mesh
-    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+    mesh_builder.refine_mesh(sim_data.m_n_divs);
+    mesh_builder.set_translation_data(0.0, 0.0);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
+    
+//    size_t l = sim_data.m_n_divs;
+//    polygon_2d_mesh_reader<RealType> mesh_builder;
+//    std::vector<std::string> mesh_files;
+//    mesh_files.push_back("mexican_hat_polymesh_nel_4096.txt");
+//    mesh_files.push_back("mexican_hat_polymesh_nel_16384.txt");
+//    mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
+//
+//    // Reading the polygonal mesh
+//    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
 
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -2749,7 +2921,7 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
         RealType rho, vp;
         rho = 1.0;
         if (y < 0.5) {
-            vp = 10.0;
+            vp = 5.0;
         }else{
             vp = 1.0;
         }

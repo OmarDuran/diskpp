@@ -15,7 +15,7 @@ class ssprk_shu_osher_tableau
 {
     public:
     
-    static void OSSPRKSS(int s, Matrix<double, Dynamic, Dynamic> &a, Matrix<double,Dynamic, Dynamic> &b){
+    static void ossprk_tables(int s, Matrix<double, Dynamic, Dynamic> &a, Matrix<double,Dynamic, Dynamic> &b){
         
         // Optimal Strong-Stability-Preserving Runge-Kutta Time Discretizations for Discontinuous Galerkin Methods
         switch (s) {
