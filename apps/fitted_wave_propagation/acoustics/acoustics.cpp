@@ -62,7 +62,7 @@ void EHHOFirstOrderCFL(int argc, char **argv);
 
 void EHHOFirstOrder(int argc, char **argv);
 
-void SSPHHOFirstOrder(int argc, char **argv);
+void SSPRKHHOFirstOrder(int argc, char **argv);
 
 void HeterogeneousIHHOFirstOrder(int argc, char **argv);
 
@@ -100,7 +100,9 @@ int main(int argc, char **argv)
     
 //     EHHOFirstOrderCFL(argc, argv);
     
-//    SSPHHOFirstOrder(argc, argv);
+    SSPRKHHOFirstOrder(argc, argv);
+    
+    
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
@@ -1773,7 +1775,7 @@ void EHHOFirstOrder(int argc, char **argv){
     simulation_log.flush();
 }
 
-void SSPHHOFirstOrder(int argc, char **argv){
+void SSPRKHHOFirstOrder(int argc, char **argv){
     
     using RealType = double;
     simulation_data sim_data = preprocessor::process_args(argc, argv);
@@ -1791,28 +1793,28 @@ void SSPHHOFirstOrder(int argc, char **argv){
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
 
-//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-//    mesh_builder.refine_mesh(sim_data.m_n_divs);
-//    mesh_builder.build_mesh();
-//    mesh_builder.move_to_mesh_storage(msh);
-    
-    size_t l = sim_data.m_n_divs;
-    polygon_2d_mesh_reader<RealType> mesh_builder;
-    std::vector<std::string> mesh_files;
-    mesh_files.push_back("unit_square_polymesh_nel_20.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_40.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_80.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_160.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_320.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_640.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_1280.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_2560.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_5120.txt");
-    
-    // Reading the polygonal mesh
-    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+    mesh_builder.refine_mesh(sim_data.m_n_divs);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
+    
+//    size_t l = sim_data.m_n_divs;
+//    polygon_2d_mesh_reader<RealType> mesh_builder;
+//    std::vector<std::string> mesh_files;
+//    mesh_files.push_back("unit_square_polymesh_nel_20.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_40.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_80.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_160.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_320.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_640.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_1280.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_2560.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_5120.txt");
+    
+//    // Reading the polygonal mesh
+//    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
     
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -1826,7 +1828,7 @@ void SSPHHOFirstOrder(int argc, char **argv){
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
-    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_q(t);
@@ -1878,7 +1880,7 @@ void SSPHHOFirstOrder(int argc, char **argv){
     }
     
     // Solving a first order equation HDG/HHO propagation problem
-    int s = 5;
+    int s = 4;
     Matrix<RealType, Dynamic, Dynamic> alpha;
     Matrix<RealType, Dynamic, Dynamic> beta;
     ssprk_shu_osher_tableau::ossprk_tables(s, alpha, beta);

@@ -68,10 +68,10 @@ int main(int argc, char **argv)
 {
 
 //    Gar6more2DIHHOFirstOrder(argc, argv);
-    Gar6more2DIHHOSecondOrder(argc, argv);
+//    Gar6more2DIHHOSecondOrder(argc, argv);
     
 //    HeterogeneousIHHOFirstOrder(argc, argv);
-//    HeterogeneousIHHOSecondOrder(argc, argv);
+    HeterogeneousIHHOSecondOrder(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
@@ -1031,16 +1031,17 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     timecounter tc;
     tc.tic();
 
-    RealType lx = 1.0;
-    RealType ly = 1.0;
-    size_t nx = 2;
-    size_t ny = 2;
+    RealType lx = 3.0;
+    RealType ly = 2.5;
+    size_t nx = 3;
+    size_t ny = 3;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
     typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
     mesh_type msh;
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
     mesh_builder.refine_mesh(sim_data.m_n_divs);
+    mesh_builder.set_translation_data(-1.0, 0.0);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
     tc.toc();
@@ -1052,7 +1053,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 1.0;
+    RealType tf = 0.75;
     RealType dt     = (tf-ti)/nt;
     
     // Creating HHO approximation spaces and corresponding linear operator
@@ -1070,15 +1071,16 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
             return f;
     };
     
-    
     auto vec_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
-            RealType x,y,xc,yc,r,wave,vx,vy;
+            RealType x,y,xc,yc,r,wave,vx,vy,c,lp;
             x = pt.x();
             y = pt.y();
             xc = 0.5;
-            yc = 0.75;
+            yc = (2.0/3.0)+1.25;
+            c = 10.0;
+            lp = std::sqrt(3.0)/10.0;
             r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
-            wave = (-4*std::sqrt(10.0/3.0)*(-1 + 1600.0*r*r))/(std::exp(800*r*r)*std::pow(M_PI,0.25));
+            wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
             vx = wave*(x-xc);
             vy = wave*(y-yc);
             static_vector<RealType, 2> v{vx,vy};
@@ -1099,7 +1101,7 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
          std::vector<RealType> mat_data(3);
          RealType rho, vp, vs;
          rho = 1.0;
-         if (y < 0.5) {
+         if (y < 1.25) {
              vp = 1.0*std::sqrt(3.0);
              vs  = 1.0;
          }else{
@@ -1146,11 +1148,26 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     
     std::ofstream simulation_log("elastodynamic_inhomogeneous_one_field.txt");
     
+    std::ofstream sensor_1_log("s1_elastodynamic_one_field.csv");
+    std::ofstream sensor_2_log("s2_elastodynamic_one_field.csv");
+    std::ofstream sensor_3_log("s3_elastodynamic_one_field.csv");
+    typename mesh_type::point_type s1_pt(0.5-2.0/3.0, 1.0/3.0);
+    typename mesh_type::point_type s2_pt(0.5, 1.0/3.0);
+    typename mesh_type::point_type s3_pt(0.5+2.0/3.0, 1.0/3.0);
+    std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
+    
+    postprocessor<mesh_type>::record_data_elastic_one_field(0, s1_pt_cell, msh, hho_di, v_dof_n, sensor_1_log);
+    postprocessor<mesh_type>::record_data_elastic_one_field(0, s2_pt_cell, msh, hho_di, v_dof_n, sensor_2_log);
+    postprocessor<mesh_type>::record_data_elastic_one_field(0, s3_pt_cell, msh, hho_di, v_dof_n, sensor_3_log);
+    
     if (sim_data.m_report_energy_Q) {
         postprocessor<mesh_type>::compute_elastic_energy_one_field(msh, hho_di, assembler, ti, u_dof_n, v_dof_n, simulation_log);
     }
     
-    bool standar_Q = false;
+    linear_solver<RealType> analysis;
+    bool standar_Q = true;
     // Newmark process
     {
         Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
@@ -1165,19 +1182,36 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
         
         tc.tic();
         assembler.assemble(msh, null_fun);
-        assembler.assemble_rhs(msh, null_fun);
-        SparseMatrix<double> Kg = assembler.LHS;
+        SparseMatrix<RealType> Kg = assembler.LHS;
         assembler.LHS *= beta*(dt*dt);
         assembler.LHS += assembler.MASS;
-    #ifdef HAVE_INTEL_MKL
-        PardisoLU<Eigen::SparseMatrix<double>>  analysis;
-    #else
-        SparseLU<Eigen::SparseMatrix<double>>   analysis;
-    #endif
-        analysis.analyzePattern(assembler.LHS);
-        analysis.factorize(assembler.LHS);
         tc.toc();
         std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
+        
+        if (sim_data.m_sc_Q) {
+            tc.tic();
+            analysis.set_Kg(assembler.LHS,assembler.get_n_face_dof());
+            analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+            tc.toc();
+            std::cout << bold << cyan << "Equations condensed in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            analysis.set_direct_solver(true);
+            
+            tc.tic();
+            analysis.factorize();
+            tc.toc();
+            std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+        
+        }else{
+            analysis.set_Kg(assembler.LHS);
+            analysis.set_direct_solver(true);
+            
+            tc.tic();
+            analysis.factorize();
+            tc.toc();
+            std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+        }
         
         for(size_t it = 1; it <= nt; it++){
 
@@ -1210,12 +1244,16 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
                 postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, v_dof_n, vec_fun, false);
             }
             
+            postprocessor<mesh_type>::record_data_elastic_one_field(it, s1_pt_cell, msh, hho_di, v_dof_n, sensor_1_log);
+            postprocessor<mesh_type>::record_data_elastic_one_field(it, s2_pt_cell, msh, hho_di, v_dof_n, sensor_2_log);
+            postprocessor<mesh_type>::record_data_elastic_one_field(it, s3_pt_cell, msh, hho_di, v_dof_n, sensor_3_log);
+            
             if (sim_data.m_report_energy_Q) {
                 postprocessor<mesh_type>::compute_elastic_energy_one_field(msh, hho_di, assembler, t, u_dof_n, v_dof_n, simulation_log);
             }
 
         }
-        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+        simulation_log << "Number of equations : " << analysis.n_equations() << std::endl;
         simulation_log << "Number of time steps =  " << nt << std::endl;
         simulation_log << "Step size =  " << dt << std::endl;
         simulation_log.flush();

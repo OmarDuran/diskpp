@@ -261,6 +261,7 @@ class ssprk_hho_scheme
     
     void ssprk_weight(Matrix<T, Dynamic, 1> & x_dof, Matrix<T, Dynamic, 1> & x_dof_n, T dt, T a, T b){
         
+        x_dof_n = x_dof;
         Matrix<T, Dynamic, 1> x_c_dof = x_dof.block(0, 0, m_n_c_dof, 1);
         Matrix<T, Dynamic, 1> x_f_dof = x_dof.block(m_n_c_dof, 0, m_n_f_dof, 1);
     
