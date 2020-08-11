@@ -1574,6 +1574,20 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
     
     std::ofstream simulation_log("elastodynamic_inhomogeneous_three_fields.txt");
     
+    std::ofstream sensor_1_log("s1_elastodynamic_three_fields.csv");
+    std::ofstream sensor_2_log("s2_elastodynamic_three_fields.csv");
+    std::ofstream sensor_3_log("s3_elastodynamic_three_fields.csv");
+    typename mesh_type::point_type s1_pt(0.5-2.0/3.0, 1.0/3.0);
+    typename mesh_type::point_type s2_pt(0.5, 1.0/3.0);
+    typename mesh_type::point_type s3_pt(0.5+2.0/3.0, 1.0/3.0);
+    std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
+    
+    postprocessor<mesh_type>::record_data_elastic_three_fields(0, s1_pt_cell, msh, hho_di, x_dof, sensor_1_log);
+    postprocessor<mesh_type>::record_data_elastic_three_fields(0, s2_pt_cell, msh, hho_di, x_dof, sensor_2_log);
+    postprocessor<mesh_type>::record_data_elastic_three_fields(0, s3_pt_cell, msh, hho_di, x_dof, sensor_3_log);
+    
     if (sim_data.m_report_energy_Q) {
         postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
     }
@@ -1650,7 +1664,7 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
             }
         }
         tc.toc();
-        std::cout << bold << cyan << "DIRK step completed: " << tc << " seconds" << reset << std::endl;
+        std::cout << bold << cyan << "SDIRK step completed: " << tc << " seconds" << reset << std::endl;
         x_dof = x_dof_n;
 
         RealType t = tn + dt;
@@ -1659,6 +1673,10 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
             std::string silo_file_name = "inhomogeneous_vector_mixed_";
                 postprocessor<mesh_type>::write_silo_three_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, vec_fun, null_flux_fun, false);
         }
+        
+        postprocessor<mesh_type>::record_data_elastic_three_fields(it, s1_pt_cell, msh, hho_di, x_dof, sensor_1_log);
+        postprocessor<mesh_type>::record_data_elastic_three_fields(it, s2_pt_cell, msh, hho_di, x_dof, sensor_2_log);
+        postprocessor<mesh_type>::record_data_elastic_three_fields(it, s3_pt_cell, msh, hho_di, x_dof, sensor_3_log);
         
         if (sim_data.m_report_energy_Q) {
             postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
