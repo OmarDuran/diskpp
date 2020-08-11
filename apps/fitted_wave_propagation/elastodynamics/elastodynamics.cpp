@@ -46,6 +46,8 @@ using namespace Eigen;
 #include "../common/ssprk_hho_scheme.hpp"
 #include "../common/ssprk_shu_osher_tableau.hpp"
 
+void Gar6more2DIHHOSecondOrder(int argc, char **argv);
+
 void Gar6more2DIHHOFirstOrder(int argc, char **argv);
 
 void HeterogeneousIHHOFirstOrder(int argc, char **argv);
@@ -65,7 +67,8 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-    Gar6more2DIHHOFirstOrder(argc, argv);
+//    Gar6more2DIHHOFirstOrder(argc, argv);
+    Gar6more2DIHHOSecondOrder(argc, argv);
     
 //    HeterogeneousIHHOFirstOrder(argc, argv);
 //    HeterogeneousIHHOSecondOrder(argc, argv);
@@ -1445,6 +1448,246 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     
 }
 
+void Gar6more2DIHHOSecondOrder(int argc, char **argv){
+    
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+
+    // Building a cartesian mesh
+    timecounter tc;
+    tc.tic();
+
+    RealType lx = 2.0;
+    RealType ly = 1.5;
+    size_t nx = 3;
+    size_t ny = 3;
+    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
+    mesh_type msh;
+
+    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+    mesh_builder.refine_mesh(sim_data.m_n_divs);
+    mesh_builder.set_translation_data(-0.5, 0.0);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+
+    // Time controls : Final time value 1.0
+    size_t nt = 10;
+    for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+        nt *= 2;
+    }
+    RealType ti = 0.0;
+    RealType tf = 0.75;
+    RealType dt     = (tf-ti)/nt;
+    
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t cell_k_degree = sim_data.m_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+
+    auto null_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+            RealType x,y;
+            x = pt.x();
+            y = pt.y();
+            static_vector<RealType, 2> f{0,0};
+            return f;
+    };
+    
+    auto vec_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+            RealType x,y,xc,yc,r,wave,vx,vy,c,lp;
+            x = pt.x();
+            y = pt.y();
+            xc = 0.5;
+            yc = 2.0/3.0;
+            c = 10.0;
+            lp = std::sqrt(3.0)/10.0;
+            r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
+            wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
+            vx = wave*(x-xc);
+            vy = wave*(y-yc);
+            static_vector<RealType, 2> v{vx,vy};
+            return v;
+    };
+    
+    // Solving a primal HHO mixed problem
+    boundary_type bnd(msh);
+    bnd.addDirichletEverywhere(null_fun);
+
+    tc.tic();
+    auto assembler = elastodynamic_one_field_assembler<mesh_type>(msh, hho_di, bnd);
+    
+    auto elastic_mat_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
+         double x,y;
+         x = pt.x();
+         y = pt.y();
+         std::vector<RealType> mat_data(3);
+         RealType rho, vp, vs;
+         rho = 1.0;
+         if (y < 0.5) {
+             vp = 1.0*std::sqrt(3.0);
+             vs  = 1.0;
+         }else{
+             vp = std::sqrt(3.0);
+             vs  = 1;
+         }
+         mat_data[0] = rho; // rho
+         mat_data[1] = vp; // seismic compressional velocity vp
+         mat_data[2] = vs; // seismic shear velocity vp
+         return mat_data;
+     };
+    
+    assembler.load_material_data(msh,elastic_mat_fun);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    tc.toc();
+    std::cout << bold << cyan << "Assembler created: " << tc.to_double() << " seconds" << reset << std::endl;
+
+    tc.tic();
+    assembler.assemble_mass(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+
+    // Projecting initial displacement, velocity and acceleration
+    tc.tic();
+    Matrix<RealType, Dynamic, 1> u_dof_n, v_dof_n, a_dof_n;
+    assembler.project_over_cells(msh, u_dof_n, null_fun);
+    assembler.project_over_faces(msh, u_dof_n, null_fun);
+    
+    assembler.project_over_cells(msh, v_dof_n, vec_fun);
+    assembler.project_over_faces(msh, v_dof_n, vec_fun);
+    
+    assembler.project_over_cells(msh, a_dof_n, null_fun);
+    assembler.project_over_faces(msh, a_dof_n, null_fun);
+    tc.toc();
+    std::cout << bold << cyan << "Initialization completed: " << tc << " seconds" << reset << std::endl;
+    
+    if (sim_data.m_render_silo_files_Q) {
+        size_t it = 0;
+        std::string silo_file_name = "inhomogeneous_vec_";
+        postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, v_dof_n, vec_fun, false);
+    }
+    
+    std::ofstream simulation_log("elastodynamic_inhomogeneous_one_field.txt");
+    
+    std::ofstream sensor_1_log("s1_elastodynamic_one_field.csv");
+    std::ofstream sensor_2_log("s2_elastodynamic_one_field.csv");
+    std::ofstream sensor_3_log("s3_elastodynamic_one_field.csv");
+    typename mesh_type::point_type s1_pt(0.5-2.0/3.0, 1.0/3.0);
+    typename mesh_type::point_type s2_pt(0.5, 1.0/3.0);
+    typename mesh_type::point_type s3_pt(0.5+2.0/3.0, 1.0/3.0);
+    std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
+    
+    postprocessor<mesh_type>::record_data_elastic_one_field(0, s1_pt_cell, msh, hho_di, v_dof_n, sensor_1_log);
+    postprocessor<mesh_type>::record_data_elastic_one_field(0, s2_pt_cell, msh, hho_di, v_dof_n, sensor_2_log);
+    postprocessor<mesh_type>::record_data_elastic_one_field(0, s3_pt_cell, msh, hho_di, v_dof_n, sensor_3_log);
+    
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_elastic_energy_one_field(msh, hho_di, assembler, ti, u_dof_n, v_dof_n, simulation_log);
+    }
+    
+    linear_solver<RealType> analysis;
+    bool standar_Q = true;
+    // Newmark process
+    {
+        Matrix<RealType, Dynamic, 1> a_dof_np = a_dof_n;
+
+        RealType beta = 0.25;
+        RealType gamma = 0.5;
+        if (!standar_Q) {
+            RealType kappa = 0.25;
+            gamma = 1.5;
+            beta = kappa*(gamma+0.5)*(gamma+0.5);
+        }
+        
+        tc.tic();
+        assembler.assemble(msh, null_fun);
+        SparseMatrix<RealType> Kg = assembler.LHS;
+        assembler.LHS *= beta*(dt*dt);
+        assembler.LHS += assembler.MASS;
+        tc.toc();
+        std::cout << bold << cyan << "Stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
+        
+        if (sim_data.m_sc_Q) {
+            tc.tic();
+            analysis.set_Kg(assembler.LHS,assembler.get_n_face_dof());
+            analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+            tc.toc();
+            std::cout << bold << cyan << "Equations condensed in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            analysis.set_direct_solver(true);
+            
+            tc.tic();
+            analysis.factorize();
+            tc.toc();
+            std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+        
+        }else{
+            analysis.set_Kg(assembler.LHS);
+            analysis.set_direct_solver(true);
+            
+            tc.tic();
+            analysis.factorize();
+            tc.toc();
+            std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+        }
+        
+        for(size_t it = 1; it <= nt; it++){
+
+            std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+
+            RealType t = dt*it+ti;
+            tc.tic();
+            // Compute intermediate state for scalar and rate
+            u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
+            v_dof_n = v_dof_n + dt*(1-gamma)*a_dof_n;
+            Matrix<RealType, Dynamic, 1> res = Kg*u_dof_n;
+
+            assembler.RHS.setZero();
+            assembler.RHS -= res;
+            tc.toc();
+            std::cout << bold << cyan << "Rhs assembly completed: " << tc << " seconds" << reset << std::endl;
+
+            tc.tic();
+            a_dof_np = analysis.solve(assembler.RHS); // new acceleration
+            tc.toc();
+            std::cout << bold << cyan << "Solution completed: " << tc << " seconds" << reset << std::endl;
+
+            // update displacement, velocity and acceleration
+            u_dof_n += beta*dt*dt*a_dof_np;
+            v_dof_n += gamma*dt*a_dof_np;
+            a_dof_n  = a_dof_np;
+
+            if (sim_data.m_render_silo_files_Q) {
+                std::string silo_file_name = "inhomogeneous_vec_";
+                postprocessor<mesh_type>::write_silo_one_field_vectorial(silo_file_name, it, msh, hho_di, v_dof_n, vec_fun, false);
+            }
+            
+            postprocessor<mesh_type>::record_data_elastic_one_field(it, s1_pt_cell, msh, hho_di, v_dof_n, sensor_1_log);
+            postprocessor<mesh_type>::record_data_elastic_one_field(it, s2_pt_cell, msh, hho_di, v_dof_n, sensor_2_log);
+            postprocessor<mesh_type>::record_data_elastic_one_field(it, s3_pt_cell, msh, hho_di, v_dof_n, sensor_3_log);
+            
+            if (sim_data.m_report_energy_Q) {
+                postprocessor<mesh_type>::compute_elastic_energy_one_field(msh, hho_di, assembler, t, u_dof_n, v_dof_n, simulation_log);
+            }
+
+        }
+        simulation_log << "Number of equations : " << analysis.n_equations() << std::endl;
+        simulation_log << "Number of time steps =  " << nt << std::endl;
+        simulation_log << "Step size =  " << dt << std::endl;
+        simulation_log.flush();
+    }
+    
+}
+
 void Gar6more2DIHHOFirstOrder(int argc, char **argv){
     
     using RealType = double;
@@ -1504,7 +1747,6 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
             yc = 2.0/3.0;
             c = 10.0;
             lp = std::sqrt(3.0)/10.0;
-
             r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
             wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
             vx = wave*(x-xc);

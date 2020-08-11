@@ -1813,7 +1813,48 @@ public:
     }
     
     
-    /// Record data at provided point for three fields vector approximation
+    /// Record data at provided point for one field vectorial approximation
+    static void record_data_elastic_one_field(size_t it, std::pair<typename Mesh::point_type,size_t> & pt_cell_index, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::ostream & seismogram_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+
+        Matrix<double, Dynamic, 1> vh = Matrix<double, Dynamic, 1>::Zero(2, 1);
+
+        typename Mesh::point_type pt = pt_cell_index.first;
+        
+        if(pt_cell_index.second == -1){
+            std::set<size_t> cell_indexes = find_cells(pt, msh, true);
+            size_t cell_index = pick_cell(pt, msh, cell_indexes, true);
+            assert(cell_index != -1);
+            pt_cell_index.second = cell_index;
+            seismogram_file << "\"Time\"" << "," << "\"vhx\"" << "," << "\"vhy\"" << std::endl;
+        }
+
+        {
+            size_t cell_ind = pt_cell_index.second;
+            // vector evaluation
+            {
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+                auto t_phi = cell_basis.eval_functions( pt );
+                assert(t_phi.rows() == cell_basis.size());
+                vh = disk::eval(vec_x_cell_dof, t_phi);
+            }
+        }
+        tc.toc();
+        std::cout << bold << cyan << "Value recorded: " << tc << " seconds" << reset << std::endl;
+        seismogram_file << it << "," << std::setprecision(16) <<  vh(0,0) << "," << std::setprecision(16) <<  vh(1,0) << std::endl;
+        seismogram_file.flush();
+
+    }
+    
+    /// Record data at provided point for three fields vectorial approximation
     static void record_data_elastic_three_fields(size_t it, std::pair<typename Mesh::point_type,size_t> & pt_cell_index, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::ostream & seismogram_file = std::cout){
 
         timecounter tc;
