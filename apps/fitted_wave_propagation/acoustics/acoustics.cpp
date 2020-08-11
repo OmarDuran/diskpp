@@ -87,7 +87,7 @@ int main(int argc, char **argv)
     
 //    HeterogeneousPulseIHHOFirstOrder(argc, argv);
 //
-    HeterogeneousPulseIHHOSecondOrder(argc, argv);
+//    HeterogeneousPulseIHHOSecondOrder(argc, argv);
 
     
     
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 //    HHOOneFieldConvergenceExample(argc, argv);
 //
 //    // Dual HHO
-//    HHOTwoFieldsConvergenceExample(argc, argv);
+    HHOTwoFieldsConvergenceExample(argc, argv);
     
     // Examples using main app objects for solving the laplacian with optimal convergence rates
     // Primal HHO
@@ -2515,7 +2515,7 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
     if(sim_data.m_hdg_stabilization_Q){
         erk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
     }else{
-//        erk_an.setIterativeSolver();
+        erk_an.setIterativeSolver();
         erk_an.DecomposeFaceTerm();
     }
     tc.toc();
@@ -2853,23 +2853,23 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
 
-    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh(sim_data.m_n_divs);
-    mesh_builder.set_translation_data(0.0, 0.0);
-    mesh_builder.build_mesh();
-    mesh_builder.move_to_mesh_storage(msh);
-    
-//    size_t l = sim_data.m_n_divs;
-//    polygon_2d_mesh_reader<RealType> mesh_builder;
-//    std::vector<std::string> mesh_files;
-//    mesh_files.push_back("mexican_hat_polymesh_nel_4096.txt");
-//    mesh_files.push_back("mexican_hat_polymesh_nel_16384.txt");
-//    mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
-//
-//    // Reading the polygonal mesh
-//    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+//    mesh_builder.refine_mesh(sim_data.m_n_divs);
+//    mesh_builder.set_translation_data(0.0, 0.0);
 //    mesh_builder.build_mesh();
 //    mesh_builder.move_to_mesh_storage(msh);
+    
+    size_t l = sim_data.m_n_divs;
+    polygon_2d_mesh_reader<RealType> mesh_builder;
+    std::vector<std::string> mesh_files;
+    mesh_files.push_back("mexican_hat_polymesh_nel_4096.txt");
+    mesh_files.push_back("mexican_hat_polymesh_nel_16384.txt");
+    mesh_files.push_back("mexican_hat_polymesh_nel_65536.txt");
+
+    // Reading the polygonal mesh
+    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
 
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -3003,8 +3003,8 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
             tc.toc();
             std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
             
-//            analysis.set_iterative_solver(true, 1.0e-10);
-            analysis.set_direct_solver(true);
+            analysis.set_iterative_solver(true, 1.0e-10);
+//            analysis.set_direct_solver(true);
             
             tc.tic();
             analysis.factorize();

@@ -125,9 +125,9 @@ public:
                 auto rec_cell_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
                 auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
                 Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_dof_data(msh, cell, x_dof);
-                size_t n_vel_dof = all_dofs.rows() - n_vec_dof;
+                size_t n_cell_dof = all_dofs.rows() - n_vec_dof;
 
-                Matrix<RealType, Dynamic, 1> cell_dofs = all_dofs.block(n_vec_dof, 0, n_vel_dof, 1);
+                Matrix<RealType, Dynamic, 1> cell_dofs = all_dofs.block(n_vec_dof, 0, n_cell_dof, 1);
                 Matrix<RealType, Dynamic, 1> rec_scalar_cell_dof = gr.first * cell_dofs;
                 
                 size_t n_rbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension);
@@ -137,9 +137,11 @@ public:
                 rec_scalar_dof.block(1, 0, n_rbs-1, 1) = rec_scalar_cell_dof;
                 
                 
-                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, rec_cell_basis, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, rec_cell_basis, hho_di.reconstruction_degree());
                 Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, rec_cell_basis, scal_fun, 1);
                 Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
+//                rec_scalar_dof(0, 0) = 0.0;
+//                real_dofs(0, 0) = 0.0;
                 Matrix<RealType, Dynamic, 1> diff = real_dofs - rec_scalar_dof;
                 scalar_l2_error += diff.dot(mass*diff);
             }else{
