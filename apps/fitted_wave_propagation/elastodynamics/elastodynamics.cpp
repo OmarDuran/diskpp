@@ -1455,8 +1455,8 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
     timecounter tc;
     tc.tic();
 
-    RealType lx = 1.0;
-    RealType ly = 1.0;
+    RealType lx = 2.0;
+    RealType ly = 1.5;
     size_t nx = 3;
     size_t ny = 3;
     typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
@@ -1465,7 +1465,7 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
     mesh_builder.refine_mesh(sim_data.m_n_divs);
-    mesh_builder.set_translation_data(0.0, 0.0);
+    mesh_builder.set_translation_data(-0.5, 0.0);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
     tc.toc();
@@ -1477,18 +1477,10 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.5;
+    RealType tf = 0.75;
     RealType dt     = (tf-ti)/nt;
     
     auto null_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
-            RealType x,y;
-            x = pt.x();
-            y = pt.y();
-            static_vector<RealType, 2> f{0,0};
-            return f;
-    };
-    
-    auto rhs_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
             RealType x,y;
             x = pt.x();
             y = pt.y();
@@ -1502,20 +1494,6 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
         y = pt.y();
         static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
         return sigma;
-    };
-    
-    auto vec_fun_old = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
-            RealType x,y,xc,yc,r,wave,vx,vy;
-            x = pt.x();
-            y = pt.y();
-            xc = 0.5;
-            yc = 2.0/3.0;
-            r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
-            wave = (-4*std::sqrt(10.0/3.0)*(-1 + 1600.0*r*r))/(std::exp(800*r*r)*std::pow(M_PI,0.25));
-            vx = wave*(x-xc);
-            vy = wave*(y-yc);
-            static_vector<RealType, 2> v{vx,vy};
-            return v;
     };
     
     auto vec_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
