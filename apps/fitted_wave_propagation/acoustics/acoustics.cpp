@@ -100,8 +100,8 @@ int main(int argc, char **argv)
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-    ESSPRKHHOFirstOrderCFL(argc, argv);
-//    EHHOFirstOrderCFL(argc, argv);
+//    ESSPRKHHOFirstOrderCFL(argc, argv);
+    EHHOFirstOrderCFL(argc, argv);
     
 //    SSPRKHHOFirstOrder(argc, argv);
 //    EHHOFirstOrder(argc, argv);
@@ -1951,13 +1951,13 @@ void EHHOFirstOrderCFL(int argc, char **argv){
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
     
-    int s = 4;
+    int s = 1;
     int k_ind = sim_data.m_k_degree;
-//    std::vector<RealType> tf_vec = {0.25,0.25,0.25,0.25};  // s0r0 {s1,s2,s3,s4}  (ok)
+    std::vector<RealType> tf_vec = {0.25,0.25,0.25,0.25};  // s0r0 {s1,s2,s3,s4}  (ok)
 //    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r0 {s1,s2,s3,s4}  (ok)
     
 //    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s0r1 {s1,s2,s3,s4}  (ok)
-    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r1 {s1}  (ok)
+//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r1 {s1}  (ok)
     
     RealType ti = 0.0;
     RealType tf = tf_vec[k_ind];
@@ -2040,7 +2040,8 @@ void EHHOFirstOrderCFL(int argc, char **argv){
             Matrix<RealType, Dynamic, Dynamic> a;
             Matrix<RealType, Dynamic, 1> b;
             Matrix<RealType, Dynamic, 1> c;
-            erk_butcher_tableau::erk_tables(s, a, b, c);
+//            erk_butcher_tableau::erk_tables(s, a, b, c);
+            erk_butcher_tableau::ssprk_tables(s, a, b, c);
 
             tc.tic();
             assembler.assemble(msh, rhs_fun);
