@@ -9,6 +9,7 @@
 #ifndef postprocessor_hpp
 #define postprocessor_hpp
 
+#include <iomanip>
 #include "../common/acoustic_one_field_assembler.hpp"
 #include "../common/acoustic_two_fields_assembler.hpp"
 #include "../common/elastodynamic_one_field_assembler.hpp"

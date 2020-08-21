@@ -68,10 +68,10 @@ int main(int argc, char **argv)
 {
 
 //    Gar6more2DIHHOFirstOrder(argc, argv);
-//    Gar6more2DIHHOSecondOrder(argc, argv);
+    Gar6more2DIHHOSecondOrder(argc, argv);
     
 //    HeterogeneousIHHOFirstOrder(argc, argv);
-    HeterogeneousIHHOSecondOrder(argc, argv);
+//    HeterogeneousIHHOSecondOrder(argc, argv);
     
 //    EHHOFirstOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
