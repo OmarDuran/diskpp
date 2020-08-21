@@ -100,8 +100,8 @@ int main(int argc, char **argv)
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-//    ESSPRKHHOFirstOrderCFL(argc, argv);
-    EHHOFirstOrderCFL(argc, argv);
+    ESSPRKHHOFirstOrderCFL(argc, argv);
+//    EHHOFirstOrderCFL(argc, argv);
     
 //    SSPRKHHOFirstOrder(argc, argv);
 //    EHHOFirstOrder(argc, argv);
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
 //    HHOOneFieldConvergenceExample(argc, argv);
 //
 //    // Dual HHO
-    HHOTwoFieldsConvergenceExample(argc, argv);
+//    HHOTwoFieldsConvergenceExample(argc, argv);
     
     // Examples using main app objects for solving the laplacian with optimal convergence rates
     // Primal HHO
@@ -1595,28 +1595,28 @@ void EHHOFirstOrder(int argc, char **argv){
     typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
     mesh_type msh;
 
-//    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-//    mesh_builder.refine_mesh(sim_data.m_n_divs);
-//    mesh_builder.build_mesh();
-//    mesh_builder.move_to_mesh_storage(msh);
-    
-    size_t l = sim_data.m_n_divs;
-    polygon_2d_mesh_reader<RealType> mesh_builder;
-    std::vector<std::string> mesh_files;
-    mesh_files.push_back("unit_square_polymesh_nel_20.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_40.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_80.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_160.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_320.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_640.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_1280.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_2560.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_5120.txt");
-    
-    // Reading the polygonal mesh
-    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+    mesh_builder.refine_mesh(sim_data.m_n_divs);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
+    
+//    size_t l = sim_data.m_n_divs;
+//    polygon_2d_mesh_reader<RealType> mesh_builder;
+//    std::vector<std::string> mesh_files;
+//    mesh_files.push_back("unit_square_polymesh_nel_20.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_40.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_80.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_160.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_320.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_640.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_1280.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_2560.txt");
+//    mesh_files.push_back("unit_square_polymesh_nel_5120.txt");
+    
+//    // Reading the polygonal mesh
+//    mesh_builder.set_poly_mesh_file(mesh_files[l]);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
     
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -1630,7 +1630,7 @@ void EHHOFirstOrder(int argc, char **argv){
     RealType dt     = (tf-ti)/nt;
     
     scal_analytic_functions functions;
-    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
     RealType t = ti;
     auto exact_vel_fun      = functions.Evaluate_v(t);
     auto exact_flux_fun     = functions.Evaluate_q(t);
@@ -1682,11 +1682,12 @@ void EHHOFirstOrder(int argc, char **argv){
     }
     
     // Solving a first order equation HDG/HHO propagation problem
-    int s = 4;
+    int s = 1;
     Matrix<RealType, Dynamic, Dynamic> a;
     Matrix<RealType, Dynamic, 1> b;
     Matrix<RealType, Dynamic, 1> c;
-    erk_butcher_tableau::erk_tables(s, a, b, c);
+//    erk_butcher_tableau::erk_tables(s, a, b, c);
+    erk_butcher_tableau::ssprk_tables(s, a, b, c);
 
     tc.tic();
     assembler.assemble(msh, rhs_fun);
@@ -1881,10 +1882,10 @@ void SSPRKHHOFirstOrder(int argc, char **argv){
     }
     
     // Solving a first order equation HDG/HHO propagation problem
-    int s = 5;
+    int s = 3;
     Matrix<RealType, Dynamic, Dynamic> alpha;
     Matrix<RealType, Dynamic, Dynamic> beta;
-    ssprk_shu_osher_tableau::ossprk_tables(s, alpha, beta);
+    ssprk_shu_osher_tableau::new_ossprk_tables(s, alpha, beta);
 
     tc.tic();
     assembler.assemble(msh, rhs_fun);
@@ -1951,13 +1952,14 @@ void EHHOFirstOrderCFL(int argc, char **argv){
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
     
-    int s = 1;
     int k_ind = sim_data.m_k_degree;
-    std::vector<RealType> tf_vec = {0.25,0.25,0.25,0.25};  // s0r0 {s1,s2,s3,s4}  (ok)
-//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r0 {s1,s2,s3,s4}  (ok)
+    std::vector<RealType> tf_vec;
     
-//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s0r1 {s1,s2,s3,s4}  (ok)
-//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r1 {s1}  (ok)
+    if(sim_data.m_hdg_stabilization_Q){
+       tf_vec = {0.5,0.5,0.5,0.5};
+    }else{
+       tf_vec = {0.25,0.25,0.25,0.25};
+    }
     
     RealType ti = 0.0;
     RealType tf = tf_vec[k_ind];
@@ -1977,188 +1979,196 @@ void EHHOFirstOrderCFL(int argc, char **argv){
     }
     disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
     std::ofstream simulation_log("acoustic_two_fields_explicit_cfl.txt");
-    for(size_t l = 0; l <= sim_data.m_n_divs; l++){
-        
-        // Building a cartesian mesh
-        timecounter tc;
-        tc.tic();
-
-        RealType lx = 1.0;
-        RealType ly = 1.0;
-        size_t nx = 9+l;
-        size_t ny = 9+l;
-        typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-        typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-        mesh_type msh;
-
-        cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-        mesh_builder.build_mesh();
-        mesh_builder.move_to_mesh_storage(msh);
-        std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-        
-        // Time controls : Final time value 1.0
-        size_t nt = nt_base;
-        for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
-        
-            RealType dt     = (tf-ti)/nt;
-            
-            // Solving a primal HHO mixed problem
-            boundary_type bnd(msh);
-            bnd.addDirichletEverywhere(exact_vel_fun);
-            tc.tic();
-            auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
-            assembler.load_material_data(msh);
-            if(sim_data.m_hdg_stabilization_Q){
-                assembler.set_hdg_stabilization();
-            }
-            if(sim_data.m_scaled_stabilization_Q){
-                assembler.set_scaled_stabilization();
-            }
-            tc.toc();
-            std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
-            
-            tc.tic();
-            assembler.assemble_mass(msh);
-            tc.toc();
-            std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
-            
-            // Projecting initial data
-            Matrix<RealType, Dynamic, 1> x_dof;
-            assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
-            assembler.project_over_faces(msh, x_dof, exact_vel_fun);
-            
-            
-            if (sim_data.m_render_silo_files_Q) {
-                size_t it = 0;
-                std::string silo_file_name = "e_scalar_mixed_";
-                postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
-            }
-            
-            RealType energy_0 = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
-            
-            // Solving a first order equation HDG/HHO propagation problem
-            Matrix<RealType, Dynamic, Dynamic> a;
-            Matrix<RealType, Dynamic, 1> b;
-            Matrix<RealType, Dynamic, 1> c;
-//            erk_butcher_tableau::erk_tables(s, a, b, c);
-            erk_butcher_tableau::ssprk_tables(s, a, b, c);
-
-            tc.tic();
-            assembler.assemble(msh, rhs_fun);
-            tc.toc();
-            std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
-            size_t n_face_dof = assembler.get_n_face_dof();
-            tc.tic();
-            erk_hho_scheme<RealType> erk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
-            erk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
-            if(sim_data.m_hdg_stabilization_Q){
-                erk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
-            }else{
-//                erk_an.setIterativeSolver();
-                erk_an.DecomposeFaceTerm();
-            }
-            tc.toc();
-            std::cout << bold << cyan << "ERK analysis created: " << tc << " seconds" << reset << std::endl;
-            
-            erk_an.refresh_faces_unknowns(x_dof);
-            Matrix<RealType, Dynamic, 1> x_dof_n;
-            bool approx_fail_check_Q = false;
-            RealType energy = energy_0;;
-            for(size_t it = 1; it <= nt; it++){
-
-                std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+    
+    for (int s = 1; s < 5; s++) {
+        simulation_log << " ******************************* " << std::endl;
+        simulation_log << " number of stages s =  " << s << std::endl;
+        simulation_log << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
                 
-                RealType tn = dt*(it-1)+ti;
-                // ERK step
+                // Building a cartesian mesh
+                timecounter tc;
                 tc.tic();
-                {
-                    size_t n_dof = x_dof.rows();
-                    Matrix<RealType, Dynamic, Dynamic> k = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof, s);
-                    Matrix<RealType, Dynamic, 1> Fg, Fg_c,xd;
-                    xd = Matrix<RealType, Dynamic, 1>::Zero(n_dof, 1);
+
+                RealType lx = 1.0;
+                RealType ly = 1.0;
+                size_t nx = 9+l;
+                size_t ny = 9+l;
+                typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+                typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+                mesh_type msh;
+
+                cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+                mesh_builder.build_mesh();
+                mesh_builder.move_to_mesh_storage(msh);
+                std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                // Time controls : Final time value 1.0
+                size_t nt = nt_base;
+                for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+                
+                    RealType dt     = (tf-ti)/nt;
                     
-                    Matrix<RealType, Dynamic, 1> yn, ki;
+                    // Solving a primal HHO mixed problem
+                    boundary_type bnd(msh);
+                    bnd.addDirichletEverywhere(exact_vel_fun);
+                    tc.tic();
+                    auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+                    assembler.load_material_data(msh);
+                    if(sim_data.m_hdg_stabilization_Q){
+                        assembler.set_hdg_stabilization();
+                    }
+                    if(sim_data.m_scaled_stabilization_Q){
+                        assembler.set_scaled_stabilization();
+                    }
+                    tc.toc();
+                    std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+                    
+                    tc.tic();
+                    assembler.assemble_mass(msh);
+                    tc.toc();
+                    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+                    
+                    // Projecting initial data
+                    Matrix<RealType, Dynamic, 1> x_dof;
+                    assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
+                    assembler.project_over_faces(msh, x_dof, exact_vel_fun);
+                    
+                    
+                    if (sim_data.m_render_silo_files_Q) {
+                        size_t it = 0;
+                        std::string silo_file_name = "e_scalar_mixed_";
+                        postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+                    }
+                    
+                    RealType energy_0 = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
+                    
+                    // Solving a first order equation HDG/HHO propagation problem
+                    Matrix<RealType, Dynamic, Dynamic> a;
+                    Matrix<RealType, Dynamic, 1> b;
+                    Matrix<RealType, Dynamic, 1> c;
+                    erk_butcher_tableau::erk_tables(s, a, b, c);
+        //            erk_butcher_tableau::ssprk_tables(s, a, b, c);
 
-                    x_dof_n = x_dof;
-                    for (int i = 0; i < s; i++) {
+                    tc.tic();
+                    assembler.assemble(msh, rhs_fun);
+                    tc.toc();
+                    std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
+                    size_t n_face_dof = assembler.get_n_face_dof();
+                    tc.tic();
+                    erk_hho_scheme<RealType> erk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+                    erk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                    if(sim_data.m_hdg_stabilization_Q){
+                        erk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
+                    }else{
+        //                erk_an.setIterativeSolver();
+                        erk_an.DecomposeFaceTerm();
+                    }
+                    tc.toc();
+                    std::cout << bold << cyan << "ERK analysis created: " << tc << " seconds" << reset << std::endl;
+                    
+                    erk_an.refresh_faces_unknowns(x_dof);
+                    Matrix<RealType, Dynamic, 1> x_dof_n;
+                    bool approx_fail_check_Q = false;
+                    RealType energy = energy_0;;
+                    for(size_t it = 1; it <= nt; it++){
+
+                        std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
                         
-                        yn = x_dof;
-                        for (int j = 0; j < s - 1; j++) {
-                            yn += a(i,j) * dt * k.block(0, j, n_dof, 1);
-                        }
-                        
+                        RealType tn = dt*(it-1)+ti;
+                        // ERK step
+                        tc.tic();
                         {
-                            RealType t = tn + c(i,0) * dt;
-                            auto exact_vel_fun      = functions.Evaluate_v(t);
-                            auto rhs_fun            = functions.Evaluate_f(t);
-                            assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
-                            assembler.assemble_rhs(msh, rhs_fun);
-                            assembler.apply_bc(msh);
-                            erk_an.SetFg(assembler.RHS);
-                            erk_an.erk_weight(yn, ki);
-                        }
+                            size_t n_dof = x_dof.rows();
+                            Matrix<RealType, Dynamic, Dynamic> k = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof, s);
+                            Matrix<RealType, Dynamic, 1> Fg, Fg_c,xd;
+                            xd = Matrix<RealType, Dynamic, 1>::Zero(n_dof, 1);
+                            
+                            Matrix<RealType, Dynamic, 1> yn, ki;
 
-                        // Accumulated solution
-                        x_dof_n += dt*b(i,0)*ki;
-                        k.block(0, i, n_dof, 1) = ki;
+                            x_dof_n = x_dof;
+                            for (int i = 0; i < s; i++) {
+                                
+                                yn = x_dof;
+                                for (int j = 0; j < s - 1; j++) {
+                                    yn += a(i,j) * dt * k.block(0, j, n_dof, 1);
+                                }
+                                
+                                {
+                                    RealType t = tn + c(i,0) * dt;
+                                    auto exact_vel_fun      = functions.Evaluate_v(t);
+                                    auto rhs_fun            = functions.Evaluate_f(t);
+                                    assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
+                                    assembler.assemble_rhs(msh, rhs_fun);
+                                    assembler.apply_bc(msh);
+                                    erk_an.SetFg(assembler.RHS);
+                                    erk_an.erk_weight(yn, ki);
+                                }
+
+                                // Accumulated solution
+                                x_dof_n += dt*b(i,0)*ki;
+                                k.block(0, i, n_dof, 1) = ki;
+                            }
+                        }
+                        tc.toc();
+                        std::cout << bold << cyan << "ERK step completed: " << tc << " seconds" << reset << std::endl;
+                        x_dof = x_dof_n;
+
+                        t = tn + dt;
+                        auto exact_vel_fun = functions.Evaluate_v(t);
+                        auto exact_flux_fun = functions.Evaluate_q(t);
+                        
+                        if (sim_data.m_render_silo_files_Q) {
+                            std::string silo_file_name = "e_scalar_mixed_";
+                            postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+                        }
+                        RealType energy_n = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+                        
+                        RealType relative_energy = (energy_n - energy) / energy;
+                        RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
+                        bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
+                        if (unstable_check_Q) { // energy is increasing
+                            approx_fail_check_Q = true;
+                            // Computing errors
+                              postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                            break;
+                        }
+                        energy = energy_n;
+                        if(it == nt){
+                            // Computing errors
+                            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                        }
+                    }
+
+                    if(approx_fail_check_Q){
+                        simulation_log << std::endl;
+                        simulation_log << "Simulation is unstable for :"<< std::endl;
+                        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+                        simulation_log << "Number of ERK steps =  " << s << std::endl;
+                        simulation_log << "Number of time steps =  " << nt << std::endl;
+                        simulation_log << "dt size =  " << dt << std::endl;
+                        simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
+                        simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
+                        simulation_log << std::endl;
+                        simulation_log.flush();
+                        break;
+                    }else{
+                        simulation_log << "Simulation is stable for :"<< std::endl;
+                        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+                        simulation_log << "Number of ERK steps =  " << s << std::endl;
+                        simulation_log << "Number of time steps =  " << nt << std::endl;
+                        simulation_log << "dt size =  " << dt << std::endl;
+                        simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
+                        simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
+                        simulation_log << std::endl;
+                        simulation_log.flush();
+                        nt -= 5;
+                        continue;
                     }
                 }
-                tc.toc();
-                std::cout << bold << cyan << "ERK step completed: " << tc << " seconds" << reset << std::endl;
-                x_dof = x_dof_n;
-
-                t = tn + dt;
-                auto exact_vel_fun = functions.Evaluate_v(t);
-                auto exact_flux_fun = functions.Evaluate_q(t);
-                
-                if (sim_data.m_render_silo_files_Q) {
-                    std::string silo_file_name = "e_scalar_mixed_";
-                    postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
-                }
-                RealType energy_n = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
-                
-                RealType relative_energy = (energy_n - energy) / energy;
-                RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
-                bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
-                if (unstable_check_Q) { // energy is increasing
-                    approx_fail_check_Q = true;
-                    // Computing errors
-                      postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
-                    break;
-                }
-                energy = energy_n;
-                if(it == nt){
-                    // Computing errors
-                    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
-                }
             }
-
-            if(approx_fail_check_Q){
-                simulation_log << std::endl;
-                simulation_log << "Simulation is unstable for :"<< std::endl;
-                simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
-                simulation_log << "Number of ERK steps =  " << s << std::endl;
-                simulation_log << "Number of time steps =  " << nt << std::endl;
-                simulation_log << "dt size =  " << dt << std::endl;
-                simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
-                simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
-                simulation_log << std::endl;
-                simulation_log.flush();
-                break;
-            }else{
-                simulation_log << "Simulation is stable for :"<< std::endl;
-                simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
-                simulation_log << "Number of ERK steps =  " << s << std::endl;
-                simulation_log << "Number of time steps =  " << nt << std::endl;
-                simulation_log << "dt size =  " << dt << std::endl;
-                simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
-                simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
-                simulation_log << std::endl;
-                simulation_log.flush();
-                nt -= 5;
-                continue;
-            }
-        }
+        simulation_log << " ******************************* " << std::endl;
+        simulation_log << std::endl << std::endl;
     }
     
 }
@@ -2169,13 +2179,14 @@ void ESSPRKHHOFirstOrderCFL(int argc, char **argv){
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
     
-    int s = 4;
     int k_ind = sim_data.m_k_degree;
-    std::vector<RealType> tf_vec = {0.25,0.25,0.25,0.25};  // s0r0 {s1,s2,s3,s4}
-//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r0 {s1,s2,s3,s4}
+    std::vector<RealType> tf_vec;
     
-//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s0r1 {s1,s2,s3,s4}
-//    std::vector<RealType> tf_vec = {0.5,0.5,0.5,0.5};  // s1r1 {s1}  (ok)
+    if(sim_data.m_hdg_stabilization_Q){
+       tf_vec = {1.0,1.0,1.0,1.0};
+    }else{
+       tf_vec = {0.5,0.5,0.5,0.5};
+    }
     
     RealType ti = 0.0;
     RealType tf = tf_vec[k_ind];
@@ -2195,156 +2206,162 @@ void ESSPRKHHOFirstOrderCFL(int argc, char **argv){
     }
     disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
     std::ofstream simulation_log("acoustic_two_fields_explicit_ssprk_cfl.txt");
-    for(size_t l = 0; l <= sim_data.m_n_divs; l++){
-        
-        // Building a cartesian mesh
-        timecounter tc;
-        tc.tic();
-
-        RealType lx = 1.0;
-        RealType ly = 1.0;
-        size_t nx = 9+l;
-        size_t ny = 9+l;
-        typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-        typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-        mesh_type msh;
-
-        cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-        mesh_builder.build_mesh();
-        mesh_builder.move_to_mesh_storage(msh);
-        std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-        
-        // Time controls : Final time value 1.0
-        size_t nt = nt_base;
-        for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+    for (int s = 1; s < 4; s++) {
+        simulation_log << " ******************************* " << std::endl;
+        simulation_log << " number of stages s =  " << s << std::endl;
+        simulation_log << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
             
-            RealType dt     = (tf-ti)/nt;
-            
-            // Solving a primal HHO mixed problem
-            boundary_type bnd(msh);
-            bnd.addDirichletEverywhere(exact_vel_fun);
+            // Building a cartesian mesh
+            timecounter tc;
             tc.tic();
-            auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
-            assembler.load_material_data(msh);
-            if(sim_data.m_hdg_stabilization_Q){
-                assembler.set_hdg_stabilization();
-            }
-            if(sim_data.m_scaled_stabilization_Q){
-                assembler.set_scaled_stabilization();
-            }
-            tc.toc();
-            std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
-            
-            tc.tic();
-            assembler.assemble_mass(msh);
-            tc.toc();
-            std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
-            
-            // Projecting initial data
-            Matrix<RealType, Dynamic, 1> x_dof;
-            assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
-            assembler.project_over_faces(msh, x_dof, exact_vel_fun);
-            
-            
-            if (sim_data.m_render_silo_files_Q) {
-                size_t it = 0;
-                std::string silo_file_name = "e_ssprk_scalar_mixed_";
-                postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
-            }
-            
-            RealType energy_0 = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
-            
-            // Solving a first order equation HDG/HHO propagation problem
-            int s = 5;
-            Matrix<RealType, Dynamic, Dynamic> alpha;
-            Matrix<RealType, Dynamic, Dynamic> beta;
-            ssprk_shu_osher_tableau::ossprk_tables(s, alpha, beta);
 
-            tc.tic();
-            assembler.assemble(msh, rhs_fun);
-            tc.toc();
-            std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
-            size_t n_face_dof = assembler.get_n_face_dof();
-            tc.tic();
-            ssprk_hho_scheme<RealType> ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
-            ssprk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
-            if(sim_data.m_hdg_stabilization_Q){
-                ssprk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
-            }else{
-        //        ssprk_an.setIterativeSolver();
-                ssprk_an.DecomposeFaceTerm();
-            }
-            tc.toc();
-            std::cout << bold << cyan << "SSPRK analysis created: " << tc << " seconds" << reset << std::endl;
-            
-            ssprk_an.refresh_faces_unknowns(x_dof);
-            Matrix<RealType, Dynamic, 1> x_dof_n;
-            bool approx_fail_check_Q = false;
-            RealType energy = energy_0;;
-            for(size_t it = 1; it <= nt; it++){
+            RealType lx = 1.0;
+            RealType ly = 1.0;
+            size_t nx = 9+l;
+            size_t ny = 9+l;
+            typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+            typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+            mesh_type msh;
 
-                std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+            cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+            mesh_builder.build_mesh();
+            mesh_builder.move_to_mesh_storage(msh);
+            std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Time controls : Final time value 1.0
+            size_t nt = nt_base;
+            for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
                 
-                RealType tn = dt*(it-1)+ti;
-                // SSPRK step
+                RealType dt     = (tf-ti)/nt;
+                
+                // Solving a primal HHO mixed problem
+                boundary_type bnd(msh);
+                bnd.addDirichletEverywhere(exact_vel_fun);
                 tc.tic();
-                ssprk_an.ssprk_step(s, alpha, beta, dt, x_dof, x_dof_n);
+                auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+                assembler.load_material_data(msh);
+                if(sim_data.m_hdg_stabilization_Q){
+                    assembler.set_hdg_stabilization();
+                }
+                if(sim_data.m_scaled_stabilization_Q){
+                    assembler.set_scaled_stabilization();
+                }
                 tc.toc();
-                std::cout << bold << cyan << "SSPRK step completed: " << tc << " seconds" << reset << std::endl;
-                x_dof = x_dof_n;
-
-                t = tn + dt;
-                auto exact_vel_fun = functions.Evaluate_v(t);
-                auto exact_flux_fun = functions.Evaluate_q(t);
+                std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                assembler.assemble_mass(msh);
+                tc.toc();
+                std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+                
+                // Projecting initial data
+                Matrix<RealType, Dynamic, 1> x_dof;
+                assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
+                assembler.project_over_faces(msh, x_dof, exact_vel_fun);
+                
                 
                 if (sim_data.m_render_silo_files_Q) {
+                    size_t it = 0;
                     std::string silo_file_name = "e_ssprk_scalar_mixed_";
                     postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
                 }
-                RealType energy_n = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
                 
-                RealType relative_energy = (energy_n - energy) / energy;
-                RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
-                bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
-                if (unstable_check_Q) { // energy is increasing
-                    approx_fail_check_Q = true;
-                    // Computing errors
-                      postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
-                    break;
-                }
-                energy = energy_n;
-                if(it == nt){
-                    // Computing errors
-                    postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
-                }
-            }
+                RealType energy_0 = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
+                
+                // Solving a first order equation HDG/HHO propagation problem
+                Matrix<RealType, Dynamic, Dynamic> alpha;
+                Matrix<RealType, Dynamic, Dynamic> beta;
+                ssprk_shu_osher_tableau::new_ossprk_tables(s, alpha, beta);
 
-            if(approx_fail_check_Q){
-                simulation_log << std::endl;
-                simulation_log << "Simulation is unstable for :"<< std::endl;
-                simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
-                simulation_log << "Number of SSPRK steps =  " << s << std::endl;
-                simulation_log << "Number of time steps =  " << nt << std::endl;
-                simulation_log << "dt size =  " << dt << std::endl;
-                simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
-                simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
-                simulation_log << std::endl;
-                simulation_log.flush();
-                break;
-            }else{
-                simulation_log << "Simulation is stable for :"<< std::endl;
-                simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
-                simulation_log << "Number of SSPRK steps =  " << s << std::endl;
-                simulation_log << "Number of time steps =  " << nt << std::endl;
-                simulation_log << "dt size =  " << dt << std::endl;
-                simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
-                simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
-                simulation_log << std::endl;
-                simulation_log.flush();
-                nt -= 5;
-                continue;
+                tc.tic();
+                assembler.assemble(msh, rhs_fun);
+                tc.toc();
+                std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
+                size_t n_face_dof = assembler.get_n_face_dof();
+                tc.tic();
+                ssprk_hho_scheme<RealType> ssprk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+                ssprk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                if(sim_data.m_hdg_stabilization_Q){
+                    ssprk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
+                }else{
+            //        ssprk_an.setIterativeSolver();
+                    ssprk_an.DecomposeFaceTerm();
+                }
+                tc.toc();
+                std::cout << bold << cyan << "SSPRK analysis created: " << tc << " seconds" << reset << std::endl;
+                
+                ssprk_an.refresh_faces_unknowns(x_dof);
+                Matrix<RealType, Dynamic, 1> x_dof_n;
+                bool approx_fail_check_Q = false;
+                RealType energy = energy_0;;
+                for(size_t it = 1; it <= nt; it++){
+
+                    std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+                    
+                    RealType tn = dt*(it-1)+ti;
+                    // SSPRK step
+                    tc.tic();
+                    ssprk_an.ssprk_step(s, alpha, beta, dt, x_dof, x_dof_n);
+                    tc.toc();
+                    std::cout << bold << cyan << "SSPRK step completed: " << tc << " seconds" << reset << std::endl;
+                    x_dof = x_dof_n;
+
+                    t = tn + dt;
+                    auto exact_vel_fun = functions.Evaluate_v(t);
+                    auto exact_flux_fun = functions.Evaluate_q(t);
+                    
+                    if (sim_data.m_render_silo_files_Q) {
+                        std::string silo_file_name = "e_ssprk_scalar_mixed_";
+                        postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+                    }
+                    RealType energy_n = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+                    
+                    RealType relative_energy = (energy_n - energy) / energy;
+                    RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
+                    bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
+                    if (unstable_check_Q) { // energy is increasing
+                        approx_fail_check_Q = true;
+                        // Computing errors
+                          postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                        break;
+                    }
+                    energy = energy_n;
+                    if(it == nt){
+                        // Computing errors
+                        postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                    }
+                }
+
+                if(approx_fail_check_Q){
+                    simulation_log << std::endl;
+                    simulation_log << "Simulation is unstable for :"<< std::endl;
+                    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+                    simulation_log << "Number of SSPRK steps =  " << s << std::endl;
+                    simulation_log << "Number of time steps =  " << nt << std::endl;
+                    simulation_log << "dt size =  " << dt << std::endl;
+                    simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
+                    simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
+                    simulation_log << std::endl;
+                    simulation_log.flush();
+                    break;
+                }else{
+                    simulation_log << "Simulation is stable for :"<< std::endl;
+                    simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+                    simulation_log << "Number of SSPRK steps =  " << s << std::endl;
+                    simulation_log << "Number of time steps =  " << nt << std::endl;
+                    simulation_log << "dt size =  " << dt << std::endl;
+                    simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
+                    simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
+                    simulation_log << std::endl;
+                    simulation_log.flush();
+                    nt -= 10;
+                    continue;
+                }
             }
         }
+        simulation_log << " ******************************* " << std::endl;
+        simulation_log << std::endl << std::endl;
     }
     
 }

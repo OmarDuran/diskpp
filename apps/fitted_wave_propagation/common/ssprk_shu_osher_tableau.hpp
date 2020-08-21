@@ -134,6 +134,178 @@ class ssprk_shu_osher_tableau
         }
         
     }
+    
+    static void new_ossprk_tables(int s, Matrix<double, Dynamic, Dynamic> &a, Matrix<double,Dynamic, Dynamic> &b){
+        
+        // NEW OPTIMAL SSPRK TIME DISCRETIZATION M (s,s)
+        switch (s) {
+            case 1:
+                {
+                    a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    a(0,0) = 1.0;
+                    b(0,0) = 1.0;
+                }
+                break;
+            case 2:
+                {
+                    a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    a(0,0) = 1.0;
+                    a(1,0) = 1.0/2.0;
+                    a(1,1) = 1.0/2.0;
+
+                    b(0,0) = 1.0;
+                    b(1,0) = 0.0;
+                    b(1,1) = 1.0/2.0;
+                                        
+                }
+                break;
+            case 3:
+                {
+                    a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    
+                    a(0,0) = 1.0;
+                    a(1,0) = 3.0/4.0;
+                    a(1,1) = 1.0/4.0;
+                    a(2,0) = 1.0/3.0;
+                    a(2,1) = 0.0;
+                    a(2,2) = 2.0/3.0;
+
+                    b(0,0) = 1.0;
+                    b(1,0) = 0.0;
+                    b(1,1) = 1.0/4.0;
+                    b(2,0) = 0.0;
+                    b(2,1) = 0.0;
+                    b(2,2) = 2.0/3.0;
+                    
+                }
+                break;
+            default:
+            {
+                std::cout << "Error:: Method not implemented." << std::endl;
+            }
+                break;
+        }
+        
+    }
+    
+    static void new_ossprk_s_p_one_tables(int s, Matrix<double, Dynamic, Dynamic> &a, Matrix<double,Dynamic, Dynamic> &b){
+        
+        // NEW OPTIMAL SSPRK TIME DISCRETIZATION M (s+1,s)
+        switch (s) {
+            case 1:
+                {
+                    a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    a(0,0) = 1.0;
+                    b(0,0) = 1.0;
+                }
+                break;
+            case 2:
+                {
+                    a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    a(0,0) = 1.0;
+                    a(1,1) = 1.0;
+
+                    b(0,0) = 1.0/2.0;
+                    b(1,1) = 1.0/2.0;
+                                        
+                }
+                break;
+            case 3:
+                {
+                    a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    
+                    a(0,0) = 1.0;
+                    a(1,0) = 0.0;
+                    a(1,1) = 1.0;
+                    a(2,0) = 1.0/3.0;
+                    a(2,1) = 0.0;
+                    a(2,2) = 2.0/3.0;
+
+                    b(0,0) = 1.0/2.0;
+                    b(1,1) = 1.0/2.0;
+                    b(2,2) = 1.0/3.0;
+        
+                    
+                }
+                break;
+            case 4:
+                {
+                    a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                    a(0,0) = 1.0;
+                    a(1,0) = 0.0;
+                    a(1,1) = 1.0;
+                    a(2,0) = 2.0/3.0;
+                    a(2,1) = 0.0;
+                    a(2,2) = 1.0/3.0;
+                    a(3,0) = 0.0;
+                    a(3,1) = 0.0;
+                    a(3,2) = 0.0;
+                    a(3,3) = 1.0;
+                    
+                    b(0,0) = 1.0/2.0;
+                    b(1,0) = 0.0;
+                    b(1,1) = 1.0/2.0;
+                    b(2,0) = 0.0;
+                    b(2,1) = 0.0;
+                    b(2,2) = 1.0/6.0;
+                    b(3,0) = 0.0;
+                    b(3,1) = 0.0;
+                    b(3,2) = 0.0;
+                    b(3,3) = 1.0/2.0;
+                }
+                break;
+            case 5:
+            {
+                a = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                b = Matrix<double, Dynamic, Dynamic>::Zero(s, s);
+                a(0,0) = 1.0;
+                a(1,0) = 0.44437049406734;
+                a(1,1) = 0.55562950593266;
+                a(2,0) = 0.62010185138540;
+                a(2,1) = 0.0;
+                a(2,2) = 0.37989814861460;
+                a(3,0) = 0.17807995410773;
+                a(3,1) = 0.0;
+                a(3,2) = 0.0;
+                a(3,3) = 0.82192004589227;
+                a(4,0) = 0.00683325884039;
+                a(4,1) = 0.0;
+                a(4,2) = 0.51723167208978;
+                a(4,3) = 0.12759831133288;
+                a(4,4) = 0.34833675773694;
+                
+                b(0,0) = 0.39175222700392;
+                b(1,0) = 0.0;
+                b(1,1) = 0.36841059262959;
+                b(2,0) = 0.0;
+                b(2,1) = 0.0;
+                b(2,2) = 0.25189177424738;
+                b(3,0) = 0.0;
+                b(3,1) = 0.0;
+                b(3,2) = 0.0;
+                b(3,3) = 0.54497475021237;
+                b(4,0) = 0.0;
+                b(4,1) = 0.0;
+                b(4,2) = 0.0;
+                b(4,3) = 0.08460416338212;
+                b(4,4) = 0.22600748319395;
+            }
+                break;
+            default:
+            {
+                std::cout << "Error:: Method not implemented." << std::endl;
+            }
+                break;
+        }
+        
+    }
   
 };
 
