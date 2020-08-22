@@ -41,7 +41,8 @@ using namespace std::chrono;
 
 class timecounter
 {
-    steady_clock::time_point            m_start, m_stop;
+    steady_clock::time_point            m_start = steady_clock::now();
+    steady_clock::time_point            m_stop = steady_clock::now();
     bool                                m_is_running;
 
 public:
