@@ -2011,7 +2011,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.75;
+    RealType tf = 1.0;
     RealType dt     = (tf-ti)/nt;
     
     // Creating HHO approximation spaces and corresponding linear operator
@@ -2058,13 +2058,14 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
          y = pt.y();
          std::vector<RealType> mat_data(3);
          RealType rho, vp, vs;
-         rho = 1.0;
          if (y > 0.0) {
-             vp = 2.0*std::sqrt(3.0);
-             vs  = 2.0;
+             vp = 1.0*std::sqrt(3.0);
+             vs  = 1.0;
+             rho = 1.0;
          }else{
              vp = std::sqrt(3.0);
-             vs  = 1;
+             vs  = 1.0;
+             rho = 1.0;
          }
          mat_data[0] = rho; // rho
          mat_data[1] = vp; // seismic compressional velocity vp
@@ -2106,12 +2107,12 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
     
     std::ofstream simulation_log("elastodynamic_inhomogeneous_one_field.txt");
     
-    std::ofstream sensor_1_log("s1_elastodynamic_one_field.csv");
-    std::ofstream sensor_2_log("s2_elastodynamic_one_field.csv");
-    std::ofstream sensor_3_log("s3_elastodynamic_one_field.csv");
-    typename mesh_type::point_type s1_pt(-2.0/3.0, 2.0/3.0);
-    typename mesh_type::point_type s2_pt( 0.0, 3.0/3.0);
-    typename mesh_type::point_type s3_pt(+2.0/3.0, 2.0/3.0);
+    std::ofstream sensor_1_log("s1_elastodynamic_one_field_h.csv");
+    std::ofstream sensor_2_log("s2_elastodynamic_one_field_h.csv");
+    std::ofstream sensor_3_log("s3_elastodynamic_one_field_h.csv");
+    typename mesh_type::point_type s1_pt(-1.0/3.0, -1.0/3.0);
+    typename mesh_type::point_type s2_pt( 0.0, -1.0/3.0);
+    typename mesh_type::point_type s3_pt(+1.0/3.0, -1.0/3.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
@@ -2251,7 +2252,7 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 0.75;
+    RealType tf = 1.0;
     RealType dt     = (tf-ti)/nt;
     
     auto null_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
@@ -2305,13 +2306,14 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
         y = pt.y();
         std::vector<RealType> mat_data(3);
         RealType rho, vp, vs;
-        rho = 1.0;
         if (y > 0.0) {
-            vp = 2.0*std::sqrt(3.0);
-            vs  = 2.0;
+            vp = 1.0*std::sqrt(3.0);
+            vs  = 1.0;
+            rho = 1.0;
         }else{
             vp = std::sqrt(3.0);
-            vs  = 1;
+            vs  = 1.0;
+            rho = 1.0;
         }
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
@@ -2347,12 +2349,12 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
     
     std::ofstream simulation_log("elastodynamic_inhomogeneous_three_fields.txt");
     
-    std::ofstream sensor_1_log("s1_elastodynamic_three_fields.csv");
-    std::ofstream sensor_2_log("s2_elastodynamic_three_fields.csv");
-    std::ofstream sensor_3_log("s3_elastodynamic_three_fields.csv");
-    typename mesh_type::point_type s1_pt(0.5-2.0/3.0, 1.0/3.0);
-    typename mesh_type::point_type s2_pt(0.5, 1.0/3.0);
-    typename mesh_type::point_type s3_pt(0.5+2.0/3.0, 1.0/3.0);
+    std::ofstream sensor_1_log("s1_elastodynamic_three_fields_h.csv");
+    std::ofstream sensor_2_log("s2_elastodynamic_three_fields_h.csv");
+    std::ofstream sensor_3_log("s3_elastodynamic_three_fields_h.csv");
+    typename mesh_type::point_type s1_pt(-1.0/3.0, -1.0/3.0);
+    typename mesh_type::point_type s2_pt( 0.0, -1.0/3.0);
+    typename mesh_type::point_type s3_pt(+1.0/3.0, -1.0/3.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
