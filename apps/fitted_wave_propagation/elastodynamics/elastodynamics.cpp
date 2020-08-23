@@ -2059,9 +2059,9 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
          std::vector<RealType> mat_data(3);
          RealType rho, vp, vs;
          if (y > 0.0) {
-             vp = 1.0*std::sqrt(3.0);
-             vs  = 1.0;
-             rho = 1.0;
+             vp = 2.0*std::sqrt(3.0);
+             vs  = 2.0;
+             rho = 2.0;
          }else{
              vp = std::sqrt(3.0);
              vs  = 1.0;
@@ -2307,9 +2307,9 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
         std::vector<RealType> mat_data(3);
         RealType rho, vp, vs;
         if (y > 0.0) {
-            vp = 1.0*std::sqrt(3.0);
-            vs  = 1.0;
-            rho = 1.0;
+            vp = 2.0*std::sqrt(3.0);
+            vs  = 2.0;
+            rho = 2.0;
         }else{
             vp = std::sqrt(3.0);
             vs  = 1.0;
