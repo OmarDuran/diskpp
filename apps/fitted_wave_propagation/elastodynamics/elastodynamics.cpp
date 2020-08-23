@@ -2036,7 +2036,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
             xc = 0.0;
             yc = 2.0/3.0;
             c = 10.0;
-            lp = std::sqrt(3.0)/10.0;
+            lp = 2.0*std::sqrt(3.0)/10.0;
             r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
             wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
             vx = wave*(x-xc);
@@ -2278,7 +2278,7 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
             xc = 0.0;
             yc = 2.0/3.0;
             c = 10.0;
-            lp = std::sqrt(3.0)/10.0;
+            lp = 2.0*std::sqrt(3.0)/10.0;
             r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
             wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
             vx = wave*(x-xc);
