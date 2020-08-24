@@ -71,9 +71,9 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-//    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
-    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
-    
+    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
+//    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
+
 //    Gar6more2DIHHOFirstOrder(argc, argv);
 //    Gar6more2DIHHOSecondOrder(argc, argv);
     
@@ -105,7 +105,7 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
     // Manufactured exact solution
     bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
     bool Nonzero_Dirichlet_Q = false;
-    RealType lambda = 10000.0;
+    RealType lambda = 1000.0;
     auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
         RealType x,y;
         x = pt.x();
@@ -306,7 +306,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
     // Manufactured exact solution
     bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
     bool Nonzero_Dirichlet_Q = false;
-    RealType lambda = 10000.0;
+    RealType lambda = 1000.0;
     auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
         RealType x,y;
         x = pt.x();
@@ -1550,7 +1550,7 @@ void Gar6more2DIHHOSecondOrder(int argc, char **argv){
             xc = 0.5;
             yc = 2.0/3.0;
             c = 10.0;
-            lp = std::sqrt(3.0)/10.0;
+            lp = 1.0*std::sqrt(3.0)/10.0;
             r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
             wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
             vx = wave*(x-xc);
@@ -1577,8 +1577,8 @@ void Gar6more2DIHHOSecondOrder(int argc, char **argv){
              vp = 1.0*std::sqrt(3.0);
              vs  = 1.0;
          }else{
-             vp = std::sqrt(3.0);
-             vs  = 1;
+             vp = 1.0*std::sqrt(3.0);
+             vs  = 1.0;
          }
          mat_data[0] = rho; // rho
          mat_data[1] = vp; // seismic compressional velocity vp
@@ -1791,7 +1791,7 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
             xc = 0.5;
             yc = 2.0/3.0;
             c = 10.0;
-            lp = std::sqrt(3.0)/10.0;
+            lp = 1.0*std::sqrt(3.0)/10.0;
             r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
             wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
             vx = wave*(x-xc);
@@ -1824,8 +1824,8 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
             vp = 1.0*std::sqrt(3.0);
             vs  = 1.0;
         }else{
-            vp = std::sqrt(3.0);
-            vs  = 1;
+            vp = 1.0*std::sqrt(3.0);
+            vs  = 1.0;
         }
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
@@ -1941,7 +1941,8 @@ void Gar6more2DIHHOFirstOrder(int argc, char **argv){
                 }
 
                 t = tn + c(i,0) * dt;
-                assembler.assemble_rhs(msh, null_fun);
+//                assembler.assemble_rhs(msh, null_fun);
+                assembler.RHS.setZero();
                 dirk_an.SetFg(assembler.RHS);
                 dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
 
@@ -2061,7 +2062,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
          if (y > 0.0) {
              vp = 2.0*std::sqrt(3.0);
              vs  = 2.0;
-             rho = 2.0;
+             rho = 1.0;
          }else{
              vp = std::sqrt(3.0);
              vs  = 1.0;
@@ -2309,7 +2310,7 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
         if (y > 0.0) {
             vp = 2.0*std::sqrt(3.0);
             vs  = 2.0;
-            rho = 2.0;
+            rho = 1.0;
         }else{
             vp = std::sqrt(3.0);
             vs  = 1.0;
@@ -2429,7 +2430,7 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
                 }
 
                 t = tn + c(i,0) * dt;
-                assembler.assemble_rhs(msh, null_fun);
+                assembler.RHS.setZero();
                 dirk_an.SetFg(assembler.RHS);
                 dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
 
