@@ -375,8 +375,8 @@ public:
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }
         
-//        return 2.0*mu*R_operator + lambda*D_operator + (rho*vs)*S_operator;
-        return 2.0*mu*R_operator + lambda*D_operator + 2.0*mu*S_operator;
+        return 2.0*mu*R_operator + lambda*D_operator + (rho*vs)*S_operator;
+//        return 2.0*mu*R_operator + lambda*D_operator + 2.0*mu*S_operator;
     }
             
     Matrix<T, Dynamic, Dynamic>
