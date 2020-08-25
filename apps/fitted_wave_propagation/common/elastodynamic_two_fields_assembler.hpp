@@ -713,22 +713,10 @@ public:
         matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
 //        data_mixed.block(0, 0, gr_lhs.rows(), gr_lhs.cols()) = gr_lhs;// adding mass that was skipped
         
-//        std::cout << "mass = " << gr_lhs << std::endl;
-        
-        elastic_material_data<T> & material = m_material[cell_ind];
-        T rho = material.rho();
-        T vp = material.vp();
-        T vs = material.vs();
-        T mu = rho * vs * vs;
-        T lambda = rho * vp * vp - 2*mu;
-        
         data_mixed.block(0, (ten_bs), ten_bs, n_cols-(ten_bs)) = -gr_rhs;
         data_mixed.block((ten_bs), 0, n_rows-(ten_bs), ten_bs) = gr_rhs.transpose();
-//        data_mixed.block((ten_bs), 0, n_rows-(ten_bs), ten_bs) = (1.0/(2.0*mu))*gr_rhs.transpose();
 
         matrix_type oper = gr_lhs.llt().solve(gr_rhs);
-        matrix_type eps_op = gr_rhs.transpose() * oper;
-//        std::cout << "eps_op = " << eps_op << std::endl;
         return std::make_pair(oper, data_mixed);
     }
     
@@ -755,26 +743,11 @@ public:
         auto n_cols = dr_rhs.cols() + ten_bs;
         matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
         
-        elastic_material_data<T> & material = m_material[cell_ind];
-        T rho = material.rho();
-        T vp = material.vp();
-        T vs = material.vs();
-        T mu = rho * vs * vs;
-        T lambda = rho * vp * vp - 2*mu;
-        
         data_mixed.block(0, 0, dr_lhs.rows(), dr_lhs.cols()) = dr_lhs;// adding mass that was skipped
-        
-//        std::cout << "mass = " << dr_lhs << std::endl;
-        
         data_mixed.block(0, (ten_bs), sca_bs, n_cols-(ten_bs)) = -dr_rhs;
         data_mixed.block((ten_bs), 0, n_rows-(ten_bs), sca_bs) = dr_rhs.transpose();
-//        data_mixed.block((ten_bs), 0, n_rows-(ten_bs), sca_bs) = (1.0/lambda)*dr_rhs.transpose();
 
         matrix_type oper = dr_lhs.ldlt().solve(dr_rhs);
-        matrix_type div_op = dr_rhs.transpose() * oper;
-//        std::cout << "div_op = " << div_op << std::endl;
-        
-        
         return std::make_pair(oper, data_mixed);
     }
             

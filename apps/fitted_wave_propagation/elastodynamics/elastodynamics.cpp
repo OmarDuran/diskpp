@@ -75,7 +75,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-//    HeterogeneousGar6more2DIHHOFirstOrderTwoFields(argc, argv);
+    HeterogeneousGar6more2DIHHOFirstOrderTwoFields(argc, argv);
     
 //    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
 //    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-    HHOTwoFieldsConvergenceExample(argc, argv);
+//    HHOTwoFieldsConvergenceExample(argc, argv);
 //    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
