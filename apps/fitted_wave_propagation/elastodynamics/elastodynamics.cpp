@@ -2911,7 +2911,7 @@ void HeterogeneousGar6more2DIHHOFirstOrderTwoFields(int argc, char **argv){
 
         if (sim_data.m_render_silo_files_Q) {
             std::string silo_file_name = "inhomogeneous_vector_mixed_two_fields_";
-                postprocessor<mesh_type>::write_silo_three_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, vec_fun, null_flux_fun, false);
+                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, assembler, x_dof, vec_fun, null_flux_fun, false);
         }
         
         postprocessor<mesh_type>::record_data_elastic_two_fields(it, s1_pt_cell, msh, hho_di, x_dof, sensor_1_log);
