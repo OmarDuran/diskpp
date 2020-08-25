@@ -2353,9 +2353,9 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
     std::ofstream sensor_1_log("s1_elastodynamic_three_fields_h.csv");
     std::ofstream sensor_2_log("s2_elastodynamic_three_fields_h.csv");
     std::ofstream sensor_3_log("s3_elastodynamic_three_fields_h.csv");
-    typename mesh_type::point_type s1_pt(-1.0/3.0, -1.0/3.0);
-    typename mesh_type::point_type s2_pt( 0.0, -1.0/3.0);
-    typename mesh_type::point_type s3_pt(+1.0/3.0, -1.0/3.0);
+    typename mesh_type::point_type s1_pt(-1.0/3.0, 1.0/3.0);
+    typename mesh_type::point_type s2_pt( 0.0, 1.0/3.0);
+    typename mesh_type::point_type s3_pt(+1.0/3.0, 1.0/3.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
