@@ -66,12 +66,14 @@ void IHHOSecondOrder(int argc, char **argv);
 
 void HHOOneFieldConvergenceExample(int argc, char **argv);
 
+void HHOTwoFieldsConvergenceExample(int argc, char **argv);
+
 void HHOThreeFieldsConvergenceExample(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
 
-    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
+//    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
 //    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
 
 //    Gar6more2DIHHOFirstOrder(argc, argv);
@@ -88,6 +90,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
+    HHOTwoFieldsConvergenceExample(argc, argv);
 //    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
@@ -292,6 +295,216 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
         error_file << std::endl << std::endl;
     }
     error_file.close();
+}
+
+void HHOTwoFieldsConvergenceExample(int argc, char **argv){
+    
+    using RealType = double;
+    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+    typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
+    
+    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    sim_data.print_simulation_data();
+
+    // Manufactured exact solution
+    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
+    bool Nonzero_Dirichlet_Q = false;
+    RealType lambda = 1000.0;
+    auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+        RealType x,y;
+        x = pt.x();
+        y = pt.y();
+        if(quadratic_function_Q){
+            RealType ux = (1 - x)*x*(1 - y)*y;
+            RealType uy = (1 - x)*x*(1 - y)*y;
+            return static_vector<RealType, 2>{ux, uy};
+        }else{
+            if (Nonzero_Dirichlet_Q) {
+                RealType ux = - std::sin(M_PI * pt.x()) * std::cos(M_PI * pt.y());
+                RealType uy = + std::cos(M_PI * pt.x()) * std::sin(M_PI * pt.y());
+                return static_vector<RealType, 2>{ux, uy};
+            }else{
+                RealType ux = std::sin(2.0 * M_PI * pt.x()) * std::sin(2.0 * M_PI * pt.y());
+                RealType uy = std::sin(3.0 * M_PI * pt.x()) * std::sin(3.0 * M_PI * pt.y());
+                return static_vector<RealType, 2>{ux, uy};
+            }
+
+        }
+        
+    };
+
+    auto exact_flux_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q,lambda](const typename mesh_type::point_type& pt) -> static_matrix<RealType,2,2> {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        if(quadratic_function_Q){
+            static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
+            RealType sxx = 2*(1 - x)*(1 - y)*y - 2*x*(1 - y)*y + (2*(1 - x)*x*(1 - y) - 2*(1 - x)*x*y)/2. + (2*(1 - x)*(1 - y)*y - 2*x*(1 - y)*y)/2.;
+            RealType sxy = (1 - x)*x*(1 - y) - (1 - x)*x*y + (1 - x)*(1 - y)*y - x*(1 - y)*y;
+            RealType syy = 2*(1 - x)*x*(1 - y) - 2*(1 - x)*x*y + (2*(1 - x)*x*(1 - y) - 2*(1 - x)*x*y)/2. + (2*(1 - x)*(1 - y)*y - 2*x*(1 - y)*y)/2.;
+            sigma(0,0) = sxx;
+            sigma(0,1) = sxy;
+            sigma(1,0) = sxy;
+            sigma(1,1) = syy;
+            return sigma;
+        }else{
+            static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
+            if (Nonzero_Dirichlet_Q) {
+                RealType sxx = - 2.0 * M_PI * std::cos(M_PI * x) * std::cos(M_PI * y);
+                RealType syy = + 2.0 * M_PI * std::cos(M_PI * x) * std::cos(M_PI * y);
+                sigma(0,0) = sxx;
+                sigma(1,1) = syy;
+                return sigma;
+            }else{
+                RealType sxx = 4*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y)
+                            + lambda*(3*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x) + 2*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y));
+                RealType sxy = 2*M_PI*std::cos(2*M_PI*y)*std::sin(2*M_PI*x)
+                            + 3*M_PI*std::cos(3*M_PI*x)*std::sin(3*M_PI*y);
+                RealType syy = 6*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x)
+                            + lambda*(3*M_PI*std::cos(3*M_PI*y)*std::sin(3*M_PI*x) + 2*M_PI*std::cos(2*M_PI*x)*std::sin(2*M_PI*y));
+                sigma(0,0) = sxx;
+                sigma(0,1) = sxy;
+                sigma(1,0) = sxy;
+                sigma(1,1) = syy;
+                return sigma;
+            }
+        }
+
+    };
+
+    auto rhs_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q,lambda](const typename mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+        double x,y;
+        x = pt.x();
+        y = pt.y();
+        if(quadratic_function_Q){
+            RealType fx = 2*(1 + x*x + y*(-5 + 3*y) + x*(-3 + 4*y));
+            RealType fy = 2*(1 + 3*x*x + (-3 + y)*y + x*(-5 + 4*y));
+            return static_vector<RealType, 2>{-fx, -fy};
+        }else{
+            if (Nonzero_Dirichlet_Q) {
+                RealType fx = + 2.0 * M_PI * M_PI * ( std::sin(M_PI * x) * std::cos( M_PI * y));
+                RealType fy = - 2.0 * M_PI * M_PI * ( std::cos(M_PI * x) * std::sin( M_PI * y));
+                return static_vector<RealType, 2>{-fx, -fy};
+            }else{
+                RealType fx = M_PI*M_PI*(9*(1 + lambda)*std::cos(3*M_PI*x)*std::cos(3*M_PI*y) - 4*(3 + lambda)*std::sin(2*M_PI*x)*std::sin(2*M_PI*y));
+                RealType fy = M_PI*M_PI*(4*(1 + lambda)*std::cos(2*M_PI*x)*std::cos(2*M_PI*y) - 9*(3 + lambda)*std::sin(3*M_PI*x)*std::sin(3*M_PI*y));
+                return static_vector<RealType, 2>{-fx, -fy};
+            }
+        }
+    };
+
+    // simple material
+    RealType rho = 1.0;
+    RealType vp;
+    if (Nonzero_Dirichlet_Q || quadratic_function_Q) {
+        vp = std::sqrt(3.0);
+    }else{
+        vp = std::sqrt(2.0 + lambda);
+    }
+    RealType vs = 1.0;
+    elastic_material_data<RealType> material(rho,vp,vs);
+    
+    std::ofstream error_file("steady_vector_mixed_two_fields_error.txt");
+    
+    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+        std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
+        error_file << "Approximation with k : " << k << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
+            
+            // Building a cartesian mesh
+            timecounter tc;
+            tc.tic();
+            RealType lx = 1.0;
+            RealType ly = 1.0;
+            size_t nx = 2;
+            size_t ny = 2;
+            mesh_type msh;
+            
+            cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+            mesh_builder.refine_mesh(l);
+            mesh_builder.build_mesh();
+            mesh_builder.move_to_mesh_storage(msh);
+            std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Creating HHO approximation spaces and corresponding linear operator
+            size_t cell_k_degree = k;
+            if(sim_data.m_hdg_stabilization_Q){
+                cell_k_degree++;
+            }
+            disk::hho_degree_info hho_di(cell_k_degree,k);
+
+            // Solving a scalar primal HHO problem
+            boundary_type bnd(msh);
+            bnd.addDirichletEverywhere(exact_vec_fun);
+            tc.tic();
+            auto assembler = elastodynamic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+            if(sim_data.m_hdg_stabilization_Q){
+                assembler.set_hdg_stabilization();
+            }
+            if(sim_data.m_scaled_stabilization_Q){
+                assembler.set_scaled_stabilization();
+            }
+            assembler.load_material_data(msh,material);
+            assembler.assemble(msh, rhs_fun);
+            assembler.assemble_mass(msh, false);
+            assembler.apply_bc(msh);
+            tc.toc();
+            std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+            
+            // Solving LS
+            Matrix<RealType, Dynamic, 1> x_dof;
+            if (sim_data.m_sc_Q) {
+                tc.tic();
+                SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
+//                std::cout << "k = " << Kg.toDense() << std::endl;
+                linear_solver<RealType> analysis(Kg,assembler.get_n_face_dof());
+                analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                tc.toc();
+                
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations (SC) : " << analysis.n_equations() << reset << std::endl;
+            }else{
+                tc.tic();
+                SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
+                linear_solver<RealType> analysis(Kg);
+                tc.toc();
+                std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                analysis.factorize();
+                tc.toc();
+                std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                tc.tic();
+                x_dof = analysis.solve(assembler.RHS);
+                tc.toc();
+                std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+                std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
+            }
+            
+            // Computing errors
+            postprocessor<mesh_type>::compute_errors_two_fields_vectorial(msh, hho_di, x_dof, exact_vec_fun, exact_flux_fun, error_file);
+            
+            if (sim_data.m_render_silo_files_Q) {
+                std::string silo_file_name = "steady_vector_mixed_two_fields_k" + std::to_string(k) + "_";
+                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, l, msh, hho_di, x_dof, exact_vec_fun, exact_flux_fun, false);
+            }
+        }
+        error_file << std::endl << std::endl;
+    }
+    error_file.close();
+    
+    
 }
 
 void HHOThreeFieldsConvergenceExample(int argc, char **argv){

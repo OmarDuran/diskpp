@@ -17,6 +17,7 @@ set(fitted_waves_headers ${fitted_waves_headers}
 	${CMAKE_CURRENT_SOURCE_DIR}/acoustic_one_field_assembler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/acoustic_two_fields_assembler.hpp	
 	${CMAKE_CURRENT_SOURCE_DIR}/elastodynamic_one_field_assembler.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/elastodynamic_two_fields_assembler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/elastodynamic_three_fields_assembler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/elastoacoustic_two_fields_assembler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/fitted_geometry_builders.hpp	
