@@ -406,7 +406,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
     
     std::ofstream error_file("steady_vector_mixed_two_fields_error.txt");
     
-    for(size_t k = 0; k <= sim_data.m_k_degree; k++){
+    for(size_t k = 1; k <= sim_data.m_k_degree; k++){
         std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
         error_file << "Approximation with k : " << k << std::endl;
         for(size_t l = 0; l <= sim_data.m_n_divs; l++){
@@ -493,11 +493,11 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             }
             
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields_vectorial(msh, hho_di, x_dof, exact_vec_fun, exact_flux_fun, error_file);
+            postprocessor<mesh_type>::compute_errors_two_fields_vectorial(msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun, error_file);
             
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "steady_vector_mixed_two_fields_k" + std::to_string(k) + "_";
-                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, l, msh, hho_di, x_dof, exact_vec_fun, exact_flux_fun, false);
+                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, l, msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun, false);
             }
         }
         error_file << std::endl << std::endl;

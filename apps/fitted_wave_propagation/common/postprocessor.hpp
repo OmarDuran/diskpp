@@ -536,7 +536,7 @@ public:
     
     
     /// Compute L2 and H1 errors for two fields vectorial approximation
-    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -587,6 +587,17 @@ public:
                     auto t_ten_phi = ten_basis.eval_functions( point_pair.point() );
                     assert(t_ten_phi.size() == ten_basis.size());
                     auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
+                    
+                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
+                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+                    
+                    auto divphi   = cbas_s.eval_functions(point_pair.point());
+                    auto divu_iqn = disk::eval(divu, divphi);
+                    
+                    sigma_h *= 2.0;
+                    sigma_h += divu_iqn * static_matrix<RealType, 2, 2>::Identity();
 
                     auto flux_diff = (flux_fun(point_pair.point()) - sigma_h).eval();
                     flux_l2_error += omega * flux_diff.squaredNorm();
@@ -804,7 +815,7 @@ public:
     }
     
     // Write a silo file for two fields vectorial approximation
-    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
+    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
 
         timecounter tc;
         tc.tic();
@@ -864,6 +875,8 @@ public:
                     assert(t_ten_phi.size() == ten_basis.size());
                     auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
 
+                    
+                    
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
                     approx_syy.push_back(sigma_h(1,1));
@@ -933,7 +946,18 @@ public:
                     auto t_ten_phi = ten_basis.eval_functions( bar );
                     assert(t_ten_phi.size() == ten_basis.size());
                     auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
-
+                    
+                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
+                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
+                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
+                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
+                    
+                    auto divphi   = cbas_s.eval_functions(bar);
+                    auto divu_iqn = disk::eval(divu, divphi);
+                    
+                    sigma_h *= 2.0;
+                    sigma_h += divu_iqn * static_matrix<RealType, 2, 2>::Identity();
+                    
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
                     approx_syy.push_back(sigma_h(1,1));

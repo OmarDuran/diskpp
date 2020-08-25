@@ -439,8 +439,9 @@ public:
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(n_cbs, n_cbs);
         
         // Symmetric tensor mass block
-//        Matrix<T, Dynamic, Dynamic> mass_matrix_sigma  = symmetric_tensor_mass_matrix(msh, cell);
-//        mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
+        Matrix<T, Dynamic, Dynamic> mass_matrix_sigma  = symmetric_tensor_mass_matrix(msh, cell);
+        mass_matrix_sigma *= ((2.0*mu));
+        mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
         
         if (add_vector_mass_Q) {
             // vector velocity mass mass block
@@ -564,10 +565,10 @@ public:
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        size_t n_dof = n_cbs + num_faces * n_fbs;
-            
+        
+        size_t n_dof = n_vec_cbs + num_faces * n_fbs;
         Matrix<T, Dynamic, 1> x_el(n_dof);
-        x_el.block(0, 0, n_cbs, 1) = x_glob.block(cell_ofs * n_cbs, 0, n_cbs, 1);
+        x_el.block(0, 0, n_vec_cbs, 1) = x_glob.block(cell_ofs * n_cbs + n_ten_cbs, 0, n_vec_cbs, 1);
         auto fcs = faces(msh, cl);
         for (size_t i = 0; i < fcs.size(); i++)
         {
@@ -582,13 +583,13 @@ public:
                 auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
-                x_el.block(n_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
+                x_el.block(n_vec_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
             }
             else
             {
                 auto face_ofs = disk::priv::offset(msh, fc);
                 auto global_ofs = n_cbs * msh.cells_size() + m_compress_indexes.at(face_ofs)*n_fbs;
-                x_el.block(n_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
+                x_el.block(n_vec_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
             }
         }
         return x_el;
@@ -710,7 +711,7 @@ public:
 
         // Shrinking data
         matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
-        data_mixed.block(0, 0, gr_lhs.rows(), gr_lhs.cols()) = gr_lhs;// adding mass that was skipped
+//        data_mixed.block(0, 0, gr_lhs.rows(), gr_lhs.cols()) = gr_lhs;// adding mass that was skipped
         
 //        std::cout << "mass = " << gr_lhs << std::endl;
         
