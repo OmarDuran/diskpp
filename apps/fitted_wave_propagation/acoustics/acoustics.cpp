@@ -85,7 +85,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
     
-//    HeterogeneousPulseEHHOFirstOrder(argc, argv);
+    HeterogeneousPulseEHHOFirstOrder(argc, argv);
     
 //    HeterogeneousPulseIHHOFirstOrder(argc, argv);
 //
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 //    HeterogeneousIHHOSecondOrder(argc, argv);
 
     
-    ESSPRKHHOFirstOrderCFL(argc, argv);
+//    ESSPRKHHOFirstOrderCFL(argc, argv);
 //    EHHOFirstOrderCFL(argc, argv);
     
 //    SSPRKHHOFirstOrder(argc, argv);

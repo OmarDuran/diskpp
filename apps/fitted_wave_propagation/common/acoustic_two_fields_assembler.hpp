@@ -300,7 +300,7 @@ public:
 
         T rho = material.rho();
         T vp = material.vp();
-        return R_operator + ((1.0)/(vp*rho))*S_operator;
+        return R_operator + ((0.1)/(vp*rho))*S_operator;
     }
             
     void apply_bc(const Mesh& msh){
