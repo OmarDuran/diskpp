@@ -448,7 +448,7 @@ public:
             // vector velocity mass mass block
             auto vec_basis = disk::make_vector_monomial_basis(msh, cell, m_hho_di.cell_degree());
             Matrix<T, Dynamic, Dynamic> mass_matrix_v = disk::make_mass_matrix(msh, cell, vec_basis);
-            mass_matrix_sigma_v *= rho;
+            mass_matrix_v *= rho;
             mass_matrix.block(n_ten_cbs+n_sca_cbs, n_ten_cbs+n_sca_cbs, n_vec_cbs, n_vec_cbs) = mass_matrix_v;
         }
 
