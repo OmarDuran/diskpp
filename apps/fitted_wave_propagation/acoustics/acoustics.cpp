@@ -85,9 +85,9 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
     
-    HeterogeneousPulseEHHOFirstOrder(argc, argv);
+//    HeterogeneousPulseEHHOFirstOrder(argc, argv);
     
-//    HeterogeneousPulseIHHOFirstOrder(argc, argv);
+    HeterogeneousPulseIHHOFirstOrder(argc, argv);
 //
 //    HeterogeneousPulseIHHOSecondOrder(argc, argv);
 
@@ -2970,7 +2970,7 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
         dirk_an.SetScale(scale);
         tc.tic();
         dirk_an.ComposeMatrix();
-//        dirk_an.setIterativeSolver();
+        dirk_an.setIterativeSolver();
         dirk_an.DecomposeMatrix();
         tc.toc();
         std::cout << bold << cyan << "Matrix decomposed: " << tc << " seconds" << reset << std::endl;
