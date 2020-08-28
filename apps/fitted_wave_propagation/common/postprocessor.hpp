@@ -536,7 +536,7 @@ public:
     
     
     /// Compute L2 and H1 errors for two fields vectorial approximation
-    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_two_fields_vectorial(Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -804,7 +804,7 @@ public:
     }
     
     // Write a silo file for two fields vectorial approximation
-    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
+    static void write_silo_two_fields_vectorial(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> flux_fun, bool cell_centered_Q){
 
         timecounter tc;
         tc.tic();
@@ -1425,7 +1425,71 @@ public:
         return energy_h;
     }
     
-    /// Compute the discrete acoustic energy for one field approximation
+    /// Compute the discrete elastic energy for two fields approximation
+    static double compute_elastic_energy_two_fields(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_two_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        
+        std::vector<RealType> energy_vec(msh.cells_size());
+        #ifdef HAVE_INTEL_TBB
+                size_t n_cells = msh.cells_size();
+                tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
+                    [&msh,&assembler,&energy_vec,&x_dof,&n_ten_cbs,&n_vec_cbs] (size_t & cell_ind){
+                            auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                            Matrix<RealType, Dynamic, 1> x_dof_loc = assembler.gather_dof_data(msh, cell, x_dof);
+                            
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix_v = mass_matrix.block(n_ten_cbs, n_ten_cbs, n_vec_cbs, n_vec_cbs);
+                            Matrix<RealType, Dynamic, 1> v_dof = x_dof_loc.block(n_ten_cbs, 0, n_vec_cbs, 1);
+                            Matrix<RealType, Dynamic, 1> v_mass_tested = mass_matrix_v * v_dof;
+                            Matrix<RealType, 1, 1> term_1 = v_dof.transpose() * v_mass_tested;
+                            energy_vec[cell_ind] = term_1(0,0);
+                            
+                            Matrix<RealType, Dynamic, Dynamic> mass_matrix_stress = mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs);
+                            Matrix<RealType, Dynamic, 1> sigma_dof = x_dof_loc.block(0, 0, n_ten_cbs, 1);
+                            Matrix<RealType, Dynamic, 1> epsilon_mass = mass_matrix_stress * sigma_dof;
+                            Matrix<RealType, 1, 1> term_2 = sigma_dof.transpose() * epsilon_mass;
+                            energy_vec[cell_ind] += term_2(0,0);
+                }
+            );
+        #else
+            for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
+            {
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix = assembler.mass_operator(cell_ind, msh, cell);
+                Matrix<RealType, Dynamic, 1> x_dof_loc = assembler.gather_dof_data(msh, cell, x_dof);
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix_v = mass_matrix.block(n_ten_cbs, n_ten_cbs, n_vec_cbs, n_vec_cbs);
+                Matrix<RealType, Dynamic, 1> v_dof = x_dof_loc.block(n_ten_cbs, 0, n_vec_cbs, 1);
+                Matrix<RealType, Dynamic, 1> v_mass_tested = mass_matrix_v * v_dof;
+                Matrix<RealType, 1, 1> term_1 = v_dof.transpose() * v_mass_tested;
+                energy_vec[cell_ind] = term_1(0,0);
+                
+                Matrix<RealType, Dynamic, Dynamic> mass_matrix_stress = mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs);
+                Matrix<RealType, Dynamic, 1> sigma_dof = x_dof_loc.block(0, 0, n_ten_cbs, 1);
+                Matrix<RealType, Dynamic, 1> epsilon_mass = mass_matrix_stress * sigma_dof;
+                Matrix<RealType, 1, 1> term_2 = sigma_dof.transpose() * epsilon_mass;
+                energy_vec[cell_ind] += term_2(0,0);
+        
+            }
+        #endif
+    
+        RealType energy_h = std::accumulate(energy_vec.begin(), energy_vec.end(),0.0);
+        energy_h *= 0.5;
+        
+        tc.toc();
+        std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
+        energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+        return energy_h;
+    }
+    
+    /// Compute the discrete elastic energy for three field approximation
     static double compute_elastic_energy_three_fields(Mesh & msh, disk::hho_degree_info & hho_di, elastodynamic_three_fields_assembler<Mesh> & assembler, double & time, Matrix<double, Dynamic, 1> & x_dof, std::ostream & energy_file = std::cout){
 
         timecounter tc;

@@ -349,23 +349,6 @@ public:
         auto n_rows = R_operator.rows();
         auto n_cols = R_operator.cols();
         
-//        R_operator.setZero();
-//        auto reconstruction_operator   = make_matrix_symmetric_gradrec(msh, cell, m_hho_di);
-//        auto n_rec_rows = reconstruction_operator.second.rows();
-//        auto n_rec_cols = reconstruction_operator.second.cols();
-//        R_operator.block(n_rows-n_rec_rows, n_cols-n_rec_cols, n_rec_rows, n_rec_cols) = reconstruction_operator.second;
-        
-        // Weak hydrostatic component
-        auto divergence_operator = div_vector_reconstruction(msh, cell, cell_ind);
-        Matrix<T, Dynamic, Dynamic> D_operator = divergence_operator.second;
-        
-//        // Weak hydrostatic component
-//        Matrix<T, Dynamic, Dynamic> D_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
-//        auto divergence_operator = make_hho_divergence_reconstruction(msh, cell, m_hho_di);
-//        auto n_div_rows = divergence_operator.second.rows();
-//        auto n_div_cols = divergence_operator.second.cols();
-//        D_operator.block(n_rows-n_div_rows, n_cols-n_div_cols, n_div_rows, n_div_cols) = divergence_operator.second;
-        
         Matrix<T, Dynamic, Dynamic> S_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
         if(m_hho_stabilization_Q)
         {
@@ -380,8 +363,7 @@ public:
             auto n_s_cols = stabilization_operator.cols();
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }
-        
-//        return 2.0*mu*R_operator + lambda*D_operator + (rho*vs)*S_operator;
+
         return R_operator + (rho*vs)*S_operator;
     }
             
@@ -488,11 +470,15 @@ public:
     
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(n_cbs, n_cbs);
         
-        // Symmetric tensor mass block
+        // Symmetric stress tensor mass block
+        
+        // Stress tensor
         Matrix<T, Dynamic, Dynamic> mass_matrix_sigma  = symmetric_tensor_mass_matrix(msh, cell);
         
-        // Symmetric trace tensor mass block
+        // Tensor trace
         Matrix<T, Dynamic, Dynamic> mass_matrix_trace_sigma  = symmetric_tensor_trace_mass_matrix(msh, cell);
+        
+        // Constitutive relationship inverse
         mass_matrix_trace_sigma *= (lambda/(2.0*mu+2.0*lambda));
         mass_matrix_sigma -= mass_matrix_trace_sigma;
         mass_matrix_sigma *= (1.0/(2.0*mu));
@@ -617,10 +603,10 @@ public:
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        
-        size_t n_dof = n_vec_cbs + num_faces * n_fbs;
+        size_t n_dof = n_cbs + num_faces * n_fbs;
+            
         Matrix<T, Dynamic, 1> x_el(n_dof);
-        x_el.block(0, 0, n_vec_cbs, 1) = x_glob.block(cell_ofs * n_cbs + n_ten_cbs, 0, n_vec_cbs, 1);
+        x_el.block(0, 0, n_cbs, 1) = x_glob.block(cell_ofs * n_cbs, 0, n_cbs, 1);
         auto fcs = faces(msh, cl);
         for (size_t i = 0; i < fcs.size(); i++)
         {
@@ -635,13 +621,13 @@ public:
                 auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(face_id);
                 Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
                 Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
-                x_el.block(n_vec_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
+                x_el.block(n_cbs + i * n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
             }
             else
             {
                 auto face_ofs = disk::priv::offset(msh, fc);
                 auto global_ofs = n_cbs * msh.cells_size() + m_compress_indexes.at(face_ofs)*n_fbs;
-                x_el.block(n_vec_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
+                x_el.block(n_cbs + i*n_fbs, 0, n_fbs, 1) = x_glob.block(global_ofs, 0, n_fbs, 1);
             }
         }
         return x_el;
@@ -763,46 +749,10 @@ public:
 
         // Shrinking data
         matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
-//        data_mixed.block(0, 0, gr_lhs.rows(), gr_lhs.cols()) = gr_lhs;// adding mass that was skipped
-        
         data_mixed.block(0, (ten_bs), ten_bs, n_cols-(ten_bs)) = -gr_rhs;
         data_mixed.block((ten_bs), 0, n_rows-(ten_bs), ten_bs) = gr_rhs.transpose();
 
         matrix_type oper = gr_lhs.llt().solve(gr_rhs);
-        return std::make_pair(oper, data_mixed);
-    }
-    
-    std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
-                 Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-    div_vector_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell, size_t & cell_ind)
-    {
-        using T = typename Mesh::coordinate_type;
-        typedef Matrix<T, Dynamic, Dynamic> matrix_type;
-            
-        auto graddeg = m_hho_di.grad_degree();
-        auto facedeg  = m_hho_di.face_degree();
-        auto ten_bs = disk::sym_matrix_basis_size(graddeg, Mesh::dimension, Mesh::dimension);
-        auto sca_bs = disk::scalar_basis_size(facedeg, Mesh::dimension);
-            
-        auto cbas_s = make_scalar_monomial_basis(msh, cell, m_hho_di.face_degree());
-        auto dr_lhs = make_mass_matrix(msh, cell, cbas_s);
-        auto dr_rhs = make_hho_divergence_reconstruction_rhs(msh, cell, m_hho_di);
-
-        assert( dr_lhs.rows() == sca_bs && dr_lhs.cols() == sca_bs );
-            
-        // Shrinking data
-        auto n_rows = dr_rhs.cols() + ten_bs;
-        auto n_cols = dr_rhs.cols() + ten_bs;
-        matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
-        
-//        data_mixed.block(0, 0, dr_lhs.rows(), dr_lhs.cols()) = dr_lhs;// adding mass that was skipped
-        
-        
-        
-        data_mixed.block(0, (ten_bs), sca_bs, n_cols-(ten_bs)) = -dr_rhs;
-        data_mixed.block((ten_bs), 0, n_rows-(ten_bs), sca_bs) = dr_rhs.transpose();
-
-        matrix_type oper = dr_lhs.ldlt().solve(dr_rhs);
         return std::make_pair(oper, data_mixed);
     }
             

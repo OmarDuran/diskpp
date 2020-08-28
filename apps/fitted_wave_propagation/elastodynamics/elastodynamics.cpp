@@ -77,7 +77,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-//    HeterogeneousGar6more2DIHHOFirstOrderTwoFields(argc, argv);
+    HeterogeneousGar6more2DIHHOFirstOrderTwoFields(argc, argv);
     
 //    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
 //    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-    HHOTwoFieldsConvergenceExample(argc, argv);
+//    HHOTwoFieldsConvergenceExample(argc, argv);
 //    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
@@ -353,16 +353,6 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             sigma(0,1) = sxy;
             sigma(1,0) = sxy;
             sigma(1,1) = syy;
-            
-//            sigma(0,0) = (-1 + 2*x)*(-1 + y)*y;
-//            sigma(0,1) = ((-1 + x + y)*(-y + x*(-1 + 2*y)))/2.;
-//            sigma(1,0) = ((-1 + x + y)*(-y + x*(-1 + 2*y)))/2.;
-//            sigma(1,1) = (-1 + x)*x*(-1 + 2*y);
-            
-//            sigma(0,0) = 2.0*M_PI;
-//            sigma(0,1) = M_PI;
-//            sigma(1,0) = M_PI;
-//            sigma(1,1) = 2.0*M_PI;
             return sigma;
         }else{
             static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
@@ -473,43 +463,9 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             if (sim_data.m_sc_Q) {
                 tc.tic();
                 SparseMatrix<RealType> Kg = assembler.LHS+assembler.MASS;
-//                std::cout << "k = " << Kg.toDense() << std::endl;
                 linear_solver<RealType> analysis(Kg,assembler.get_n_face_dof());
                 analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
                 tc.toc();
-                
-                if(0){
-                    x_dof = assembler.RHS;
-                    x_dof.setZero();
-                    assembler.project_over_cells(msh, x_dof, exact_vec_fun, exact_flux_fun);
-                    assembler.project_over_faces(msh, x_dof, exact_vec_fun);
-                    
-                    int dim = 2;
-                    size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
-                    size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
-                    size_t cell_dof = n_ten_cbs + n_vec_cbs;
-                    
-                    size_t cell_ind = 0;
-                    auto& cell = msh.backend_storage()->surfaces[cell_ind];
-                    Matrix<RealType, Dynamic, Dynamic> k = assembler.mixed_operator(cell_ind, msh, cell);
-                    Matrix<RealType, Dynamic, Dynamic> m = assembler.mass_operator(cell_ind, msh, cell, false);
-                    
-                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
-                    Matrix<RealType, Dynamic, 1> rhs_x_cell_dof = assembler.RHS.block(cell_ind*cell_dof + n_ten_cbs, 0, n_vec_cbs, 1);
-                    
-                    Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_ind*cell_dof, 0, n_ten_cbs, 1);
-                    
-//                    std::cout << " s_dof = " << ten_x_cell_dof << std::endl;
-//                    std::cout << " m = " << m.block(0, 0, n_ten_cbs, n_ten_cbs) << std::endl;
-                    std::cout << " ev = " << m.block(0, 0, n_ten_cbs, n_ten_cbs)*ten_x_cell_dof << std::endl;
-                    
-//                    std::cout << " v_dof = " << vec_x_cell_dof << std::endl;
-//                    std::cout << " k = " << k.block(0, n_ten_cbs, n_ten_cbs, vec_x_cell_dof.rows()) << std::endl;
-                    std::cout << " ev = " << k.block(0, n_ten_cbs, n_ten_cbs, vec_x_cell_dof.rows())*vec_x_cell_dof << std::endl;
-                    
-                    int aka = 0;
-                }
-                
                 
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
@@ -543,11 +499,11 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             }
             
             // Computing errors
-            postprocessor<mesh_type>::compute_errors_two_fields_vectorial(msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun, error_file);
+            postprocessor<mesh_type>::compute_errors_two_fields_vectorial(msh, hho_di, x_dof, exact_vec_fun, exact_flux_fun, error_file);
             
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "steady_vector_mixed_two_fields_k" + std::to_string(k) + "_";
-                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, l, msh, hho_di, assembler, x_dof, exact_vec_fun, exact_flux_fun, false);
+                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, l, msh, hho_di, x_dof, exact_vec_fun, exact_flux_fun, false);
             }
         }
         error_file << std::endl << std::endl;
@@ -1188,13 +1144,13 @@ void IHHOFirstOrderTwoFields(int argc, char **argv){
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
         std::string silo_file_name = "vector_mixed_two_fields";
-            postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun, false);
+            postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
     }
     
     std::ofstream simulation_log("elastodynamic_two_fields.txt");
     
     if (sim_data.m_report_energy_Q) {
-//        postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+        postprocessor<mesh_type>::compute_elastic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
     }
     
     // Solving a first order equation HDG/HHO propagation problem
@@ -1203,7 +1159,7 @@ void IHHOFirstOrderTwoFields(int argc, char **argv){
     Matrix<RealType, Dynamic, 1> c;
 
     // DIRK(s) schemes
-    int s = 1;
+    int s = 3;
     bool is_sdirk_Q = true;
 
     if (is_sdirk_Q) {
@@ -1280,11 +1236,11 @@ void IHHOFirstOrderTwoFields(int argc, char **argv){
 
         if (sim_data.m_render_silo_files_Q) {
             std::string silo_file_name = "vector_mixed__two_fields";
-                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun, false);
+                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
         }
         
         if (sim_data.m_report_energy_Q) {
-//            postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+            postprocessor<mesh_type>::compute_elastic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
         }
 
         if(it == nt){
@@ -3008,8 +2964,8 @@ void HeterogeneousGar6more2DIHHOFirstOrderTwoFields(int argc, char **argv){
         std::vector<RealType> mat_data(3);
         RealType rho, vp, vs;
         if (y > 0.0) {
-            vp = 1.0*std::sqrt(3.0);
-            vs  = 1.0;
+            vp = 2.0*std::sqrt(3.0);
+            vs  = 2.0;
             rho = 1.0;
         }else{
             vp = std::sqrt(3.0);
@@ -3045,7 +3001,7 @@ void HeterogeneousGar6more2DIHHOFirstOrderTwoFields(int argc, char **argv){
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
         std::string silo_file_name = "inhomogeneous_vector_mixed_two_fields_";
-            postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, assembler, x_dof, vec_fun, null_flux_fun, false);
+            postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, vec_fun, null_flux_fun, false);
     }
     
     std::ofstream simulation_log("elastodynamic_inhomogeneous_two_fields.txt");
@@ -3064,9 +3020,9 @@ void HeterogeneousGar6more2DIHHOFirstOrderTwoFields(int argc, char **argv){
     postprocessor<mesh_type>::record_data_elastic_two_fields(0, s2_pt_cell, msh, hho_di, x_dof, sensor_2_log);
     postprocessor<mesh_type>::record_data_elastic_two_fields(0, s3_pt_cell, msh, hho_di, x_dof, sensor_3_log);
     
-//    if (sim_data.m_report_energy_Q) {
-//        postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
-//    }
+    if (sim_data.m_report_energy_Q) {
+        postprocessor<mesh_type>::compute_elastic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
+    }
     
     // Solving a first order equation HDG/HHO propagation problem
     Matrix<RealType, Dynamic, Dynamic> a;
@@ -3147,16 +3103,16 @@ void HeterogeneousGar6more2DIHHOFirstOrderTwoFields(int argc, char **argv){
 
         if (sim_data.m_render_silo_files_Q) {
             std::string silo_file_name = "inhomogeneous_vector_mixed_two_fields_";
-                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, assembler, x_dof, vec_fun, null_flux_fun, false);
+                postprocessor<mesh_type>::write_silo_two_fields_vectorial(silo_file_name, it, msh, hho_di, x_dof, vec_fun, null_flux_fun, false);
         }
         
         postprocessor<mesh_type>::record_data_elastic_two_fields(it, s1_pt_cell, msh, hho_di, x_dof, sensor_1_log);
         postprocessor<mesh_type>::record_data_elastic_two_fields(it, s2_pt_cell, msh, hho_di, x_dof, sensor_2_log);
         postprocessor<mesh_type>::record_data_elastic_two_fields(it, s3_pt_cell, msh, hho_di, x_dof, sensor_3_log);
         
-//        if (sim_data.m_report_energy_Q) {
-//            postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
-//        }
+        if (sim_data.m_report_energy_Q) {
+            postprocessor<mesh_type>::compute_elastic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+        }
 
     }
     
