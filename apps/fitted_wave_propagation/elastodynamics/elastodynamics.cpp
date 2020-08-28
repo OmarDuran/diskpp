@@ -79,7 +79,7 @@ int main(int argc, char **argv)
 
 //    HeterogeneousGar6more2DIHHOFirstOrderTwoFields(argc, argv);
     
-    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
+//    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
 //    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
 
 //    Gar6more2DIHHOFirstOrder(argc, argv);
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-//    HHOTwoFieldsConvergenceExample(argc, argv);
+    HHOTwoFieldsConvergenceExample(argc, argv);
 //    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
@@ -353,6 +353,16 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
             sigma(0,1) = sxy;
             sigma(1,0) = sxy;
             sigma(1,1) = syy;
+            
+//            sigma(0,0) = (-1 + 2*x)*(-1 + y)*y;
+//            sigma(0,1) = ((-1 + x + y)*(-y + x*(-1 + 2*y)))/2.;
+//            sigma(1,0) = ((-1 + x + y)*(-y + x*(-1 + 2*y)))/2.;
+//            sigma(1,1) = (-1 + x)*x*(-1 + 2*y);
+            
+//            sigma(0,0) = 2.0*M_PI;
+//            sigma(0,1) = M_PI;
+//            sigma(1,0) = M_PI;
+//            sigma(1,1) = 2.0*M_PI;
             return sigma;
         }else{
             static_matrix<RealType, 2, 2> sigma = static_matrix<RealType,2,2>::Zero(2,2);
@@ -467,6 +477,39 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
                 linear_solver<RealType> analysis(Kg,assembler.get_n_face_dof());
                 analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
                 tc.toc();
+                
+                if(0){
+                    x_dof = assembler.RHS;
+                    x_dof.setZero();
+                    assembler.project_over_cells(msh, x_dof, exact_vec_fun, exact_flux_fun);
+                    assembler.project_over_faces(msh, x_dof, exact_vec_fun);
+                    
+                    int dim = 2;
+                    size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
+                    size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+                    size_t cell_dof = n_ten_cbs + n_vec_cbs;
+                    
+                    size_t cell_ind = 0;
+                    auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                    Matrix<RealType, Dynamic, Dynamic> k = assembler.mixed_operator(cell_ind, msh, cell);
+                    Matrix<RealType, Dynamic, Dynamic> m = assembler.mass_operator(cell_ind, msh, cell, false);
+                    
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
+                    Matrix<RealType, Dynamic, 1> rhs_x_cell_dof = assembler.RHS.block(cell_ind*cell_dof + n_ten_cbs, 0, n_vec_cbs, 1);
+                    
+                    Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_ind*cell_dof, 0, n_ten_cbs, 1);
+                    
+//                    std::cout << " s_dof = " << ten_x_cell_dof << std::endl;
+//                    std::cout << " m = " << m.block(0, 0, n_ten_cbs, n_ten_cbs) << std::endl;
+                    std::cout << " ev = " << m.block(0, 0, n_ten_cbs, n_ten_cbs)*ten_x_cell_dof << std::endl;
+                    
+//                    std::cout << " v_dof = " << vec_x_cell_dof << std::endl;
+//                    std::cout << " k = " << k.block(0, n_ten_cbs, n_ten_cbs, vec_x_cell_dof.rows()) << std::endl;
+                    std::cout << " ev = " << k.block(0, n_ten_cbs, n_ten_cbs, vec_x_cell_dof.rows())*vec_x_cell_dof << std::endl;
+                    
+                    int aka = 0;
+                }
+                
                 
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 

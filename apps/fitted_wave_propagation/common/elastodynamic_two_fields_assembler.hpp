@@ -349,16 +349,22 @@ public:
         auto n_rows = R_operator.rows();
         auto n_cols = R_operator.cols();
         
-        // Weak hydrostatic component
-//        auto divergence_operator = div_vector_reconstruction(msh, cell, cell_ind);
-//        Matrix<T, Dynamic, Dynamic> D_operator = divergence_operator.second;
+//        R_operator.setZero();
+//        auto reconstruction_operator   = make_matrix_symmetric_gradrec(msh, cell, m_hho_di);
+//        auto n_rec_rows = reconstruction_operator.second.rows();
+//        auto n_rec_cols = reconstruction_operator.second.cols();
+//        R_operator.block(n_rows-n_rec_rows, n_cols-n_rec_cols, n_rec_rows, n_rec_cols) = reconstruction_operator.second;
         
         // Weak hydrostatic component
-        Matrix<T, Dynamic, Dynamic> D_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
-        auto divergence_operator = make_hho_divergence_reconstruction(msh, cell, m_hho_di);
-        auto n_div_rows = divergence_operator.second.rows();
-        auto n_div_cols = divergence_operator.second.cols();
-        D_operator.block(n_rows-n_div_rows, n_cols-n_div_cols, n_div_rows, n_div_cols) = divergence_operator.second;
+        auto divergence_operator = div_vector_reconstruction(msh, cell, cell_ind);
+        Matrix<T, Dynamic, Dynamic> D_operator = divergence_operator.second;
+        
+//        // Weak hydrostatic component
+//        Matrix<T, Dynamic, Dynamic> D_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
+//        auto divergence_operator = make_hho_divergence_reconstruction(msh, cell, m_hho_di);
+//        auto n_div_rows = divergence_operator.second.rows();
+//        auto n_div_cols = divergence_operator.second.cols();
+//        D_operator.block(n_rows-n_div_rows, n_cols-n_div_cols, n_div_rows, n_div_cols) = divergence_operator.second;
         
         Matrix<T, Dynamic, Dynamic> S_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
         if(m_hho_stabilization_Q)
@@ -375,8 +381,8 @@ public:
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }
         
-        return 2.0*mu*R_operator + lambda*D_operator + (rho*vs)*S_operator;
-//        return 2.0*mu*R_operator + lambda*D_operator + 2.0*mu*S_operator;
+//        return 2.0*mu*R_operator + lambda*D_operator + (rho*vs)*S_operator;
+        return R_operator + (rho*vs)*S_operator;
     }
             
     Matrix<T, Dynamic, Dynamic>
@@ -422,6 +428,50 @@ public:
         
         return mass_matrix;
     }
+    
+    Matrix<T, Dynamic, Dynamic>
+    symmetric_tensor_trace_mass_matrix(const Mesh& msh, const typename Mesh::cell_type& cell)
+    {
+            
+        size_t dim = Mesh::dimension;
+        auto gradeg = m_hho_di.grad_degree();
+        auto ten_b = make_sym_matrix_monomial_basis(msh, cell, gradeg);
+        auto ten_bs = disk::sym_matrix_basis_size(gradeg, dim, dim);
+        Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(ten_bs, ten_bs);
+        
+        auto qps = integrate(msh, cell, 2 * gradeg);
+
+        // number of tensor components
+        size_t dec = 0;
+         if (dim == 3)
+             dec = 6;
+         else if (dim == 2)
+             dec = 3;
+         else
+             std::logic_error("Expected 3 >= dim > 1");
+
+         for (auto& qp : qps)
+         {
+             auto phi = ten_b.eval_functions(qp.point());
+
+             for (size_t j = 0; j < ten_bs; j++)
+             {
+                auto identity = phi[j];
+                identity.setZero();
+                for(size_t d = 0; d < dim; d++){
+                    identity(d,d) = 1.0;
+                }
+                auto trace = phi[j].trace();
+                auto trace_phi_j = disk::priv::inner_product(phi[j].trace(), identity);
+                auto qp_phi_j = disk::priv::inner_product(qp.weight(), trace_phi_j);
+                for (size_t i = 0; i < ten_bs; i ++){
+                         mass_matrix(i, j) += disk::priv::inner_product(phi[i], qp_phi_j);
+                }
+             }
+         }
+        
+        return mass_matrix;
+    }
             
     Matrix<T, Dynamic, Dynamic> mass_operator(size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell, bool add_vector_mass_Q = true){
             
@@ -440,7 +490,12 @@ public:
         
         // Symmetric tensor mass block
         Matrix<T, Dynamic, Dynamic> mass_matrix_sigma  = symmetric_tensor_mass_matrix(msh, cell);
-        mass_matrix_sigma *= ((2.0*mu));
+        
+        // Symmetric trace tensor mass block
+        Matrix<T, Dynamic, Dynamic> mass_matrix_trace_sigma  = symmetric_tensor_trace_mass_matrix(msh, cell);
+        mass_matrix_trace_sigma *= (lambda/(2.0*mu+2.0*lambda));
+        mass_matrix_sigma -= mass_matrix_trace_sigma;
+        mass_matrix_sigma *= (1.0/(2.0*mu));
         mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
         
         if (add_vector_mass_Q) {
@@ -509,14 +564,11 @@ public:
         {
             auto phi = ten_b.eval_functions(qp.point());
             static_matrix<T, 2,2> sigma = ten_fun(qp.point());
-            T trace = 0.0;
-            for (size_t d = 0; d < dim; d++){
-             trace += sigma(d,d);
-            }
-            static_matrix<T, 2,2> sigma_s = sigma - (trace)*static_matrix<T, 2, 2>::Identity();
+//            T trace = sigma.trace();
+//            static_matrix<T, 2,2> sigma_s = sigma - (trace/(2.0+2.0))*static_matrix<T, 2, 2>::Identity();
             for (size_t i = 0; i < ten_bs; i++){
                 auto qp_phi_i = disk::priv::inner_product(qp.weight(), phi[i]);
-                rhs(i,0) += disk::priv::inner_product(qp_phi_i,sigma_s);
+                rhs(i,0) += disk::priv::inner_product(qp_phi_i,sigma);
             }
         }
         Matrix<T, Dynamic, 1> x_dof = mass_matrix.llt().solve(rhs);
@@ -743,7 +795,10 @@ public:
         auto n_cols = dr_rhs.cols() + ten_bs;
         matrix_type data_mixed = matrix_type::Zero(n_rows,n_cols);
         
-        data_mixed.block(0, 0, dr_lhs.rows(), dr_lhs.cols()) = dr_lhs;// adding mass that was skipped
+//        data_mixed.block(0, 0, dr_lhs.rows(), dr_lhs.cols()) = dr_lhs;// adding mass that was skipped
+        
+        
+        
         data_mixed.block(0, (ten_bs), sca_bs, n_cols-(ten_bs)) = -dr_rhs;
         data_mixed.block((ten_bs), 0, n_rows-(ten_bs), sca_bs) = dr_rhs.transpose();
 

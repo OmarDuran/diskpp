@@ -588,17 +588,6 @@ public:
                     assert(t_ten_phi.size() == ten_basis.size());
                     auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
                     
-                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
-                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
-                    
-                    auto divphi   = cbas_s.eval_functions(point_pair.point());
-                    auto divu_iqn = disk::eval(divu, divphi);
-                    
-                    sigma_h *= 2.0;
-                    sigma_h += divu_iqn * static_matrix<RealType, 2, 2>::Identity();
-
                     auto flux_diff = (flux_fun(point_pair.point()) - sigma_h).eval();
                     flux_l2_error += omega * flux_diff.squaredNorm();
 
@@ -874,8 +863,6 @@ public:
                     auto t_ten_phi = ten_basis.eval_functions( bar );
                     assert(t_ten_phi.size() == ten_basis.size());
                     auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
-
-                    
                     
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
@@ -946,17 +933,6 @@ public:
                     auto t_ten_phi = ten_basis.eval_functions( bar );
                     assert(t_ten_phi.size() == ten_basis.size());
                     auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
-                    
-                    auto cbas_s = disk::make_scalar_monomial_basis(msh, cell, hho_di.face_degree());
-                    Matrix<RealType, Dynamic, 1> div_x_cell_dof = assembler.gather_dof_data(msh, cell, x_dof);
-                    auto           dr   = make_hho_divergence_reconstruction(msh, cell, hho_di);
-                    dynamic_vector<RealType> divu = dr.first * div_x_cell_dof;
-                    
-                    auto divphi   = cbas_s.eval_functions(bar);
-                    auto divu_iqn = disk::eval(divu, divphi);
-                    
-                    sigma_h *= 2.0;
-                    sigma_h += divu_iqn * static_matrix<RealType, 2, 2>::Identity();
                     
                     approx_sxx.push_back(sigma_h(0,0));
                     approx_sxy.push_back(sigma_h(0,1));
