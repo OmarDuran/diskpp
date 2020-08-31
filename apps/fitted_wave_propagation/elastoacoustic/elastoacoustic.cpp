@@ -194,20 +194,7 @@ int main(int argc, char **argv)
         }
         
     }
-    
-    for (auto fc_id : interface_face_indexes) {
-        {
-            disk::bnd_info bi{bc_acoustic_id, true};
-            msh.backend_storage()->boundary_info.at(fc_id) = bi;
-            acoustic_bc_face_indexes.insert(fc_id);
-        }
-//        {
-//            disk::bnd_info bi{bc_elastic_id, true};
-//            msh.backend_storage()->boundary_info.at(fc_id) = bi;
-//            elastic_bc_face_indexes.insert(fc_id);
-//        }
-    }
-    
+
     // detect interface elastic - acoustic
     e_boundary_type e_bnd(msh);
     a_boundary_type a_bnd(msh);
@@ -217,8 +204,7 @@ int main(int argc, char **argv)
     // Solving a primal HHO mixed problem
 
     
-//    tc.tic();
-
+    tc.tic();
     auto assembler = elastoacoustic_two_fields_assembler<mesh_type>(msh, hho_di, e_bnd, a_bnd, e_material, a_material);
     assembler.set_interface_cell_indexes(interface_cell_pair_indexes);
     if(sim_data.m_hdg_stabilization_Q){
@@ -231,11 +217,9 @@ int main(int argc, char **argv)
     assembler.assemble_mass(msh);
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
-
-//        std::cout << "M = " << assembler.MASS.toDense() << std::endl;
     
     tc.tic();
-//    assembler.assemble_coupling_terms(msh);
+    assembler.assemble_coupling_terms(msh);
     tc.toc();
     std::cout << bold << cyan << "Coupling Assembly completed: " << tc << " seconds" << reset << std::endl;
 
@@ -272,16 +256,11 @@ int main(int argc, char **argv)
 
         tc.tic();
         assembler.assemble(msh, f_fun, s_f_fun);
-//        std::cout << "K = " << assembler.LHS.toDense() << std::endl;
-    
         SparseMatrix<RealType> Kg = assembler.LHS;
-        
-//        assembler.COUPLING.setZero();
-        
         SparseMatrix<RealType> C = assembler.COUPLING;
-//        std::cout << "C = " << assembler.COUPLING.toDense() << std::endl;
+
         assembler.LHS *= beta*(dt*dt);
-//        assembler.LHS += gamma*dt*C;
+        assembler.LHS += gamma*dt*C;
         assembler.LHS += assembler.MASS;
         linear_solver<RealType> analysis;
         if (sim_data.m_sc_Q) {
@@ -316,7 +295,6 @@ int main(int argc, char **argv)
             assembler.get_e_bc_conditions().updateDirichletFunction(u_fun, 0);
             assembler.get_a_bc_conditions().updateDirichletFunction(s_u_fun, 0);
             assembler.assemble_rhs(msh, f_fun, s_f_fun);
-//            assembler.apply_bc_conditions_on_interface(msh, v_fun, s_v_fun);
             
             // Compute intermediate state for scalar and rate
             u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
@@ -324,7 +302,7 @@ int main(int argc, char **argv)
             Matrix<RealType, Dynamic, 1> res = Kg*u_dof_n;
             Matrix<RealType, Dynamic, 1> res_v = C*v_dof_n;
             assembler.RHS -= res;
-//            assembler.RHS -= res_v;
+            assembler.RHS -= res_v;
             tc.toc();
             std::cout << bold << cyan << "Rhs assembly completed: " << tc << " seconds" << reset << std::endl;
             tc.tic();

@@ -314,7 +314,7 @@ public:
 
     }
     
-    void scatter_e_interface_data(const Mesh& msh, const typename Mesh::face_type& face,
+    void scatter_ea_interface_data(const Mesh& msh, const typename Mesh::face_type& face,
              const Matrix<T, Dynamic, Dynamic>& interface_matrix)
     {
         auto vfbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
@@ -606,7 +606,7 @@ public:
             auto& e_cell = storage->surfaces[chunk.second.first];
             auto& a_cell = storage->surfaces[chunk.second.second];
             Matrix<T, Dynamic, Dynamic> interface_operator_loc = e_interface_operator(msh, face, e_cell, a_cell);
-            scatter_e_interface_data(msh, face, interface_operator_loc);
+            scatter_ea_interface_data(msh, face, interface_operator_loc);
         }
         finalize_coupling();
     }
@@ -1121,7 +1121,9 @@ public:
     }
     
     size_t get_cell_basis_data(){
-        size_t n_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_v_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_s_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_cbs = n_s_cbs + n_v_cbs;
         return n_cbs;
     }
             
