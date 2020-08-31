@@ -760,7 +760,7 @@ public:
             auto stabilization_operator    = make_vector_hdg_stabilization(msh, cell, m_hho_di);
             S_operator = stabilization_operator;
         }
-        return 2.0*mu*(R_operator + S_operator)+lambda * divergence_operator.second;
+        return 2.0 * mu * (R_operator + S_operator) + lambda * divergence_operator.second;
     }
     
     Matrix<T, Dynamic, Dynamic> a_laplacian_operator(acoustic_material_data<T> & material, const Mesh& msh, const typename Mesh::cell_type& cell){
@@ -861,9 +861,9 @@ public:
     void classify_cells(const Mesh& msh){
 
         m_e_elements_with_bc_eges.clear();
-        size_t cell_ind = 0;
         for (auto& cell : msh)
         {
+            auto cell_ind = msh.lookup(cell);
             auto face_list = faces(msh, cell);
             for (size_t face_i = 0; face_i < face_list.size(); face_i++)
             {
@@ -876,13 +876,17 @@ public:
                     break;
                 }
             }
-            cell_ind++;
         }
         
         m_a_elements_with_bc_eges.clear();
-        cell_ind = 0;
         for (auto& cell : msh)
         {
+            typename Mesh::point_type bar = barycenter(msh, cell);
+            if (bar.x() < 0) {
+                continue;
+            }
+            
+            auto cell_ind = msh.lookup(cell);
             auto face_list = faces(msh, cell);
             for (size_t face_i = 0; face_i < face_list.size(); face_i++)
             {
@@ -895,8 +899,26 @@ public:
                     break;
                 }
             }
-            cell_ind++;
         }
+        
+        std::sort( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() );
+        m_e_elements_with_bc_eges.erase( std::unique( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() ), m_e_elements_with_bc_eges.end() );
+        
+        size_t c = 0;
+        for (auto a_ind : m_a_elements_with_bc_eges) {
+            for (auto e_ind : m_e_elements_with_bc_eges) {
+                if(a_ind == e_ind){
+                    m_a_elements_with_bc_eges[c] = -1;
+                    break;
+                }
+            }
+            c++;
+        }        
+        std::sort( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() );
+        m_a_elements_with_bc_eges.erase( std::unique( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() ), m_a_elements_with_bc_eges.end() );
+        size_t n_data = m_a_elements_with_bc_eges.size();
+        m_a_elements_with_bc_eges.resize(n_data-1);
+        int aka = 0;
     }
     
     void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
@@ -942,6 +964,26 @@ public:
         auto cell_ofs = a_cell_ind * n_cbs + m_n_elastic_cell_dof;
         x_glob.block(cell_ofs, 0, n_cbs, 1) = x_proj_dof;
     }
+    
+//    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<T(const typename Mesh::point_type& )> scal_fun){
+//
+//        for (auto& cell : msh)
+//        {
+//            auto fcs = faces(msh, cell);
+//            for (size_t i = 0; i < fcs.size(); i++)
+//            {
+//                auto face = fcs[i];
+//                auto fc_id = msh.lookup(face);
+//                bool is_dirichlet_Q = m_bnd.is_dirichlet_face(fc_id);
+//                if (is_dirichlet_Q)
+//                {
+//                    continue;
+//                }
+//                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), scal_fun);
+//                scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
+//            }
+//        }
+//    }
     
     Matrix<T, Dynamic, 1>
     gather_e_dof_data(size_t e_cell_ind,const Mesh& msh, const typename Mesh::cell_type& cl,

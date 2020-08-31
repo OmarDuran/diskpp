@@ -79,12 +79,12 @@ int main(int argc, char **argv)
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
-    RealType ti = 0.5;
-    RealType tf = 0.515625;
+    RealType ti = 0.0;
+    RealType tf = 0.25;
     RealType dt = (tf-ti)/nt;
     
     scal_vec_analytic_functions functions;
-    functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
     RealType t = ti;
     
     auto u_fun     = functions.Evaluate_u(t);
@@ -161,7 +161,7 @@ int main(int argc, char **argv)
             elastic_material_data<RealType> material = elastic_mat_fun(bar);
             e_material.insert(std::make_pair(cell_ind,material));
         }
-        
+
         auto cell_faces = faces(msh,cell);
         for (auto face :cell_faces) {
             auto fc_id = msh.lookup(face);
@@ -195,6 +195,19 @@ int main(int argc, char **argv)
         
     }
     
+    for (auto fc_id : interface_face_indexes) {
+        {
+            disk::bnd_info bi{bc_acoustic_id, true};
+            msh.backend_storage()->boundary_info.at(fc_id) = bi;
+            acoustic_bc_face_indexes.insert(fc_id);
+        }
+//        {
+//            disk::bnd_info bi{bc_elastic_id, true};
+//            msh.backend_storage()->boundary_info.at(fc_id) = bi;
+//            elastic_bc_face_indexes.insert(fc_id);
+//        }
+    }
+    
     // detect interface elastic - acoustic
     e_boundary_type e_bnd(msh);
     a_boundary_type a_bnd(msh);
@@ -222,7 +235,7 @@ int main(int argc, char **argv)
 //        std::cout << "M = " << assembler.MASS.toDense() << std::endl;
     
     tc.tic();
-    assembler.assemble_coupling_terms(msh);
+//    assembler.assemble_coupling_terms(msh);
     tc.toc();
     std::cout << bold << cyan << "Coupling Assembly completed: " << tc << " seconds" << reset << std::endl;
 
@@ -266,13 +279,14 @@ int main(int argc, char **argv)
 //        assembler.COUPLING.setZero();
         
         SparseMatrix<RealType> C = assembler.COUPLING;
-        std::cout << "C = " << assembler.COUPLING.toDense() << std::endl;
+//        std::cout << "C = " << assembler.COUPLING.toDense() << std::endl;
         assembler.LHS *= beta*(dt*dt);
-        assembler.LHS += gamma*dt*C;
+//        assembler.LHS += gamma*dt*C;
         assembler.LHS += assembler.MASS;
         linear_solver<RealType> analysis;
         if (sim_data.m_sc_Q) {
             analysis.set_Kg(assembler.LHS, assembler.get_n_face_dof());
+            std::cout << bold << cyan << "Condense equations, not working" << reset << std::endl;
             analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
         }else{
             analysis.set_Kg(assembler.LHS);
@@ -302,7 +316,7 @@ int main(int argc, char **argv)
             assembler.get_e_bc_conditions().updateDirichletFunction(u_fun, 0);
             assembler.get_a_bc_conditions().updateDirichletFunction(s_u_fun, 0);
             assembler.assemble_rhs(msh, f_fun, s_f_fun);
-            assembler.apply_bc_conditions_on_interface(msh, v_fun, s_v_fun);
+//            assembler.apply_bc_conditions_on_interface(msh, v_fun, s_v_fun);
             
             // Compute intermediate state for scalar and rate
             u_dof_n = u_dof_n + dt*v_dof_n + 0.5*dt*dt*(1-2.0*beta)*a_dof_n;
@@ -310,10 +324,9 @@ int main(int argc, char **argv)
             Matrix<RealType, Dynamic, 1> res = Kg*u_dof_n;
             Matrix<RealType, Dynamic, 1> res_v = C*v_dof_n;
             assembler.RHS -= res;
-            assembler.RHS -= res_v;
+//            assembler.RHS -= res_v;
             tc.toc();
             std::cout << bold << cyan << "Rhs assembly completed: " << tc << " seconds" << reset << std::endl;
-
             tc.tic();
             a_dof_np = analysis.solve(assembler.RHS); // new acceleration
             tc.toc();
