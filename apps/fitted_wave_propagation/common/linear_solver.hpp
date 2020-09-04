@@ -202,25 +202,31 @@ class linear_solver
     Matrix<T, Dynamic, 1> & Fc(){
         return m_Fc;
     }
-    
-    void condense_equations(std::pair<size_t,size_t> cell_basis_data){
+        
+    void condense_equations(std::vector<std::pair<size_t,size_t>> vec_cell_basis_data){
         
         if (!m_global_sc_Q) {
             return;
         }
         
-        size_t n_cells = cell_basis_data.first;
-        size_t n_cbs   = cell_basis_data.second;
-        size_t nnz_cc = n_cbs*n_cbs*n_cells;
+        size_t nnz_cc = 0;
+        for (auto chunk : vec_cell_basis_data) {
+            nnz_cc += chunk.second*chunk.second*chunk.first;
+        }
         std::vector< Triplet<T> > triplets_cc;
         triplets_cc.resize(nnz_cc);
         m_Kcc_inv = SparseMatrix<T>( m_n_c_dof, m_n_c_dof );
         #ifdef HAVE_INTEL_TBB
+        size_t stride_n_block_eq = 0;
+        size_t stride_n_block_l = 0;
+        for (auto chunk : vec_cell_basis_data) {
+                size_t n_cells = chunk.first;
+                size_t n_cbs   = chunk.second;
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
-                    [this,&triplets_cc,&n_cbs] (size_t & cell_ind){
+                    [this,&triplets_cc,&n_cbs,&stride_n_block_eq,&stride_n_block_l] (size_t & cell_ind){
                     
-                    size_t stride_eq = cell_ind * n_cbs;
-                    size_t stride_l = cell_ind * n_cbs * n_cbs;
+                    size_t stride_eq = cell_ind * n_cbs + stride_n_block_eq;
+                    size_t stride_l = cell_ind * n_cbs * n_cbs + stride_n_block_l;
 
                     SparseMatrix<T> K_cc_loc = m_Kcc.block(stride_eq, stride_eq, n_cbs, n_cbs);
                     SparseLU<SparseMatrix<T>> analysis_cc;
@@ -239,12 +245,20 @@ class linear_solver
                     }
                 }
             );
+            stride_n_block_eq   += n_cells * n_cbs;
+            stride_n_block_l    += n_cells * n_cbs * n_cbs;
+        }
         #else
 
+        size_t stride_n_block_eq = 0;
+        size_t stride_n_block_l = 0;
+        for (auto chunk : vec_cell_basis_data) {
+            size_t n_cells = chunk.first;
+            size_t n_cbs   = chunk.second;
             for (size_t cell_ind = 0; cell_ind < n_cells; cell_ind++)
             {
-                size_t stride_eq = cell_ind * n_cbs;
-                size_t stride_l = cell_ind * n_cbs * n_cbs;
+                size_t stride_eq = cell_ind * n_cbs + stride_n_block_eq;
+                size_t stride_l = cell_ind * n_cbs * n_cbs + stride_n_block_l;
                 
                 SparseMatrix<T> K_cc_loc = m_Kcc.block(stride_eq, stride_eq, n_cbs, n_cbs);
                 SparseLU<SparseMatrix<T>> analysis_cc;
@@ -263,6 +277,9 @@ class linear_solver
                 }
 
             }
+            stride_n_block_eq   += n_cells * n_cbs;
+            stride_n_block_l    += n_cells * n_cbs * n_cbs;
+        }
         #endif
         
         m_Kcc_inv.setFromTriplets( triplets_cc.begin(), triplets_cc.end() );
@@ -271,6 +288,12 @@ class linear_solver
         m_is_decomposed_Q = false;
         return;
 
+    }
+    
+    void condense_equations(std::pair<size_t,size_t> cell_basis_data){
+        std::vector<std::pair<size_t,size_t>> vec_cell_basis_data(1);
+        vec_cell_basis_data[0] = cell_basis_data;
+        condense_equations(vec_cell_basis_data);
     }
         
     void factorize(){

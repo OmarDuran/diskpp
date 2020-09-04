@@ -901,24 +901,24 @@ public:
             }
         }
         
-        std::sort( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() );
-        m_e_elements_with_bc_eges.erase( std::unique( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() ), m_e_elements_with_bc_eges.end() );
-        
-        size_t c = 0;
-        for (auto a_ind : m_a_elements_with_bc_eges) {
-            for (auto e_ind : m_e_elements_with_bc_eges) {
-                if(a_ind == e_ind){
-                    m_a_elements_with_bc_eges[c] = -1;
-                    break;
-                }
-            }
-            c++;
-        }        
-        std::sort( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() );
-        m_a_elements_with_bc_eges.erase( std::unique( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() ), m_a_elements_with_bc_eges.end() );
-        size_t n_data = m_a_elements_with_bc_eges.size();
-        m_a_elements_with_bc_eges.resize(n_data-1);
-        int aka = 0;
+//        std::sort( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() );
+//        m_e_elements_with_bc_eges.erase( std::unique( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() ), m_e_elements_with_bc_eges.end() );
+//        
+//        size_t c = 0;
+//        for (auto a_ind : m_a_elements_with_bc_eges) {
+//            for (auto e_ind : m_e_elements_with_bc_eges) {
+//                if(a_ind == e_ind){
+//                    m_a_elements_with_bc_eges[c] = -1;
+//                    break;
+//                }
+//            }
+//            c++;
+//        }        
+//        std::sort( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() );
+//        m_a_elements_with_bc_eges.erase( std::unique( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() ), m_a_elements_with_bc_eges.end() );
+//        size_t n_data = m_a_elements_with_bc_eges.size();
+//        m_a_elements_with_bc_eges.resize(n_data-1);
+//        int aka = 0;
     }
     
     void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
@@ -1115,16 +1115,18 @@ public:
     }
                 
     size_t get_n_face_dof(){
-        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        size_t n_face_dof = (m_n_edges - m_n_essential_edges) * n_fbs;
+        size_t n_face_dof = m_n_elastic_face_dof + m_n_acoustic_face_dof;
         return n_face_dof;
     }
     
-    size_t get_cell_basis_data(){
+    size_t get_e_cell_basis_data(){
         size_t n_v_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        return n_v_cbs;
+    }
+    
+    size_t get_a_cell_basis_data(){
         size_t n_s_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
-        size_t n_cbs = n_s_cbs + n_v_cbs;
-        return n_cbs;
+        return n_s_cbs;
     }
             
 };

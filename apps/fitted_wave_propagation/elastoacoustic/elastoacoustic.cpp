@@ -79,12 +79,12 @@ int main(int argc, char **argv)
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
-    RealType ti = 0.0;
-    RealType tf = 0.25;
+    RealType ti = 0.25;
+    RealType tf = 0.5;
     RealType dt = (tf-ti)/nt;
     
     scal_vec_analytic_functions functions;
-    functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
+    functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
     RealType t = ti;
     
     auto u_fun     = functions.Evaluate_u(t);
@@ -266,7 +266,11 @@ int main(int argc, char **argv)
         if (sim_data.m_sc_Q) {
             analysis.set_Kg(assembler.LHS, assembler.get_n_face_dof());
             std::cout << bold << cyan << "Condense equations, not working" << reset << std::endl;
-            analysis.condense_equations(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+            
+            std::vector<std::pair<size_t,size_t>> vec_cell_basis_data(2);
+            vec_cell_basis_data[0] = std::make_pair(assembler.get_e_material_data().size(), assembler.get_e_cell_basis_data());
+            vec_cell_basis_data[1] = std::make_pair(assembler.get_a_material_data().size(), assembler.get_a_cell_basis_data());
+            analysis.condense_equations(vec_cell_basis_data);
         }else{
             analysis.set_Kg(assembler.LHS);
         }
@@ -329,7 +333,7 @@ int main(int argc, char **argv)
             }
 
         }
-        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+        simulation_log << "Number of equations : " << analysis.n_equations() << std::endl;
         simulation_log << "Number of time steps =  " << nt << std::endl;
         simulation_log << "Step size =  " << dt << std::endl;
         simulation_log.flush();
