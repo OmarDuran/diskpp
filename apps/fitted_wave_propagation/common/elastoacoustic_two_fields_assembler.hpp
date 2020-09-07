@@ -900,25 +900,6 @@ public:
                 }
             }
         }
-        
-//        std::sort( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() );
-//        m_e_elements_with_bc_eges.erase( std::unique( m_e_elements_with_bc_eges.begin(), m_e_elements_with_bc_eges.end() ), m_e_elements_with_bc_eges.end() );
-//        
-//        size_t c = 0;
-//        for (auto a_ind : m_a_elements_with_bc_eges) {
-//            for (auto e_ind : m_e_elements_with_bc_eges) {
-//                if(a_ind == e_ind){
-//                    m_a_elements_with_bc_eges[c] = -1;
-//                    break;
-//                }
-//            }
-//            c++;
-//        }        
-//        std::sort( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() );
-//        m_a_elements_with_bc_eges.erase( std::unique( m_a_elements_with_bc_eges.begin(), m_a_elements_with_bc_eges.end() ), m_a_elements_with_bc_eges.end() );
-//        size_t n_data = m_a_elements_with_bc_eges.size();
-//        m_a_elements_with_bc_eges.resize(n_data-1);
-//        int aka = 0;
     }
     
     void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
@@ -965,25 +946,69 @@ public:
         x_glob.block(cell_ofs, 0, n_cbs, 1) = x_proj_dof;
     }
     
-//    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<T(const typename Mesh::point_type& )> scal_fun){
-//
-//        for (auto& cell : msh)
-//        {
-//            auto fcs = faces(msh, cell);
-//            for (size_t i = 0; i < fcs.size(); i++)
-//            {
-//                auto face = fcs[i];
-//                auto fc_id = msh.lookup(face);
-//                bool is_dirichlet_Q = m_bnd.is_dirichlet_face(fc_id);
-//                if (is_dirichlet_Q)
-//                {
-//                    continue;
-//                }
-//                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), scal_fun);
-//                scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
-//            }
-//        }
-//    }
+    
+    
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> vec_fun, std::function<T(const typename Mesh::point_type& )> scal_fun){
+
+        auto storage = msh.backend_storage();
+
+        // elastic block
+        for (auto e_chunk : m_e_material) {
+            auto& cell = storage->surfaces[e_chunk.first];
+            auto fcs = faces(msh, cell);
+            for (size_t i = 0; i < fcs.size(); i++)
+            {
+                auto face = fcs[i];
+                auto fc_id = msh.lookup(face);
+                bool is_dirichlet_Q = m_e_bnd.is_dirichlet_face(fc_id);
+                if (is_dirichlet_Q)
+                {
+                    continue;
+                }
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
+                scatter_e_face_dof_data(msh, face, x_glob, x_proj_dof);
+            }
+        }
+        
+        // acoustic block
+        for (auto a_chunk : m_a_material) {
+            auto& cell = storage->surfaces[a_chunk.first];
+            auto fcs = faces(msh, cell);
+            for (size_t i = 0; i < fcs.size(); i++)
+            {
+                auto face = fcs[i];
+                auto fc_id = msh.lookup(face);
+                bool is_dirichlet_Q = m_a_bnd.is_dirichlet_face(fc_id);
+                if (is_dirichlet_Q)
+                {
+                    continue;
+                }
+                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), scal_fun);
+                scatter_a_face_dof_data(msh, face, x_glob, x_proj_dof);
+            }
+        }
+    }
+    
+    void
+    scatter_e_face_dof_data(  const Mesh& msh, const typename Mesh::face_type& face,
+                    Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+    {
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        auto fc_id = msh.lookup(face);
+        auto glob_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_e_compress_indexes.at(fc_id)*n_fbs;
+        x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
+    }
+    
+    void
+    scatter_a_face_dof_data( const Mesh& msh, const typename Mesh::face_type& face,
+                      Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> x_proj_dof) const
+    {
+        size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
+        auto fc_id = msh.lookup(face);
+        auto glob_offset = m_n_elastic_cell_dof + m_n_acoustic_cell_dof + m_n_elastic_face_dof + m_a_compress_indexes.at(fc_id)*n_fbs;
+        x_glob.block(glob_offset, 0, n_fbs, 1) = x_proj_dof;
+        
+    }
     
     Matrix<T, Dynamic, 1>
     gather_e_dof_data(size_t e_cell_ind,const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -1114,6 +1139,14 @@ public:
              return m_a_material;
     }
                 
+    size_t get_a_n_cells_dof(){
+        return m_n_acoustic_cell_dof;
+    }
+    
+    size_t get_e_n_cells_dof(){
+        return m_n_elastic_cell_dof;
+    }
+    
     size_t get_n_face_dof(){
         size_t n_face_dof = m_n_elastic_face_dof + m_n_acoustic_face_dof;
         return n_face_dof;
