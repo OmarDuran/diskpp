@@ -2134,6 +2134,7 @@ public:
                 auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
                 auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
                 Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_dof_data(msh, cell, x_dof);
+                std::cout << "all_dofs = " << all_dofs << std::endl;
                 Matrix<RealType, Dynamic, 1> recdofs = gr.first * all_dofs;
                 
                 auto t_dphi = rec_basis.eval_gradients( pt );
