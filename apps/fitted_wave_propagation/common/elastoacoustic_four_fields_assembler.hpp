@@ -1277,12 +1277,13 @@ public:
             const auto qps = integrate(msh, cell, 2*recdeg);
             for (auto& qp : qps)
             {
-              auto dphi = rec_basis.eval_gradients(qp.point());
-                f_vec = vec_fun(qp.point());
-              for (size_t i = 0; i < rbs-1; i++){
-              Matrix<T, 2, 1> phi_i = dphi.block(i+1, 0, 1, 2).transpose();
-                  rhs(i,0) = rhs(i,0) + (qp.weight() * f_vec*phi_i)(0,0);
-              }
+                auto dphi = rec_basis.eval_gradients(qp.point());
+                f_vec(0,0) = vec_fun(qp.point())[0];
+                f_vec(0,1) = vec_fun(qp.point())[1];
+                for (size_t i = 0; i < rbs-1; i++){
+                    Matrix<T, 2, 1> phi_i = dphi.block(i+1, 0, 1, 2).transpose();
+                    rhs(i,0) = rhs(i,0) + (qp.weight() * f_vec*phi_i)(0,0);
+                }
             }
             Matrix<T, Dynamic, 1> x_dof = mass_matrix_q.llt().solve(rhs);
             return x_dof;
