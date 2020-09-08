@@ -55,8 +55,8 @@ int main(int argc, char **argv)
 {
         
 //    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
-//    IHHOFirstOrder(argc, argv);
-    IHHOSecondOrder(argc, argv);
+    IHHOFirstOrder(argc, argv);
+//    IHHOSecondOrder(argc, argv);
 }
 
 void IHHOFirstOrder(int argc, char **argv){
@@ -96,7 +96,7 @@ void IHHOFirstOrder(int argc, char **argv){
     RealType dt     = (tf-ti)/nt;
     
     scal_vec_analytic_functions functions;
-    functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInSpace);
+    functions.set_function_type(scal_vec_analytic_functions::EFunctionType::EFunctionQuadraticInTime);
     RealType t = ti;
     
     auto u_fun     = functions.Evaluate_u(t);
@@ -226,22 +226,18 @@ void IHHOFirstOrder(int argc, char **argv){
     
     tc.tic();
     assembler.assemble_mass(msh);
-//    std::cout << "m = " << assembler.MASS.toDense() << std::endl;
     tc.toc();
     std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
     
     tc.tic();
     assembler.assemble_coupling_terms(msh);
-//    std::cout << "c = " << assembler.COUPLING.toDense() << std::endl;
     tc.toc();
     std::cout << bold << cyan << "Coupling Assembly completed: " << tc << " seconds" << reset << std::endl;
     
     // Projecting initial data
     Matrix<RealType, Dynamic, 1> x_dof;
     assembler.project_over_cells(msh, x_dof, v_fun, flux_fun, s_v_fun, s_flux_fun);
-    std::cout << "x_dof = " << x_dof << std::endl;
     assembler.project_over_faces(msh, x_dof, v_fun, s_v_fun);
-    std::cout << "x_dof = " << x_dof << std::endl;
     
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
@@ -272,7 +268,6 @@ void IHHOFirstOrder(int argc, char **argv){
 
     tc.tic();
     assembler.assemble(msh, f_fun, s_f_fun);
-//    std::cout << "k = " << assembler.LHS.toDense() << std::endl;
     tc.toc();
     std::cout << bold << cyan << "First stiffness assembly completed: " << tc << " seconds" << reset << std::endl;
     assembler.LHS += assembler.COUPLING; // Line to delete.
@@ -342,21 +337,23 @@ void IHHOFirstOrder(int argc, char **argv){
         std::cout << bold << cyan << "DIRK step completed: " << tc << " seconds" << reset << std::endl;
         x_dof = x_dof_n;
         t = tn + dt;
-//        auto exact_vel_fun = functions.Evaluate_v(t);
-//        auto exact_flux_fun = functions.Evaluate_sigma(t);
+        auto v_fun     = functions.Evaluate_v(t);
+        auto flux_fun     = functions.Evaluate_sigma(t);
+        auto s_v_fun     = functions.Evaluate_s_v(t);
+        auto s_flux_fun     = functions.Evaluate_s_q(t);
 
         if (sim_data.m_render_silo_files_Q) {
             std::string silo_file_name = "elasto_acoustic_four_fields_";
             postprocessor<mesh_type>::write_silo_four_fields_elastoacoustic(silo_file_name, it, msh, hho_di, x_dof, e_material, a_material, false);
         }
         
-        if (sim_data.m_report_energy_Q) {
+//        if (sim_data.m_report_energy_Q) {
 //            postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
-        }
+//        }
 
         if(it == nt){
             // Computing errors
-//            postprocessor<mesh_type>::compute_errors_three_fields_vectorial(msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, simulation_log);
+            postprocessor<mesh_type>::compute_errors_four_fields_elastoacoustic(msh, hho_di, assembler, x_dof, v_fun, flux_fun, s_v_fun, s_flux_fun, simulation_log);
         }
 
     }

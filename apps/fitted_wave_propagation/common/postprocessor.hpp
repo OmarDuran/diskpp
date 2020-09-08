@@ -143,8 +143,6 @@ public:
                 Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, rec_cell_basis, hho_di.reconstruction_degree());
                 Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, rec_cell_basis, scal_fun, 1);
                 Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
-//                rec_scalar_dof(0, 0) = 0.0;
-//                real_dofs(0, 0) = 0.0;
                 Matrix<RealType, Dynamic, 1> diff = real_dofs - rec_scalar_dof;
                 scalar_l2_error += diff.dot(mass*diff);
             }else{
@@ -2065,6 +2063,148 @@ public:
         error_file.flush();
     }
     
+    /// Compute L2 and H1 errors for four fields elastoacoustic approximation
+    static void compute_errors_four_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_four_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        
+        RealType scalar_l2_error = 0.0;
+        RealType flux_l2_error = 0.0;
+        RealType vector_l2_error = 0.0;
+        RealType sigma_l2_error = 0.0;
+        RealType h = 10.0;
+
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t e_cell_dof = n_ten_cbs + n_vec_cbs;
+
+        size_t n_vel_scal_cbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_scal_cbs = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
+        size_t a_cell_dof = n_vel_scal_cbs + n_scal_cbs;
+        
+        auto storage = msh.backend_storage();
+        
+        size_t e_cell_ind = 0;
+        for (auto& e_chunk : assembler.get_e_material_data()) {
+            
+            auto& cell = storage->surfaces[e_chunk.first];
+            
+            RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
+            }
+
+            Matrix<RealType, Dynamic, 1> vec_cell_dof = x_dof.block(e_cell_ind*e_cell_dof+n_ten_cbs, 0, n_vec_cbs, 1);
+
+            // scalar evaluation
+            {
+                auto cell_basis = disk::make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, vec_fun);
+                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
+                Matrix<RealType, Dynamic, 1> diff = real_dofs - vec_cell_dof;
+                vector_l2_error += diff.dot(mass*diff);
+
+            }
+
+            elastic_material_data<RealType> material = e_chunk.second;
+            RealType mu = material.rho()*material.vs()*material.vs();
+            RealType lambda = material.rho()*material.vp()*material.vp() - 2.0*mu;
+            
+            
+            // tensor evaluation
+            {
+                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
+                
+                auto ten_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(e_cell_ind*e_cell_dof, 0, n_ten_cbs, 1);
+
+                // Error integrals
+                for (auto & point_pair : int_rule) {
+
+                    RealType omega = point_pair.weight();
+                    
+                    auto t_ten_phi = ten_basis.eval_functions( point_pair.point() );
+                    assert(t_ten_phi.size() == ten_basis.size());
+                    auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
+                    
+                    auto flux_diff = (sigma_fun(point_pair.point()) - sigma_h).eval();
+                    sigma_l2_error += omega * flux_diff.squaredNorm();
+
+                }
+                
+            }
+            
+            e_cell_ind++;
+        }
+        
+        size_t n_elastic_cell_dof = assembler.get_e_material_data().size() * e_cell_dof;
+        size_t a_cell_ind = 0;
+        for (auto& a_chunk : assembler.get_a_material_data()) {
+            
+            auto& cell = storage->surfaces[a_chunk.first];
+            
+            RealType h_l = diameter(msh, cell);
+            if (h_l < h) {
+                h = h_l;
+            }
+
+            Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(a_cell_ind*a_cell_dof+n_elastic_cell_dof+n_vel_scal_cbs, 0, n_scal_cbs, 1);
+
+            // scalar evaluation
+            {
+                auto cell_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, Dynamic> mass = make_mass_matrix(msh, cell, cell_basis, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> rhs = make_rhs(msh, cell, cell_basis, scal_fun);
+                Matrix<RealType, Dynamic, 1> real_dofs = mass.llt().solve(rhs);
+                Matrix<RealType, Dynamic, 1> diff = real_dofs - scalar_cell_dof;
+                scalar_l2_error += diff.dot(mass*diff);
+
+            }
+
+            // flux evaluation
+            {
+                auto int_rule = integrate(msh, cell, 2*(hho_di.cell_degree()+1));
+                auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+                Matrix<RealType, Dynamic, 1> flux_cell_dof = x_dof.block(a_cell_ind*a_cell_dof+n_elastic_cell_dof, 0, n_vel_scal_cbs, 1);
+                
+                // Error integrals
+                for (auto & point_pair : int_rule) {
+
+                    RealType omega = point_pair.weight();
+                    auto t_dphi = cell_basis.eval_gradients( point_pair.point() );
+                    
+                    Matrix<RealType, 1, 2> grad_uh = Matrix<RealType, 1, 2>::Zero();
+                    for (size_t i = 1; i < t_dphi.rows(); i++){
+                      grad_uh = grad_uh + flux_cell_dof(i-1)*t_dphi.block(i, 0, 1, 2);
+                    }
+
+                    Matrix<RealType, 1, 2> grad_u_exact = Matrix<RealType, 1, 2>::Zero();
+                    grad_u_exact(0,0) =  flux_fun(point_pair.point())[0];
+                    grad_u_exact(0,1) =  flux_fun(point_pair.point())[1];
+                    flux_l2_error += omega * (grad_u_exact - grad_uh).dot(grad_u_exact - grad_uh);
+
+                }
+            }
+            a_cell_ind++;
+        }
+        
+        tc.toc();
+        std::cout << bold << cyan << "Error completed: " << tc << " seconds" << reset << std::endl;
+        error_file << "Characteristic h size = " << h << std::endl;
+        error_file << "Elastic region : " << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(vector_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(sigma_l2_error) << std::endl;
+        error_file << "Acoustic region : " << std::endl;
+        error_file << "L2-norm error = " << std::setprecision(16) << std::sqrt(scalar_l2_error) << std::endl;
+        error_file << "H1-norm error = " << std::setprecision(16) << std::sqrt(flux_l2_error) << std::endl;
+        error_file << std::endl;
+        error_file.flush();
+    }
     
     /// Find the cells associated to the requested point
     static std::set<size_t> find_cells(typename Mesh::point_type & pt, Mesh & msh, bool verbose_Q = false){

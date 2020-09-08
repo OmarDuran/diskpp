@@ -66,7 +66,7 @@ public:
     SparseMatrix<T>         COUPLING;
 
     elastoacoustic_four_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const e_boundary_type& e_bnd, const a_boundary_type& a_bnd, std::map<size_t,elastic_material_data<T>> & e_material, std::map<size_t,acoustic_material_data<T>> & a_material)
-        : m_hho_di(hho_di), m_e_bnd(e_bnd), m_a_bnd(a_bnd), m_e_material(e_material), m_a_material(a_material), m_hho_stabilization_Q(true)
+        : m_hho_di(hho_di), m_e_bnd(e_bnd), m_a_bnd(a_bnd), m_e_material(e_material), m_a_material(a_material), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto storage = msh.backend_storage();
@@ -633,17 +633,19 @@ public:
             for (auto& cell_ind : m_e_elements_with_bc_eges)
             {
                 auto& cell = storage->surfaces[cell_ind];
+                size_t e_cell_ind = m_e_cell_index[cell_ind];
                 elastic_material_data<T> e_mat = m_e_material.find(cell_ind)->second;
                 Matrix<T, Dynamic, Dynamic> mixed_operator_loc = e_mixed_operator(e_mat,msh,cell);
-                scatter_e_bc_data(cell_ind, msh, cell, mixed_operator_loc);
+                scatter_e_bc_data(e_cell_ind, msh, cell, mixed_operator_loc);
             }
         
             for (auto& cell_ind : m_a_elements_with_bc_eges)
             {
                 auto& cell = storage->surfaces[cell_ind];
+                size_t a_cell_ind = m_a_cell_index[cell_ind];
                 acoustic_material_data<T> a_mat = m_a_material.find(cell_ind)->second;
                 Matrix<T, Dynamic, Dynamic> mixed_operator_loc = a_mixed_operator(a_mat, msh, cell);
-                scatter_a_bc_data(cell_ind, msh, cell, mixed_operator_loc);
+                scatter_a_bc_data(a_cell_ind, msh, cell, mixed_operator_loc);
             }
         
         #endif
