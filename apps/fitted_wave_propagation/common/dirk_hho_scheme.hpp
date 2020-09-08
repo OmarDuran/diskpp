@@ -23,7 +23,7 @@ class dirk_hho_scheme
     SparseMatrix<T> m_Kg;
     Matrix<T, Dynamic, 1> m_Fg;
     linear_solver<T>  m_analysis;
-    std::pair<size_t,size_t> m_cell_basis_data;
+    std::vector<std::pair<size_t,size_t>> m_cell_basis_data;
     size_t m_n_f_dof;
     bool m_global_sc_Q;
     bool m_iteraive_solver_Q;
@@ -50,6 +50,14 @@ class dirk_hho_scheme
     }
     
     void set_static_condensation_data(std::pair<size_t,size_t> cell_basis_data, size_t n_f_dof){
+        std::vector<std::pair<size_t,size_t>> vec_cell_basis_data(1);
+        vec_cell_basis_data[0] = cell_basis_data;
+        m_cell_basis_data = vec_cell_basis_data;
+        m_n_f_dof = n_f_dof;
+        m_global_sc_Q = true;
+    }
+    
+    void set_static_condensation_data(std::vector<std::pair<size_t,size_t>> cell_basis_data, size_t n_f_dof){
         m_cell_basis_data = cell_basis_data;
         m_n_f_dof = n_f_dof;
         m_global_sc_Q = true;

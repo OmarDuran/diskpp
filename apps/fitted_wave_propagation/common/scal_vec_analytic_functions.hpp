@@ -518,54 +518,55 @@ class scal_vec_analytic_functions
     }
     
     
-    std::function<std::vector<double>(const typename disk::generic_mesh<double, 2>::point_type& )> Evaluate_s_q(double & t){
+    std::function<static_vector<double, 2>(const typename disk::generic_mesh<double, 2>::point_type& )> Evaluate_s_q(double & t){
         
         switch (m_function_type) {
             case EFunctionNonPolynomial:
                 {
-                    return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> std::vector<double> {
-                            double x,y;
+                    return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
+                            double x,y,qx,qy;
                             x = pt.x();
                             y = pt.y();
-                            std::vector<double> flux(2);
-                            flux[0] = M_PI*x*x*std::cos(M_PI*x)*std::sin(std::sqrt(2.0)*M_PI*t)*std::sin(M_PI*y) + 2*x*std::sin(std::sqrt(2.0)*M_PI*t)*std::sin(M_PI*x)*std::sin(M_PI*y);
-                            flux[1] = M_PI*x*x*std::cos(M_PI*y)*std::sin(std::sqrt(2.0)*M_PI*t)*std::sin(M_PI*x);
-                            return flux;
+                            qx = M_PI*x*x*std::cos(M_PI*x)*std::sin(std::sqrt(2.0)*M_PI*t)*std::sin(M_PI*y) + 2*x*std::sin(std::sqrt(2.0)*M_PI*t)*std::sin(M_PI*x)*std::sin(M_PI*y);
+                            qy = M_PI*x*x*std::cos(M_PI*y)*std::sin(std::sqrt(2.0)*M_PI*t)*std::sin(M_PI*x);
+                        static_vector<double, 2> q{qx,qy};
+                        return q;
                         };
                 }
                 break;
             case EFunctionQuadraticInTime:
                 {
-                    return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> std::vector<double> {
-                            double x,y;
+                    return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
+                            double x,y,qx,qy;
                             x = pt.x();
                             y = pt.y();
                             std::vector<double> flux(2);
-                            flux[0] = M_PI*t*t*x*std::cos(M_PI*x)*std::sin(M_PI*y) + t*t*std::sin(M_PI*x)*std::sin(M_PI*y);
-                            flux[1] = M_PI*t*t*x*std::cos(M_PI*y)*std::sin(M_PI*x);
-                        
-                            return flux;
+                            qx = M_PI*t*t*x*std::cos(M_PI*x)*std::sin(M_PI*y) + t*t*std::sin(M_PI*x)*std::sin(M_PI*y);
+                            qy = M_PI*t*t*x*std::cos(M_PI*y)*std::sin(M_PI*x);
+                            static_vector<double, 2> q{qx,qy};
+                            return q;
                         };
                 }
                 break;
             case EFunctionQuadraticInSpace:
                 {
-                    return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> std::vector<double> {
-                            double x,y;
+                    return [&t](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2> {
+                            double x,y,qx,qy;
                             x = pt.x();
                             y = pt.y();
                             std::vector<double> flux(2);
-                            flux[0] = 2*(1 - x)*x*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t) - x*x*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t);
-                            flux[1] = (1 - x)*x*x*(1 - y)*std::sin(std::sqrt(2.0)*M_PI*t) - (1 - x)*x*x*y*std::sin(std::sqrt(2.0)*M_PI*t);
-                            return flux;
+                            qx = 2*(1 - x)*x*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t) - x*x*(1 - y)*y*std::sin(std::sqrt(2.0)*M_PI*t);
+                            qy = (1 - x)*x*x*(1 - y)*std::sin(std::sqrt(2.0)*M_PI*t) - (1 - x)*x*x*y*std::sin(std::sqrt(2.0)*M_PI*t);
+                            static_vector<double, 2> q{qx,qy};
+                            return q;
                         };
                 }
                 break;
             default:
             {
                 std::cout << " Function not implemented " << std::endl;
-                return [](const typename disk::generic_mesh<double, 2>::point_type& pt) -> std::vector<double> {
-                        std::vector<double> f;
+                return [](const typename disk::generic_mesh<double, 2>::point_type& pt) -> static_vector<double, 2>{
+                    static_vector<double, 2> f{0,0};
                         return f;
                     };
             }

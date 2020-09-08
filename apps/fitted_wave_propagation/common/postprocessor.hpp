@@ -16,6 +16,7 @@
 #include "../common/elastodynamic_two_fields_assembler.hpp"
 #include "../common/elastodynamic_three_fields_assembler.hpp"
 #include "../common/elastoacoustic_two_fields_assembler.hpp"
+#include "../common/elastoacoustic_four_fields_assembler.hpp"
 
 #ifdef HAVE_INTEL_TBB
 #include <tbb/parallel_for.h>
@@ -1592,8 +1593,7 @@ public:
         std::cout << bold << cyan << "Properties file rendered in : " << tc << " seconds" << reset << std::endl;
     }
     
-    static void write_silo_two_fields_elastoacoustic(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof,
-    std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<double(const typename Mesh::point_type& )> scal_fun, std::map<size_t,elastic_material_data<double>> & e_material, std::map<size_t,acoustic_material_data<double>> & a_material, bool cell_centered_Q){
+    static void write_silo_two_fields_elastoacoustic(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::map<size_t,elastic_material_data<double>> & e_material, std::map<size_t,acoustic_material_data<double>> & a_material, bool cell_centered_Q){
 
         timecounter tc;
         tc.tic();
@@ -1602,30 +1602,22 @@ public:
         auto num_cells = msh.cells_size();
         auto num_points = msh.points_size();
         using RealType = double;
-        std::vector<RealType> exact_ux, exact_uy, approx_ux, approx_uy;
-        std::vector<RealType> exact_u, approx_u;
+        std::vector<RealType> approx_ux, approx_uy;
+        std::vector<RealType> approx_u;
         size_t e_cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
         size_t a_cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
         auto storage = msh.backend_storage();
         
         if (cell_centered_Q) {
-            exact_ux.resize( num_cells );
-            exact_uy.resize( num_cells );
-            exact_u.resize( num_cells );
             approx_ux.resize( num_cells );
             approx_uy.resize( num_cells );
             approx_u.resize( num_cells );
-              
+            
             size_t e_cell_ind = 0;
             for (auto& e_chunk : e_material) {
                 
                 auto& cell = storage->surfaces[e_chunk.first];
                 auto bar = barycenter(msh, cell);
-                
-                exact_ux.at(e_chunk.first) = ( vec_fun(bar)(0,0) );
-                exact_uy.at(e_chunk.first) = ( vec_fun(bar)(1,0) );
-                
-                exact_u.at(e_chunk.first) = ( 0.0 / 0.0 );
                 approx_u.at(e_chunk.first) =( 0.0/ 0.0);
                 
                 // vector evaluation
@@ -1647,10 +1639,6 @@ public:
                 
                 auto& cell = storage->surfaces[a_chunk.first];
                 auto bar = barycenter(msh, cell);
-                exact_u.at(a_chunk.first) = ( scal_fun(bar));
-                
-                exact_ux.at(a_chunk.first) = ( 0.0/0.0 );
-                exact_uy.at(a_chunk.first) = ( 0.0/0.0 );
                 approx_ux.at(a_chunk.first) = ( 0.0/0.0 );
                 approx_uy.at(a_chunk.first) = ( 0.0/0.0 );
                 
@@ -1667,81 +1655,76 @@ public:
 
 
         }else{
+            
+            // Filling with nan (It is weird but useful in Paraview)
+            approx_ux.resize( num_points , 0.0/ 0.0);
+            approx_uy.resize( num_points , 0.0/ 0.0);
+            approx_u.resize( num_points , 0.0/ 0.0);
+            
+            std::map<size_t,size_t> e_cell_index;
+            std::map<size_t,size_t> a_cell_index;
+            
+            // elastic data
+            size_t e_cell_ind = 0;
+            for (auto chunk : e_material) {
+                e_cell_index.insert(std::make_pair(chunk.first,e_cell_ind));
+                e_cell_ind++;
+            }
 
-            exact_ux.reserve( num_points );
-            exact_uy.reserve( num_points );
-            exact_u.reserve( num_points );
-            approx_ux.reserve( num_points );
-            approx_uy.reserve( num_points );
-            approx_u.reserve( num_points );
-                        
-            // scan for selected cells, common cells are discardable
-            std::map<size_t, size_t> point_to_cell;
-            size_t cell_ind = 0;
-            for (auto& cell : msh)
-            {
+            // acoustic data
+            size_t a_cell_ind = 0;
+            for (auto chunk : a_material) {
+                a_cell_index.insert(std::make_pair(chunk.first,a_cell_ind));
+                a_cell_ind++;
+            }
+            
+            for (auto& e_chunk : e_material) {
+                
+                auto& cell = storage->surfaces[e_chunk.first];
+                size_t e_cell_ind = e_cell_index[e_chunk.first];
+                auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                 Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(e_cell_ind*e_cell_dof, 0, e_cell_dof, 1);
+                
                 auto points = cell.point_ids();
                 size_t n_p = points.size();
                 for (size_t l = 0; l < n_p; l++)
                 {
                     auto pt_id = points[l];
-                    point_to_cell[pt_id] = cell_ind;
-                }
-                cell_ind++;
-            }
-
-            std::map<size_t,elastic_material_data<double>>::iterator it;
-            size_t n_elastic_cell_dof = e_material.size() * e_cell_dof;
-            size_t e_cell_ind = 0;
-            size_t a_cell_ind = 0;
-            for (auto& pt_id : point_to_cell)
-            {
-                auto bar = *std::next(msh.points_begin(), pt_id.first);
-                cell_ind = pt_id.second;
-                auto& cell = storage->surfaces[cell_ind];
-                
-                it = e_material.find(cell_ind);
-                if (it != e_material.end())
-                {
-                    exact_ux.push_back( vec_fun(bar)(0,0) );
-                    exact_uy.push_back( vec_fun(bar)(1,0) );
-                    
-                    exact_u.push_back( 0.0 / 0.0 );
-                    approx_u.push_back( 0.0/ 0.0);
-                    
-                    e_cell_ind = std::distance(std::begin(e_material), e_material.find(cell_ind));
+                    auto pt_coord = *std::next(msh.points_begin(), pt_id);
                     // vector evaluation
                     {
-                        auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
-                        Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(e_cell_ind*e_cell_dof, 0, e_cell_dof, 1);
-                        auto t_phi = cell_basis.eval_functions( bar );
+                        auto t_phi = cell_basis.eval_functions( pt_coord );
                         assert(t_phi.rows() == cell_basis.size());
                         auto uh = disk::eval(vec_x_cell_dof, t_phi);
-                        approx_ux.push_back(uh(0,0));
-                        approx_uy.push_back(uh(1,0));
-                    }
-                }else{
-                    
-                    exact_u.push_back( scal_fun(bar));
-                    
-                    exact_ux.push_back( 0.0/0.0 );
-                    exact_uy.push_back( 0.0/0.0 );
-                    approx_ux.push_back( 0.0/0.0 );
-                    approx_uy.push_back( 0.0/0.0 );
-                    
-                    a_cell_ind = std::distance(std::begin(a_material), a_material.find(cell_ind));
-                    // scalar evaluation
-                    {
-                        auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
-                        Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(a_cell_ind*a_cell_dof + n_elastic_cell_dof, 0, a_cell_dof, 1);
-                        auto t_phi = cell_basis.eval_functions( bar );
-                        RealType uh = scalar_cell_dof.dot( t_phi );
-                        approx_u.push_back(uh);
+                        approx_ux.at(pt_id) = uh(0,0);
+                        approx_uy.at(pt_id) = uh(1,0);
                     }
                 }
-
             }
-
+            
+            size_t n_elastic_cell_dof = e_material.size() * e_cell_dof;
+            for (auto& a_chunk : a_material) {
+                
+                auto& cell = storage->surfaces[a_chunk.first];
+                size_t a_cell_ind = a_cell_index[a_chunk.first];
+                auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(a_cell_ind*a_cell_dof + n_elastic_cell_dof, 0, a_cell_dof, 1);
+                
+                auto points = cell.point_ids();
+                size_t n_p = points.size();
+                for (size_t l = 0; l < n_p; l++)
+                {
+                    auto pt_id = points[l];
+                    auto pt_coord = *std::next(msh.points_begin(), pt_id);
+                    // scalar evaluation
+                    {
+                        auto t_phi = cell_basis.eval_functions( pt_coord );
+                        RealType uh = scalar_cell_dof.dot( t_phi );
+                        approx_u.at(pt_id) = uh;
+                    }
+                }
+            }
+            
         }
 
         disk::silo_database silo;
@@ -1749,32 +1732,186 @@ public:
         silo.create(silo_file_name.c_str());
         silo.add_mesh(msh, "mesh");
         if (cell_centered_Q) {
-            disk::silo_zonal_variable<double> vx_silo("vx", exact_ux);
-            disk::silo_zonal_variable<double> vy_silo("vy", exact_uy);
-            disk::silo_zonal_variable<double> v_silo("v", exact_u);
             disk::silo_zonal_variable<double> vhx_silo("vhx", approx_ux);
             disk::silo_zonal_variable<double> vhy_silo("vhy", approx_uy);
             disk::silo_zonal_variable<double> vh_silo("vh", approx_u);
-            silo.add_variable("mesh", vx_silo);
-            silo.add_variable("mesh", vy_silo);
-            silo.add_variable("mesh", v_silo);
             silo.add_variable("mesh", vhx_silo);
             silo.add_variable("mesh", vhy_silo);
             silo.add_variable("mesh", vh_silo);
         }else{
-            disk::silo_nodal_variable<double> vx_silo("vx", exact_ux);
-            disk::silo_nodal_variable<double> vy_silo("vy", exact_uy);
-            disk::silo_nodal_variable<double> v_silo("v", exact_u);
             disk::silo_nodal_variable<double> vhx_silo("vhx", approx_ux);
             disk::silo_nodal_variable<double> vhy_silo("vhy", approx_uy);
             disk::silo_nodal_variable<double> vh_silo("vh", approx_u);
-            silo.add_variable("mesh", vx_silo);
-            silo.add_variable("mesh", vy_silo);
-            silo.add_variable("mesh", v_silo);
             silo.add_variable("mesh", vhx_silo);
             silo.add_variable("mesh", vhy_silo);
             silo.add_variable("mesh", vh_silo);
+        }
+
+        silo.close();
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
+    
+    static void write_silo_four_fields_elastoacoustic(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::map<size_t,elastic_material_data<double>> & e_material, std::map<size_t,acoustic_material_data<double>> & a_material, bool cell_centered_Q){
+
+        timecounter tc;
+        tc.tic();
+        
+        auto dim = Mesh::dimension;
+        auto num_cells = msh.cells_size();
+        auto num_points = msh.points_size();
+        using RealType = double;
+        std::vector<RealType> approx_ux, approx_uy;
+        std::vector<RealType> approx_u;
+        
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t e_cell_dof = n_ten_cbs + n_vec_cbs;
+
+        size_t n_vel_scal_cbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_scal_cbs = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
+        size_t a_cell_dof = n_vel_scal_cbs + n_scal_cbs;
+
+        auto storage = msh.backend_storage();
+        
+        if (cell_centered_Q) {
+            approx_ux.resize( num_cells );
+            approx_uy.resize( num_cells );
+            approx_u.resize( num_cells );
             
+            size_t e_cell_ind = 0;
+            for (auto& e_chunk : e_material) {
+                
+                auto& cell = storage->surfaces[e_chunk.first];
+                auto bar = barycenter(msh, cell);
+                approx_u.at(e_chunk.first) =( 0.0/ 0.0);
+                
+                // vector evaluation
+                {
+                    auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                    Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(e_cell_ind*e_cell_dof+n_ten_cbs, 0, n_vec_cbs, 1);
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    assert(t_phi.rows() == cell_basis.size());
+                    auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                    approx_ux.at(e_chunk.first) = (uh(0,0));
+                    approx_uy.at(e_chunk.first) = (uh(1,0));
+                }
+                e_cell_ind++;
+            }
+            
+            size_t n_elastic_cell_dof = e_material.size() * e_cell_dof;
+            size_t a_cell_ind = 0;
+            for (auto& a_chunk : a_material) {
+                
+                auto& cell = storage->surfaces[a_chunk.first];
+                auto bar = barycenter(msh, cell);
+                approx_ux.at(a_chunk.first) = ( 0.0/0.0 );
+                approx_uy.at(a_chunk.first) = ( 0.0/0.0 );
+                
+                // scalar evaluation
+                {
+                    auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
+                    Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(a_cell_ind*a_cell_dof + n_vel_scal_cbs + n_elastic_cell_dof, 0, n_scal_cbs, 1);
+                    auto t_phi = cell_basis.eval_functions( bar );
+                    RealType uh = scalar_cell_dof.dot( t_phi );
+                    approx_u.at(a_chunk.first) = (uh);
+                }
+                a_cell_ind++;
+            }
+
+
+        }else{
+            
+            // Filling with nan (It is weird but useful in Paraview)
+            approx_ux.resize( num_points , 0.0/ 0.0);
+            approx_uy.resize( num_points , 0.0/ 0.0);
+            approx_u.resize( num_points , 0.0/ 0.0);
+            
+            std::map<size_t,size_t> e_cell_index;
+            std::map<size_t,size_t> a_cell_index;
+            
+            // elastic data
+            size_t e_cell_ind = 0;
+            for (auto chunk : e_material) {
+                e_cell_index.insert(std::make_pair(chunk.first,e_cell_ind));
+                e_cell_ind++;
+            }
+
+            // acoustic data
+            size_t a_cell_ind = 0;
+            for (auto chunk : a_material) {
+                a_cell_index.insert(std::make_pair(chunk.first,a_cell_ind));
+                a_cell_ind++;
+            }
+            
+            for (auto& e_chunk : e_material) {
+                
+                auto& cell = storage->surfaces[e_chunk.first];
+                size_t e_cell_ind = e_cell_index[e_chunk.first];
+                auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                 Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(e_cell_ind*e_cell_dof+n_ten_cbs, 0, n_vec_cbs, 1);
+                
+                auto points = cell.point_ids();
+                size_t n_p = points.size();
+                for (size_t l = 0; l < n_p; l++)
+                {
+                    auto pt_id = points[l];
+                    auto pt_coord = *std::next(msh.points_begin(), pt_id);
+                    // vector evaluation
+                    {
+                        auto t_phi = cell_basis.eval_functions( pt_coord );
+                        assert(t_phi.rows() == cell_basis.size());
+                        auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                        approx_ux.at(pt_id) = uh(0,0);
+                        approx_uy.at(pt_id) = uh(1,0);
+                    }
+                }
+            }
+            
+            size_t n_elastic_cell_dof = e_material.size() * e_cell_dof;
+            for (auto& a_chunk : a_material) {
+                
+                auto& cell = storage->surfaces[a_chunk.first];
+                size_t a_cell_ind = a_cell_index[a_chunk.first];
+                auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> scalar_cell_dof = x_dof.block(a_cell_ind*a_cell_dof + n_vel_scal_cbs + n_elastic_cell_dof, 0, n_scal_cbs, 1);
+                
+                auto points = cell.point_ids();
+                size_t n_p = points.size();
+                for (size_t l = 0; l < n_p; l++)
+                {
+                    auto pt_id = points[l];
+                    auto pt_coord = *std::next(msh.points_begin(), pt_id);
+                    // scalar evaluation
+                    {
+                        auto t_phi = cell_basis.eval_functions( pt_coord );
+                        RealType uh = scalar_cell_dof.dot( t_phi );
+                        approx_u.at(pt_id) = uh;
+                    }
+                }
+            }
+            
+        }
+
+        disk::silo_database silo;
+        silo_file_name += std::to_string(it) + ".silo";
+        silo.create(silo_file_name.c_str());
+        silo.add_mesh(msh, "mesh");
+        if (cell_centered_Q) {
+            disk::silo_zonal_variable<double> vhx_silo("vhx", approx_ux);
+            disk::silo_zonal_variable<double> vhy_silo("vhy", approx_uy);
+            disk::silo_zonal_variable<double> vh_silo("vh", approx_u);
+            silo.add_variable("mesh", vhx_silo);
+            silo.add_variable("mesh", vhy_silo);
+            silo.add_variable("mesh", vh_silo);
+        }else{
+            disk::silo_nodal_variable<double> vhx_silo("vhx", approx_ux);
+            disk::silo_nodal_variable<double> vhy_silo("vhy", approx_uy);
+            disk::silo_nodal_variable<double> vh_silo("vh", approx_u);
+            silo.add_variable("mesh", vhx_silo);
+            silo.add_variable("mesh", vhy_silo);
+            silo.add_variable("mesh", vh_silo);
         }
 
         silo.close();
@@ -1784,7 +1921,7 @@ public:
     }
     
     /// Compute L2 and H1 errors for two fields elastoacoustic approximation
-    static void compute_errors_two_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<std::vector<double>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
+    static void compute_errors_two_fields_elastoacoustic(Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_two_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2, 2>(const typename Mesh::point_type& )> sigma_fun,std::function<double(const typename Mesh::point_type& )> scal_fun, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> flux_fun, std::ostream & error_file = std::cout){
 
         timecounter tc;
         tc.tic();
@@ -1907,9 +2044,7 @@ public:
                         grad_uh = grad_uh + recdofs(i-1)*t_dphi.block(i, 0, 1, 2);
                     }
 
-                    Matrix<RealType, 1, 2> grad_u_exact = Matrix<RealType, 1, 2>::Zero();
-                    grad_u_exact(0,0) =  flux_fun(point_pair.point())[0];
-                    grad_u_exact(0,1) =  flux_fun(point_pair.point())[1];
+                    Matrix<RealType, 1, 2> grad_u_exact = flux_fun(point_pair.point());
                     flux_l2_error += omega * (grad_u_exact - grad_uh).dot(grad_u_exact - grad_uh);
 
                 }

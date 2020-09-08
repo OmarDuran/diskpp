@@ -344,7 +344,7 @@ public:
         T mu = rho * vs * vs;
         T lambda = rho * vp * vp - 2*mu;
         
-        auto reconstruction_operator   = strain_tensor_reconstruction(msh, cell, cell_ind);
+        auto reconstruction_operator   = strain_tensor_reconstruction(msh, cell);
         Matrix<T, Dynamic, Dynamic> R_operator = reconstruction_operator.second;
         auto n_rows = R_operator.rows();
         auto n_cols = R_operator.cols();
@@ -550,8 +550,6 @@ public:
         {
             auto phi = ten_b.eval_functions(qp.point());
             static_matrix<T, 2,2> sigma = ten_fun(qp.point());
-//            T trace = sigma.trace();
-//            static_matrix<T, 2,2> sigma_s = sigma - (trace/(2.0+2.0))*static_matrix<T, 2, 2>::Identity();
             for (size_t i = 0; i < ten_bs; i++){
                 auto qp_phi_i = disk::priv::inner_product(qp.weight(), phi[i]);
                 rhs(i,0) += disk::priv::inner_product(qp_phi_i,sigma);
@@ -658,7 +656,7 @@ public:
                  
     std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
                  Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>  >
-    strain_tensor_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell, size_t & cell_ind)
+    strain_tensor_reconstruction(const Mesh& msh, const typename Mesh::cell_type& cell)
     {
 
         using T        = typename Mesh::coordinate_type;
