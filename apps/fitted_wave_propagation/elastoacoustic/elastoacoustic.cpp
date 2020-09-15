@@ -56,8 +56,8 @@ void IHHOSecondOrder(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-      HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
-//    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
+//      HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
+    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
 }
