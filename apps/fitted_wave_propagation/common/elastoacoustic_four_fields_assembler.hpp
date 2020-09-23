@@ -1400,7 +1400,7 @@ public:
     {
         auto e_cell_ind = m_e_cell_index.find(cell_ind)->second;
         auto num_faces = howmany_faces(msh, cl);
-        size_t n_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t n_cbs = get_e_cell_basis_data();
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         
         Matrix<T, Dynamic, 1> x_el(n_cbs + num_faces * n_fbs );
@@ -1438,7 +1438,7 @@ public:
     {
         auto a_cell_ind = m_a_cell_index.find(cell_ind)->second;
         auto num_faces = howmany_faces(msh, cl);
-        size_t n_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_cbs = get_a_cell_basis_data();
         size_t n_fbs = disk::scalar_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1);
         
         Matrix<T, Dynamic, 1> x_local(n_cbs + num_faces * n_fbs );

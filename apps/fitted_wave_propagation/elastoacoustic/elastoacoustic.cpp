@@ -56,8 +56,8 @@ void IHHOSecondOrder(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-//      HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
-    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
+      HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
+//    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
 //    IHHOFirstOrder(argc, argv);
 //    IHHOSecondOrder(argc, argv);
 }
@@ -870,6 +870,21 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
     
     std::ofstream simulation_log("elasto_acoustic_inhomogeneous_four_fields.txt");
     
+    std::ofstream sensor_1_log("s1_elasto_acoustic_four_fields_h.csv");
+    std::ofstream sensor_2_log("s2_elasto_acoustic_four_fields_h.csv");
+    std::ofstream sensor_3_log("s3_elasto_acoustic_four_fields_h.csv");
+    bool e_side_Q = false;
+    typename mesh_type::point_type s1_pt(-1.0/3.0, +1.0/3.0);
+    typename mesh_type::point_type s2_pt( 0.0, +1.0/3.0);
+    typename mesh_type::point_type s3_pt(+1.0/3.0, +1.0/3.0);
+    std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
+    std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
+
+    postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, sensor_1_log);
+    postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, s2_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, sensor_2_log);
+    postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(0, s3_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, sensor_3_log);
+    
 //    if (sim_data.m_report_energy_Q) {
 //        postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
 //    }
@@ -956,6 +971,10 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
             std::string silo_file_name = "elasto_acoustic_inhomogeneous_four_fields_";
             postprocessor<mesh_type>::write_silo_four_fields_elastoacoustic(silo_file_name, it, msh, hho_di, x_dof, e_material, a_material, false);
         }
+        
+        postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, s1_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, sensor_1_log);
+        postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, s2_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, sensor_2_log);
+        postprocessor<mesh_type>::record_velocity_data_elasto_acoustic_four_fields(it, s3_pt_cell, msh, hho_di, assembler, x_dof, e_side_Q, sensor_3_log);
         
 //        if (sim_data.m_report_energy_Q) {
 //            postprocessor<mesh_type>::compute_elastic_energy_three_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
@@ -1168,13 +1187,13 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
 
     std::ofstream simulation_log("elasto_acoustic_inhomogeneous_two_fields.txt");
     
-    std::ofstream sensor_1_log("s1_elasto_acoustic_one_field_h.csv");
-    std::ofstream sensor_2_log("s2_elasto_acoustic_one_field_h.csv");
-    std::ofstream sensor_3_log("s3_elasto_acoustic_one_field_h.csv");
-    bool e_side_Q = true;
-    typename mesh_type::point_type s1_pt(-1.0/3.0, -1.0/3.0);
-    typename mesh_type::point_type s2_pt( 0.0, -1.0/3.0);
-    typename mesh_type::point_type s3_pt(+1.0/3.0, -1.0/3.0);
+    std::ofstream sensor_1_log("s1_elasto_acoustic_two_fields_h.csv");
+    std::ofstream sensor_2_log("s2_elasto_acoustic_two_fields_h.csv");
+    std::ofstream sensor_3_log("s3_elasto_acoustic_two_fields_h.csv");
+    bool e_side_Q = false;
+    typename mesh_type::point_type s1_pt(-1.0/3.0, +1.0/3.0);
+    typename mesh_type::point_type s2_pt( 0.0, +1.0/3.0);
+    typename mesh_type::point_type s3_pt(+1.0/3.0, +1.0/3.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);

@@ -2613,7 +2613,6 @@ public:
 
         using RealType = double;
         auto dim = Mesh::dimension;
-        size_t cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
 
         Matrix<double, Dynamic, 1> vh = Matrix<double, Dynamic, 1>::Zero(2, 1);
 
@@ -2636,7 +2635,8 @@ public:
                 size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
                 auto& cell = msh.backend_storage()->surfaces[cell_ind];
                 auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
-                Matrix<RealType, Dynamic, 1> vec_x_cell_dof = v_dof.block(cell_ind*cell_dof, 0, cell_dof, 1);
+                Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_e_dof_data(cell_ind, msh, cell, v_dof);
+                Matrix<RealType, Dynamic, 1> vec_x_cell_dof = all_dofs.block(0, 0, cell_dof, 1);
                 auto t_phi = cell_basis.eval_functions( pt );
                 assert(t_phi.rows() == cell_basis.size());
                 vh = disk::eval(vec_x_cell_dof, t_phi);
@@ -2644,6 +2644,7 @@ public:
             else
             {// reconstructed velocity evaluation
 
+                size_t cell_dof = disk::scalar_basis_size(hho_di.cell_degree(), dim);
                 auto& cell = msh.backend_storage()->surfaces[cell_ind];
                 auto rec_basis = disk::make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
                 auto gr = make_scalar_hho_laplacian(msh, cell, hho_di);
@@ -2659,6 +2660,78 @@ public:
                 acoustic_material_data<RealType> a_mat = assembler.get_a_material_data().find(cell_ind)->second;
                 RealType rho = a_mat.rho();
                 vh = (1.0/rho)*(grad_uh);
+            }
+            
+        }
+        tc.toc();
+        std::cout << bold << cyan << "Value recorded: " << tc << " seconds" << reset << std::endl;
+        seismogram_file << it << "," << std::setprecision(16) <<  vh(0,0) << "," << std::setprecision(16) <<  vh(1,0) << std::endl;
+        seismogram_file.flush();
+
+    }
+    
+    /// Record velocity data at provided point for elasto acoustic four fields approximation
+    static void record_velocity_data_elasto_acoustic_four_fields(size_t it, std::pair<typename Mesh::point_type,size_t> & pt_cell_index, Mesh & msh, disk::hho_degree_info & hho_di, elastoacoustic_four_fields_assembler<Mesh> & assembler, Matrix<double, Dynamic, 1> & x_dof, bool e_side_Q, std::ostream & seismogram_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
+        size_t e_n_cbs = n_ten_cbs + n_vec_cbs;
+        
+        size_t n_vel_scal_cbs = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_scal_cbs = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
+        size_t a_n_cbs = n_vel_scal_cbs + n_scal_cbs;
+        
+        size_t e_n_cell_dof = assembler.get_e_n_cells_dof();
+        size_t a_n_cell_dof = assembler.get_a_n_cells_dof();
+
+        Matrix<double, Dynamic, 1> vh = Matrix<double, Dynamic, 1>::Zero(2, 1);
+
+        typename Mesh::point_type pt = pt_cell_index.first;
+        
+        if(pt_cell_index.second == -1){
+            std::set<size_t> cell_indexes = find_cells(pt, msh, true);
+            size_t cell_index = pick_cell(pt, msh, cell_indexes, true);
+            assert(cell_index != -1);
+            pt_cell_index.second = cell_index;
+            seismogram_file << "\"Time\"" << "," << "\"vhx\"" << "," << "\"vhy\"" << std::endl;
+        }
+
+        {
+            size_t cell_ind = pt_cell_index.second;
+            
+            
+            if(e_side_Q){// vector evaluation
+                
+                size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_e_dof_data(cell_ind, msh, cell, x_dof);
+                Matrix<RealType, Dynamic, 1> vec_x_cell_dof = all_dofs.block(0 + n_ten_cbs, 0, cell_dof, 1);
+                auto t_phi = cell_basis.eval_functions( pt );
+                assert(t_phi.rows() == cell_basis.size());
+                vh = disk::eval(vec_x_cell_dof, t_phi);
+            }
+            else
+            {// velocity evaluation
+
+                size_t cell_dof = disk::vector_basis_size(hho_di.cell_degree(), dim, dim);
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+                Matrix<RealType, Dynamic, 1> all_dofs = assembler.gather_a_dof_data(cell_ind, msh, cell, x_dof);
+                Matrix<RealType, Dynamic, 1> flux_cell_dof = all_dofs.block(0, 0, cell_dof, 1);
+                auto t_dphi = cell_basis.eval_gradients( pt );
+                
+                Matrix<RealType, 1, 2> flux_uh = Matrix<RealType, 1, 2>::Zero();
+                for (size_t i = 1; i < t_dphi.rows(); i++){
+                  flux_uh = flux_uh + flux_cell_dof(i-1)*t_dphi.block(i, 0, 1, 2);
+                }
+                vh = flux_uh;
             }
             
         }
