@@ -3393,7 +3393,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
     if (sim_data.m_render_silo_files_Q) {
         size_t it = 0;
         std::string silo_file_name = "inhomogeneous_scalar_";
-        postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, v_dof_n, p_fun, false);
+        postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, p_fun, false);
     }
     
     std::ofstream simulation_log("inhomogeneous_acoustic_one_field.txt");
@@ -3401,9 +3401,9 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
     std::ofstream sensor_1_log("s1_acoustic_one_field_h.csv");
     std::ofstream sensor_2_log("s2_acoustic_one_field_h.csv");
     std::ofstream sensor_3_log("s3_acoustic_one_field_h.csv");
-    typename mesh_type::point_type s1_pt(-1.0/3.0, +1.0/3.0);
-    typename mesh_type::point_type s2_pt( 0.0, +1.0/3.0);
-    typename mesh_type::point_type s3_pt(+1.0/3.0, +1.0/3.0);
+    typename mesh_type::point_type s1_pt(-1.0/3.0, -1.0/3.0);
+    typename mesh_type::point_type s2_pt( 0.0, -1.0/3.0);
+    typename mesh_type::point_type s3_pt(+1.0/3.0, -1.0/3.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
@@ -3497,7 +3497,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
             
             if (sim_data.m_render_silo_files_Q) {
                 std::string silo_file_name = "inhomogeneous_scalar_";
-                postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, v_dof_n, p_fun, false);
+                postprocessor<mesh_type>::write_silo_one_field(silo_file_name, it, msh, hho_di, p_dof_n, p_fun, false);
             }
             
             postprocessor<mesh_type>::record_velocity_data_acoustic_one_field(it, s1_pt_cell, msh, hho_di, assembler, p_dof_n, sensor_1_log);
