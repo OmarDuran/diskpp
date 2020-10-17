@@ -1,6 +1,7 @@
 
 set(input_files ${input_files} 
 	${CMAKE_CURRENT_SOURCE_DIR}/input_files/elliptic_convergence_test.lua
+	${CMAKE_CURRENT_SOURCE_DIR}/input_files/acoustics_convergence_test.lua
 )
 
 file(COPY ${input_files} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug/input_files/)

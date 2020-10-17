@@ -10,5 +10,6 @@ config.stab_scal = 1 -- <0-1>:  Stabilization scaling 0 (HHO), 1 (HDG-like): def
 config.func_type = 0 -- <0-1>:  Manufactured function type 0 (non-polynomial), 1 (quadratic): default 0
 config.stat_cond = 1 -- <0-1>:  Static condensation: default 0
 config.iter_solv = 0 -- <0-1>:  Iterative solver : default 0
+config.poly_mesh = 0 -- <0-1>:  Use of polynoal meshes : default 0
 config.silo_output = 0 -- <0-1>:  Write silo files : default 0
 

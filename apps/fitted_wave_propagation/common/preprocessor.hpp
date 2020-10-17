@@ -37,7 +37,11 @@ public:
     
     bool m_iterative_solver_Q;
     
-    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_scaled_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_quadratic_function_Q(false), m_iterative_solver_Q(false){
+    bool m_polygonal_mesh_Q;
+    
+    size_t m_exact_functions;
+    
+    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_scaled_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_quadratic_function_Q(false), m_iterative_solver_Q(false),  m_polygonal_mesh_Q(false), m_exact_functions(0){
         
     }
     
@@ -53,6 +57,8 @@ public:
         m_report_energy_Q       = other.m_report_energy_Q;
         m_quadratic_function_Q  = other.m_quadratic_function_Q;
         m_iterative_solver_Q    = other.m_iterative_solver_Q;
+        m_polygonal_mesh_Q      = other.m_polygonal_mesh_Q;
+        m_exact_functions       = other.m_exact_functions;
     }
 
     const simulation_data & operator=(const simulation_data & other){
@@ -72,6 +78,8 @@ public:
         m_report_energy_Q       = other.m_report_energy_Q;
         m_quadratic_function_Q  = other.m_quadratic_function_Q;
         m_iterative_solver_Q    = other.m_iterative_solver_Q;
+        m_polygonal_mesh_Q      = other.m_polygonal_mesh_Q;
+        m_exact_functions       = other.m_exact_functions;
         
         return *this;
     }
@@ -91,6 +99,9 @@ public:
         std::cout << bold << red << "report energy file ? : " << m_report_energy_Q << reset << std::endl;
         std::cout << bold << red << "quadratic spatial function ? : " << m_quadratic_function_Q << reset << std::endl;
         std::cout << bold << red << "iterative solver ? : " << m_iterative_solver_Q << reset << std::endl;
+        std::cout << bold << red << "polygonal mesh ? : " << m_polygonal_mesh_Q << reset << std::endl;
+        std::cout << bold << red << "Exact functions {0,1,2} : " << m_exact_functions << reset << std::endl;
+        
     }
     
 };
@@ -323,6 +334,7 @@ public:
         sim_data.m_render_silo_files_Q      = lua["config"]["silo_output"].get_or(0);
         sim_data.m_quadratic_function_Q     = lua["config"]["func_type"].get_or(0);
         sim_data.m_iterative_solver_Q       = lua["config"]["iter_solv"].get_or(0);
+        sim_data.m_polygonal_mesh_Q         = lua["config"]["poly_mesh"].get_or(0);
         return sim_data;
     }
     
@@ -339,6 +351,38 @@ public:
                 "config.silo_output = 0 -- <0-1>:  Write silo files : default 0\n";
         exit(1);
         throw std::invalid_argument("Program will stop.");
+    }
+    
+    static simulation_data process_acoustics_lua_file(char** argv)
+    {
+        
+        sol::state lua;
+        lua.open_libraries(sol::lib::math, sol::lib::base);
+        
+        // expected input tables
+        lua["config"] = lua.create_table();
+
+        std::string lua_file = argv[3];
+        auto r = lua.do_file(lua_file);
+        if ( !r.valid() ){
+            PrintConvergeceTestSample();
+        }
+        
+        // populating simulation data
+        simulation_data sim_data;
+        sim_data.m_k_degree                 = lua["config"]["fac_k_deg"].get_or(0);
+        sim_data.m_n_divs                   = lua["config"]["num_l_ref"].get_or(0);
+        sim_data.m_nt_divs                  = lua["config"]["num_t_ref"].get_or(0);
+        sim_data.m_hdg_stabilization_Q      = lua["config"]["stab_type"].get_or(0);
+        sim_data.m_scaled_stabilization_Q   = lua["config"]["stab_scal"].get_or(0);
+        sim_data.m_sc_Q                     = lua["config"]["stat_cond"].get_or(0);
+        sim_data.m_render_silo_files_Q      = lua["config"]["silo_output"].get_or(0);
+        sim_data.m_quadratic_function_Q     = lua["config"]["func_type"].get_or(0);
+        sim_data.m_iterative_solver_Q       = lua["config"]["iter_solv"].get_or(0);
+        sim_data.m_polygonal_mesh_Q         = lua["config"]["poly_mesh"].get_or(0);
+        sim_data.m_exact_functions          = lua["config"]["exac_func"].get_or(0);
+        sim_data.m_report_energy_Q          = lua["config"]["writ_ener"].get_or(0);
+        return sim_data;
     }
     
 };
