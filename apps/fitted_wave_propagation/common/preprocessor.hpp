@@ -10,6 +10,7 @@
 #define preprocessor_hpp
 
 #include <getopt.h>
+#include "contrib/sol2/sol.hpp"
 
 class simulation_data
 {
@@ -34,7 +35,9 @@ public:
     
     bool m_quadratic_function_Q;
     
-    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_scaled_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_quadratic_function_Q(false){
+    bool m_iterative_solver_Q;
+    
+    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_scaled_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_quadratic_function_Q(false), m_iterative_solver_Q(false){
         
     }
     
@@ -49,6 +52,7 @@ public:
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
         m_report_energy_Q       = other.m_report_energy_Q;
         m_quadratic_function_Q  = other.m_quadratic_function_Q;
+        m_iterative_solver_Q    = other.m_iterative_solver_Q;
     }
 
     const simulation_data & operator=(const simulation_data & other){
@@ -67,6 +71,7 @@ public:
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
         m_report_energy_Q       = other.m_report_energy_Q;
         m_quadratic_function_Q  = other.m_quadratic_function_Q;
+        m_iterative_solver_Q    = other.m_iterative_solver_Q;
         
         return *this;
     }
@@ -85,6 +90,7 @@ public:
         std::cout << bold << red << "write silo files ? : " << m_render_silo_files_Q << reset << std::endl;
         std::cout << bold << red << "report energy file ? : " << m_report_energy_Q << reset << std::endl;
         std::cout << bold << red << "quadratic spatial function ? : " << m_quadratic_function_Q << reset << std::endl;
+        std::cout << bold << red << "iterative solver ? : " << m_iterative_solver_Q << reset << std::endl;
     }
     
 };
@@ -207,7 +213,7 @@ public:
                 "-r <0-1>:  Scaled stabilization 0 -> without, 1 -> with: default 0 \n"
                 "-q <0-1>:  Quadratic function type 0 -> non-polynomial, 1 -> quadratic: default 0 \n"
                 "-f <0-1>:  Write silo files : default 0\n"
-                "-c <0-1>:  Static Condensation (implicit schemes): default 0 \n"
+                "-c <0-1>:  Static Condensation: default 0 \n"
                 "-help:     Show help\n";
         exit(1);
     }
@@ -291,6 +297,50 @@ public:
         sim_data.m_quadratic_function_Q = quadratic_func_Q;
         return sim_data;
     }
+    
+    static simulation_data process_convergence_test_lua_file(char** argv)
+    {
+        
+        sol::state lua;
+        lua.open_libraries(sol::lib::math, sol::lib::base);
+        
+        // expected input tables
+        lua["config"] = lua.create_table();
+
+        std::string lua_file = argv[3];
+        auto r = lua.do_file(lua_file);
+        if ( !r.valid() ){
+            PrintConvergeceTestSample();
+        }
+        
+        // populating simulation data
+        simulation_data sim_data;
+        sim_data.m_k_degree                 = lua["config"]["max_k_deg"].get_or(0);
+        sim_data.m_n_divs                   = lua["config"]["max_l_ref"].get_or(0);
+        sim_data.m_hdg_stabilization_Q      = lua["config"]["stab_type"].get_or(0);
+        sim_data.m_scaled_stabilization_Q   = lua["config"]["stab_scal"].get_or(0);
+        sim_data.m_sc_Q                     = lua["config"]["stat_cond"].get_or(0);
+        sim_data.m_render_silo_files_Q      = lua["config"]["silo_output"].get_or(0);
+        sim_data.m_quadratic_function_Q     = lua["config"]["func_type"].get_or(0);
+        sim_data.m_iterative_solver_Q       = lua["config"]["iter_solv"].get_or(0);
+        return sim_data;
+    }
+    
+    static void PrintConvergeceTestSample()
+    {
+        std::cout << "Please specify a lua configuration file like this: " << std::endl;
+        std::cout <<
+                "config.max_k_deg = 0 -- <int>:  Maximum face polynomial degree: default 0\n"
+                "config.max_l_ref = 0 -- <int>:  Maximum number of uniform spatial refinements: default 0\n"
+                "config.stab_type = 0 -- <0-1>:  Stabilization type 0 (HHO), 1 (HDG-like): default 0\n"
+                "config.stab_scal = 0 -- <0-1>:  Stabilization scaling 0 (HHO), 1 (HDG-like): default 0\n"
+                "config.func_type = 0 -- <0-1>:  Manufactured function type 0 (non-polynomial), 1 (quadratic): default 0\n"
+                "config.stat_cond = 0 -- <0-1>:  Static condensation: default 0\n"
+                "config.silo_output = 0 -- <0-1>:  Write silo files : default 0\n";
+        exit(1);
+        throw std::invalid_argument("Program will stop.");
+    }
+    
 };
 
 #endif /* preprocessor_hpp */

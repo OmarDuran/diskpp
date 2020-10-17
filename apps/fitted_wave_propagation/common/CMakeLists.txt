@@ -32,4 +32,3 @@ set(fitted_waves_headers ${fitted_waves_headers}
 	${CMAKE_CURRENT_SOURCE_DIR}/lsrk_butcher_tableau.hpp
 PARENT_SCOPE)
 
-

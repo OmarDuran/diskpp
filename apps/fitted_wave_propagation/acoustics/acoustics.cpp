@@ -50,6 +50,22 @@ using namespace Eigen;
 #include "../common/ssprk_hho_scheme.hpp"
 #include "../common/ssprk_shu_osher_tableau.hpp"
 
+
+/// Enumerate defining available function prototypes
+enum EAcousticPrototype {
+    EOneFieldConvTest = 0,
+    ETwoFieldsConvTest = 1,
+    EOneFieldConvTestPoly = 2,
+    ETwoFieldsConvTestPoly = 3
+};
+
+// ----- common data type ------------------------------
+using RealType = double;
+typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+
+// ----- function prototypes ------------------------------
+
 void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv);
 
 void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv);
@@ -76,64 +92,136 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv);
 
 void IHHOSecondOrder(int argc, char **argv);
 
-void HHOOneFieldConvergenceExamplePolyMesh(int argc, char **argv);
 
-void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv);
 
-void HHOOneFieldConvergenceExample(int argc, char **argv);
+void EllipticOneFieldConvergenceTest(char **argv);
 
-void HHOTwoFieldsConvergenceExample(int argc, char **argv);
+void EllipticTwoFieldsConvergenceTest(char **argv);
+
+void EllipticOneFieldConvergenceTestPoly(char **argv);
+
+void EllipticTwoFieldsConvergenceTestPoly(char **argv);
+
+int prototype_selector(char **argv, EAcousticPrototype prototype);
+
+void print_prototype_description();
 
 int main(int argc, char **argv)
 {
+    EAcousticPrototype prototype;
+    const char* const short_opts = "p:h:";
+    const option long_opts[] = {
+            {"prototype", required_argument, nullptr, 'p'},
+            {"help", no_argument, nullptr, 'h'},
+            {nullptr, no_argument, nullptr, 0}
+    };
     
-    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
-    
-//    HeterogeneousPulseEHHOFirstOrder(argc, argv);
-//    HeterogeneousPulseIHHOFirstOrder(argc, argv);
-//
-//    HeterogeneousPulseIHHOSecondOrder(argc, argv);
-    
-    
-//    HeterogeneousEHHOFirstOrder(argc, argv);
-//
-//    HeterogeneousIHHOFirstOrder(argc, argv);
-//
-//    HeterogeneousIHHOSecondOrder(argc, argv);
+    while (true)
+    {
+        const auto opt = getopt_long(argc, argv, short_opts, long_opts, nullptr);
+        if (-1 == opt)
+            break;
 
+        switch (opt)
+        {
+        case 'p':
+            prototype = EAcousticPrototype(std::stoi(optarg));
+            break;
+        case 'h':
+             print_prototype_description();
+            break;
+        case '?':
+        default:
+            throw std::invalid_argument("Invalid option.");
+            break;
+        }
+    }
     
-//    ESSPRKHHOFirstOrderCFL(argc, argv);
-//    EHHOFirstOrderCFL(argc, argv);
-    
-//    SSPRKHHOFirstOrder(argc, argv);
-//    EHHOFirstOrder(argc, argv);
-//    IHHOFirstOrder(argc, argv);
-//    IHHOSecondOrder(argc, argv);
-    
-//    // Examples using main app objects for solving the laplacian with optimal convergence rates
-//    // Primal HHO
-//    HHOOneFieldConvergenceExample(argc, argv);
-//
-//    // Dual HHO
-//    HHOTwoFieldsConvergenceExample(argc, argv);
-    
-    // Examples using main app objects for solving the laplacian with optimal convergence rates
-    // Primal HHO
-//    HHOOneFieldConvergenceExamplePolyMesh(argc, argv);
+    if (argc != 4)
+    {
+        throw std::invalid_argument("Please specify and option and a lua configuration file.");
+        return 0;
+    }
 
-    // Dual HHO
-//    HHOTwoFieldsConvergenceExamplePolyMesh(argc, argv);
-    
-    return 0;
+    return prototype_selector(argv, prototype);
 }
 
-void HHOOneFieldConvergenceExample(int argc, char **argv){
-
-    using RealType = double;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+void print_prototype_description(){
     
-    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+}
+
+int prototype_selector(char **argv, EAcousticPrototype prototype){
+    
+    switch (prototype) {
+        case EAcousticPrototype::EOneFieldConvTest:
+            {
+                EllipticOneFieldConvergenceTest(argv);
+            }
+            break;
+        case EAcousticPrototype::ETwoFieldsConvTest:
+            {
+                EllipticTwoFieldsConvergenceTest(argv);
+            }
+            break;
+        case EAcousticPrototype::EOneFieldConvTestPoly:
+            {
+                EllipticOneFieldConvergenceTestPoly(argv);
+            }
+            break;
+        case EAcousticPrototype::ETwoFieldsConvTestPoly:
+            {
+                EllipticTwoFieldsConvergenceTestPoly(argv);
+            }
+            break;
+        default:
+            {
+                throw std::invalid_argument("Prototype not available.");
+            }
+            break;
+    }
+    
+    //    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
+        
+    //    HeterogeneousPulseEHHOFirstOrder(argc, argv);
+    //    HeterogeneousPulseIHHOFirstOrder(argc, argv);
+    //
+    //    HeterogeneousPulseIHHOSecondOrder(argc, argv);
+        
+        
+    //    HeterogeneousEHHOFirstOrder(argc, argv);
+    //
+    //    HeterogeneousIHHOFirstOrder(argc, argv);
+    //
+    //    HeterogeneousIHHOSecondOrder(argc, argv);
+
+        
+    //    ESSPRKHHOFirstOrderCFL(argc, argv);
+    //    EHHOFirstOrderCFL(argc, argv);
+    //    SSPRKHHOFirstOrder(argc, argv);
+        
+    //    EHHOFirstOrder(argc, argv);
+    //    IHHOFirstOrder(argc, argv);
+    //    IHHOSecondOrder(argc, argv);
+        
+    //    // Examples using main app objects for solving an elliptic problem with optimal convergence rates
+    //    // Primal HHO
+//        HHOOneFieldConvergenceExample(argc, argv);
+    //
+    //    // Dual HHO
+    //    HHOTwoFieldsConvergenceExample(argc, argv);
+        
+        // Examples using main app objects for solving the laplacian with optimal convergence rates
+        // Primal HHO
+    //    HHOOneFieldConvergenceExamplePolyMesh(argc, argv);
+
+        // Dual HHO
+    //    HHOTwoFieldsConvergenceExamplePolyMesh(argc, argv);
+}
+
+void EllipticOneFieldConvergenceTest(char **argv){
+    
+    simulation_data sim_data = preprocessor::process_convergence_test_lua_file(argv);
+    
     sim_data.print_simulation_data();
 
     // Manufactured exact solution
@@ -232,7 +320,9 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver(true);
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver(true);
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -250,7 +340,9 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver(true);
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver(true);
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -277,13 +369,9 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
     error_file.close();
 }
 
-void HHOTwoFieldsConvergenceExample(int argc, char **argv){
-
-    using RealType = double;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+void EllipticTwoFieldsConvergenceTest(char **argv){
     
-    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    simulation_data sim_data = preprocessor::process_convergence_test_lua_file(argv);
     sim_data.print_simulation_data();
 
     // Manufactured exact solution
@@ -387,7 +475,9 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-//                analysis.set_iterative_solver();
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver();
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -406,7 +496,9 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-//                analysis.set_iterative_solver();
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver();
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -433,13 +525,9 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
     error_file.close();
 }
 
-void HHOOneFieldConvergenceExamplePolyMesh(int argc, char **argv){
+void EllipticOneFieldConvergenceTestPoly(char **argv){
 
-    using RealType = double;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
-    
-    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    simulation_data sim_data = preprocessor::process_convergence_test_lua_file(argv);
     sim_data.print_simulation_data();
 
     // Manufactured exact solution
@@ -489,14 +577,15 @@ void HHOOneFieldConvergenceExamplePolyMesh(int argc, char **argv){
     std::ofstream error_file("steady_scalar_polygon_error.txt");
     polygon_2d_mesh_reader<RealType> mesh_builder;
     std::vector<std::string> mesh_files;
-    mesh_files.push_back("unit_square_polymesh_nel_20.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_40.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_80.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_160.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_320.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_640.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_1280.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_2560.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_20.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_40.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_80.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_160.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_320.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_640.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_1280.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_2560.txt");
+    
     for(size_t k = 0; k <= sim_data.m_k_degree; k++){
         std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
         error_file << "Approximation with k : " << k << std::endl;
@@ -542,7 +631,9 @@ void HHOOneFieldConvergenceExamplePolyMesh(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver(true);
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver(true);
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -560,7 +651,9 @@ void HHOOneFieldConvergenceExamplePolyMesh(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-                analysis.set_iterative_solver(true);
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver(true);
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -587,13 +680,9 @@ void HHOOneFieldConvergenceExamplePolyMesh(int argc, char **argv){
     error_file.close();
 }
 
-void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv){
-
-    using RealType = double;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+void EllipticTwoFieldsConvergenceTestPoly(char **argv){
     
-    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    simulation_data sim_data = preprocessor::process_convergence_test_lua_file(argv);
     sim_data.print_simulation_data();
 
     // Manufactured exact solution
@@ -643,14 +732,15 @@ void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv){
     std::ofstream error_file("steady_scalar_mixed_polygon_error.txt");
     polygon_2d_mesh_reader<RealType> mesh_builder;
     std::vector<std::string> mesh_files;
-    mesh_files.push_back("unit_square_polymesh_nel_20.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_40.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_80.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_160.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_320.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_640.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_1280.txt");
-    mesh_files.push_back("unit_square_polymesh_nel_2560.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_20.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_40.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_80.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_160.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_320.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_640.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_1280.txt");
+    mesh_files.push_back("meshes/unit_square_polymesh_nel_2560.txt");
+    
     for(size_t k = 0; k <= sim_data.m_k_degree; k++){
         std::cout << bold << cyan << "Running an approximation with k : " << k << reset << std::endl;
         error_file << "Approximation with k : " << k << std::endl;
@@ -701,7 +791,9 @@ void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-//                analysis.set_iterative_solver();
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver();
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -720,7 +812,9 @@ void HHOTwoFieldsConvergenceExamplePolyMesh(int argc, char **argv){
                 tc.toc();
                 std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
                 
-//                analysis.set_iterative_solver();
+                if(sim_data.m_iterative_solver_Q){
+                  analysis.set_iterative_solver();
+                }
                 
                 tc.tic();
                 analysis.factorize();
@@ -761,8 +855,8 @@ void IHHOSecondOrder(int argc, char **argv){
     RealType ly = 1.0;
     size_t nx = 2;
     size_t ny = 2;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
 //    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -954,8 +1048,8 @@ void HeterogeneousIHHOSecondOrder(int argc, char **argv){
     RealType ly = 0.2;
     size_t nx = 10;
     size_t ny = 1;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -1161,8 +1255,8 @@ void IHHOFirstOrder(int argc, char **argv){
     RealType ly = 1.0;
     size_t nx = 2;
     size_t ny = 2;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
 //    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -1378,8 +1472,8 @@ void HeterogeneousIHHOFirstOrder(int argc, char **argv){
     RealType ly = 0.2;
     size_t nx = 10;
     size_t ny = 1;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -1593,8 +1687,8 @@ void EHHOFirstOrder(int argc, char **argv){
     RealType ly = 1.0;
     size_t nx = 2;
     size_t ny = 2;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -1793,8 +1887,8 @@ void SSPRKHHOFirstOrder(int argc, char **argv){
     RealType ly = 1.0;
     size_t nx = 2;
     size_t ny = 2;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -1996,8 +2090,8 @@ void EHHOFirstOrderCFL(int argc, char **argv){
                 RealType ly = 1.0;
                 size_t nx = 9+l;
                 size_t ny = 9+l;
-                typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-                typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+                
+                
                 mesh_type msh;
 
                 cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -2222,8 +2316,8 @@ void ESSPRKHHOFirstOrderCFL(int argc, char **argv){
             RealType ly = 1.0;
             size_t nx = 9+l;
             size_t ny = 9+l;
-            typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-            typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+            
+            
             mesh_type msh;
 
             cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -2382,8 +2476,8 @@ void HeterogeneousEHHOFirstOrder(int argc, char **argv){
     RealType ly = 0.2;
     size_t nx = 10;
     size_t ny = 1;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -2577,8 +2671,8 @@ void HeterogeneousPulseEHHOFirstOrder(int argc, char **argv){
     RealType ly = 1.0;
     size_t nx = 2;
     size_t ny = 2;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
 //    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -2814,8 +2908,8 @@ void HeterogeneousPulseIHHOFirstOrder(int argc, char **argv){
     RealType ly = 1.0;
     size_t nx = 2;
     size_t ny = 2;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
 //    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -3058,8 +3152,8 @@ void HeterogeneousPulseIHHOSecondOrder(int argc, char **argv){
     RealType ly = 1.0;
     size_t nx = 2;
     size_t ny = 2;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
+    
     mesh_type msh;
 
 //    cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
@@ -3297,8 +3391,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
     RealType ly = 3.0;
     size_t nx = 3;
     size_t ny = 3;
-    typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
-    typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+    
     mesh_type msh;
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
