@@ -33,15 +33,13 @@ public:
     
     bool m_report_energy_Q;
     
-    bool m_quadratic_function_Q;
-    
     bool m_iterative_solver_Q;
     
     bool m_polygonal_mesh_Q;
     
     size_t m_exact_functions;
     
-    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_scaled_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_quadratic_function_Q(false), m_iterative_solver_Q(false),  m_polygonal_mesh_Q(false), m_exact_functions(0){
+    simulation_data() : m_k_degree(0), m_n_divs(0), m_hdg_stabilization_Q(false), m_scaled_stabilization_Q(false), m_sc_Q(false), m_nt_divs(0), m_render_silo_files_Q(false), m_report_energy_Q(false), m_iterative_solver_Q(false),  m_polygonal_mesh_Q(false), m_exact_functions(0){
         
     }
     
@@ -55,7 +53,6 @@ public:
         m_nt_divs               = other.m_nt_divs;
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
         m_report_energy_Q       = other.m_report_energy_Q;
-        m_quadratic_function_Q  = other.m_quadratic_function_Q;
         m_iterative_solver_Q    = other.m_iterative_solver_Q;
         m_polygonal_mesh_Q      = other.m_polygonal_mesh_Q;
         m_exact_functions       = other.m_exact_functions;
@@ -76,7 +73,6 @@ public:
         m_nt_divs               = other.m_nt_divs;
         m_render_silo_files_Q   = other.m_render_silo_files_Q;
         m_report_energy_Q       = other.m_report_energy_Q;
-        m_quadratic_function_Q  = other.m_quadratic_function_Q;
         m_iterative_solver_Q    = other.m_iterative_solver_Q;
         m_polygonal_mesh_Q      = other.m_polygonal_mesh_Q;
         m_exact_functions       = other.m_exact_functions;
@@ -97,7 +93,6 @@ public:
         std::cout << bold << red << "time refinements : " << m_nt_divs << reset << std::endl;
         std::cout << bold << red << "write silo files ? : " << m_render_silo_files_Q << reset << std::endl;
         std::cout << bold << red << "report energy file ? : " << m_report_energy_Q << reset << std::endl;
-        std::cout << bold << red << "quadratic spatial function ? : " << m_quadratic_function_Q << reset << std::endl;
         std::cout << bold << red << "iterative solver ? : " << m_iterative_solver_Q << reset << std::endl;
         std::cout << bold << red << "polygonal mesh ? : " << m_polygonal_mesh_Q << reset << std::endl;
         std::cout << bold << red << "Exact functions {0,1,2} : " << m_exact_functions << reset << std::endl;
@@ -305,7 +300,6 @@ public:
         sim_data.m_scaled_stabilization_Q = scaled_Q;
         sim_data.m_sc_Q = sc_Q;
         sim_data.m_render_silo_files_Q = silo_files_Q;
-        sim_data.m_quadratic_function_Q = quadratic_func_Q;
         return sim_data;
     }
     
@@ -321,7 +315,7 @@ public:
         std::string lua_file = argv[3];
         auto r = lua.do_file(lua_file);
         if ( !r.valid() ){
-            PrintConvergeceTestSample();
+            PrintConvergeceTestExample();
         }
         
         // populating simulation data
@@ -332,23 +326,25 @@ public:
         sim_data.m_scaled_stabilization_Q   = lua["config"]["stab_scal"].get_or(0);
         sim_data.m_sc_Q                     = lua["config"]["stat_cond"].get_or(0);
         sim_data.m_render_silo_files_Q      = lua["config"]["silo_output"].get_or(0);
-        sim_data.m_quadratic_function_Q     = lua["config"]["func_type"].get_or(0);
         sim_data.m_iterative_solver_Q       = lua["config"]["iter_solv"].get_or(0);
+        sim_data.m_exact_functions          = lua["config"]["exac_func"].get_or(0);
         sim_data.m_polygonal_mesh_Q         = lua["config"]["poly_mesh"].get_or(0);
         return sim_data;
     }
     
-    static void PrintConvergeceTestSample()
+    static void PrintConvergeceTestExample()
     {
         std::cout << "Please specify a lua configuration file like this: " << std::endl;
         std::cout <<
-                "config.max_k_deg = 0 -- <int>:  Maximum face polynomial degree: default 0\n"
-                "config.max_l_ref = 0 -- <int>:  Maximum number of uniform spatial refinements: default 0\n"
-                "config.stab_type = 0 -- <0-1>:  Stabilization type 0 (HHO), 1 (HDG-like): default 0\n"
-                "config.stab_scal = 0 -- <0-1>:  Stabilization scaling 0 (HHO), 1 (HDG-like): default 0\n"
-                "config.func_type = 0 -- <0-1>:  Manufactured function type 0 (non-polynomial), 1 (quadratic): default 0\n"
-                "config.stat_cond = 0 -- <0-1>:  Static condensation: default 0\n"
-                "config.silo_output = 0 -- <0-1>:  Write silo files : default 0\n";
+        "config.max_k_deg = 3 -- <int>:  Maximum face polynomial degree: default 0\n"
+        "config.max_l_ref = 3 -- <int>:  Maximum number of uniform spatial refinements: default 0\n"
+        "config.stab_type = 0 -- <0-1>:  Stabilization type 0 (HHO), 1 (HDG-like): default 0\n"
+        "config.stab_scal = 1 -- <0-1>:  Stabilization scaling 0 (HHO), 1 (HDG-like): default 0\n"
+        "config.stat_cond = 1 -- <0-1>:  Static condensation: default 0\n"
+        "config.iter_solv = 0 -- <0-1>:  Iterative solver : default 0\n"
+        "config.exac_func = 0 -- <0-1>:  Manufactured function type 0 (non-polynomial), 1 (quadratic): default 0\n"
+        "config.poly_mesh = 0 -- <0-1>:  Use of polynoal meshes : default 0\n"
+        "config.silo_output = 0 -- <0-1>:  Write silo files : default 0\n";
         exit(1);
         throw std::invalid_argument("Program will stop.");
     }
@@ -365,7 +361,7 @@ public:
         std::string lua_file = argv[3];
         auto r = lua.do_file(lua_file);
         if ( !r.valid() ){
-            PrintConvergeceTestSample();
+            PrintSimulationExample();
         }
         
         // populating simulation data
@@ -377,12 +373,30 @@ public:
         sim_data.m_scaled_stabilization_Q   = lua["config"]["stab_scal"].get_or(0);
         sim_data.m_sc_Q                     = lua["config"]["stat_cond"].get_or(0);
         sim_data.m_render_silo_files_Q      = lua["config"]["silo_output"].get_or(0);
-        sim_data.m_quadratic_function_Q     = lua["config"]["func_type"].get_or(0);
         sim_data.m_iterative_solver_Q       = lua["config"]["iter_solv"].get_or(0);
         sim_data.m_polygonal_mesh_Q         = lua["config"]["poly_mesh"].get_or(0);
         sim_data.m_exact_functions          = lua["config"]["exac_func"].get_or(0);
         sim_data.m_report_energy_Q          = lua["config"]["writ_ener"].get_or(0);
         return sim_data;
+    }
+    
+    static void PrintSimulationExample()
+    {
+        std::cout << "Please specify a lua configuration file like this: " << std::endl;
+        std::cout <<
+        "config.fac_k_deg = 3 -- <int>:  Face polynomial degree: default 0\n"
+        "config.num_l_ref = 3 -- <int>:  Number of uniform spatial refinements: default 0\n"
+        "config.num_t_ref = 7 -- <int>:  Number of uniform time refinements: default 0\n"
+        "config.stab_type = 1 -- <0-1>:  Stabilization type 0 (HHO), 1 (HDG-like): default 0\n"
+        "config.stab_scal = 0 -- <0-1>:  Stabilization scaling 0 (HHO), 1 (HDG-like): default 0\n"
+        "config.stat_cond = 1 -- <0-1>:  Static condensation: default 0\n"
+        "config.iter_solv = 0 -- <0-1>:  Iterative solver : default 0\n"
+        "config.poly_mesh = 0 -- <0-1>:  Use of polynoal meshes : default 0\n"
+        "config.exac_func = 0 -- <0-2>:  Exact function type {0,1,2} : default 0\n"
+        "config.writ_ener = 1 -- <0-1>:  Report energy at each time value : default 0\n"
+        "config.silo_output = 0 -- <0-1>:  Write silo files : default 0\n";
+        exit(1);
+        throw std::invalid_argument("Program will stop.");
     }
     
 };
