@@ -186,9 +186,14 @@ int prototype_selector(char **argv, EAcousticPrototype prototype){
                 HeterogeneousEHHOFirstOrder(argv);
             }
             break;
-        case EAcousticPrototype::Hete2DITwoFieldsAcoustic:
+        case EAcousticPrototype::Hete2DIOneFieldAcoustic:
             {
                 HeterogeneousPulseIHHOSecondOrder(argv);
+            }
+            break;
+        case EAcousticPrototype::Hete2DITwoFieldsAcoustic:
+            {
+                HeterogeneousPulseIHHOFirstOrder(argv);
             }
             break;
         case EAcousticPrototype::Hete2DETwoFieldsAcoustic:
@@ -275,7 +280,6 @@ void EllipticOneFieldConvergenceTest(char **argv){
             tc.tic();
             mesh_type msh;
             if (sim_data.m_polygonal_mesh_Q) {
-                size_t l = sim_data.m_n_divs;
                 polygon_2d_mesh_reader<RealType> mesh_builder;
                 std::vector<std::string> mesh_files;
                 mesh_files.push_back("meshes/unit_square_polymesh_nel_20.txt");
@@ -299,7 +303,7 @@ void EllipticOneFieldConvergenceTest(char **argv){
                 size_t ny = 2;
                 
                 cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-                mesh_builder.refine_mesh(sim_data.m_n_divs);
+                mesh_builder.refine_mesh(l);
                 mesh_builder.build_mesh();
                 mesh_builder.move_to_mesh_storage(msh);
             }
@@ -451,7 +455,6 @@ void EllipticTwoFieldsConvergenceTest(char **argv){
             tc.tic();
             mesh_type msh;
             if (sim_data.m_polygonal_mesh_Q) {
-                size_t l = sim_data.m_n_divs;
                 polygon_2d_mesh_reader<RealType> mesh_builder;
                 std::vector<std::string> mesh_files;
                 mesh_files.push_back("meshes/unit_square_polymesh_nel_20.txt");
@@ -475,7 +478,7 @@ void EllipticTwoFieldsConvergenceTest(char **argv){
                 size_t ny = 2;
                 
                 cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-                mesh_builder.refine_mesh(sim_data.m_n_divs);
+                mesh_builder.refine_mesh(l);
                 mesh_builder.build_mesh();
                 mesh_builder.move_to_mesh_storage(msh);
             }
@@ -1264,7 +1267,7 @@ void HeterogeneousIHHOSecondOrder(char **argv){
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Time controls : Final time value 0.5
-    size_t nt = 5;
+    size_t nt = 10;
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }
@@ -1465,7 +1468,7 @@ void HeterogeneousIHHOFirstOrder(char **argv){
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Time controls : Final time value 0.5
-    size_t nt = 5;
+    size_t nt = 10;
     for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
         nt *= 2;
     }

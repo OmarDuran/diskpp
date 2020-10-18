@@ -336,10 +336,10 @@ public:
     {
         std::cout << "Please specify a lua configuration file like this: " << std::endl;
         std::cout <<
-        "config.max_k_deg = 3 -- <int>:  Maximum face polynomial degree: default 0\n"
-        "config.max_l_ref = 3 -- <int>:  Maximum number of uniform spatial refinements: default 0\n"
+        "config.max_k_deg = 4 -- <int>:  Maximum face polynomial degree: default 0\n"
+        "config.max_l_ref = 4 -- <int>:  Maximum number of uniform spatial refinements: default 0\n"
         "config.stab_type = 0 -- <0-1>:  Stabilization type 0 (HHO), 1 (HDG-like): default 0\n"
-        "config.stab_scal = 1 -- <0-1>:  Stabilization scaling 0 (HHO), 1 (HDG-like): default 0\n"
+        "config.stab_scal = 1 -- <0-1>:  Stabilization scaling 0 O(1), 1 O(1/h_{f}): default 0\n"
         "config.stat_cond = 1 -- <0-1>:  Static condensation: default 0\n"
         "config.iter_solv = 0 -- <0-1>:  Iterative solver : default 0\n"
         "config.exac_func = 0 -- <0-1>:  Manufactured function type 0 (non-polynomial), 1 (quadratic): default 0\n"
@@ -388,7 +388,7 @@ public:
         "config.num_l_ref = 3 -- <int>:  Number of uniform spatial refinements: default 0\n"
         "config.num_t_ref = 7 -- <int>:  Number of uniform time refinements: default 0\n"
         "config.stab_type = 1 -- <0-1>:  Stabilization type 0 (HHO), 1 (HDG-like): default 0\n"
-        "config.stab_scal = 0 -- <0-1>:  Stabilization scaling 0 (HHO), 1 (HDG-like): default 0\n"
+        "config.stab_scal = 0 -- <0-1>:  Stabilization scaling 0 O(1), 1 O(1/h_{f}): default 0\n"
         "config.stat_cond = 1 -- <0-1>:  Static condensation: default 0\n"
         "config.iter_solv = 0 -- <0-1>:  Iterative solver : default 0\n"
         "config.poly_mesh = 0 -- <0-1>:  Use of polynoal meshes : default 0\n"
