@@ -2473,6 +2473,56 @@ public:
 
     }
     
+    /// Record velocity data at provided point for two fields approximation
+    static void record_velocity_data_acoustic_two_fields(size_t it, std::pair<typename Mesh::point_type,size_t> & pt_cell_index, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::ostream & seismogram_file = std::cout){
+
+        timecounter tc;
+        tc.tic();
+
+        using RealType = double;
+        auto dim = Mesh::dimension;
+        size_t n_scal_dof = disk::scalar_basis_size(hho_di.cell_degree(), Mesh::dimension);
+        size_t n_vec_dof = disk::scalar_basis_size(hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t cell_dof = n_scal_dof + n_vec_dof;
+
+        Matrix<double, Dynamic, 1> vh = Matrix<double, Dynamic, 1>::Zero(2, 1);
+
+        typename Mesh::point_type pt = pt_cell_index.first;
+        
+        if(pt_cell_index.second == -1){
+            std::set<size_t> cell_indexes = find_cells(pt, msh, true);
+            size_t cell_index = pick_cell(pt, msh, cell_indexes, true);
+            assert(cell_index != -1);
+            pt_cell_index.second = cell_index;
+            seismogram_file << "\"Time\"" << "," << "\"vhx\"" << "," << "\"vhy\"" << std::endl;
+        }
+
+        {
+            size_t cell_ind = pt_cell_index.second;
+            // velocity evaluation
+            {
+                
+                auto& cell = msh.backend_storage()->surfaces[cell_ind];
+                auto cell_basis = make_scalar_monomial_basis(msh, cell, hho_di.reconstruction_degree());
+                Matrix<RealType, Dynamic, 1> flux_cell_dof = x_dof.block(cell_ind*cell_dof, 0, n_vec_dof, 1);
+                auto t_dphi = cell_basis.eval_gradients( pt );
+                
+                Matrix<RealType, 1, 2> sigma_h = Matrix<RealType, 1, 2>::Zero();
+                for (size_t i = 1; i < t_dphi.rows(); i++){
+                  sigma_h = sigma_h + flux_cell_dof(i-1)*t_dphi.block(i, 0, 1, 2);
+                }
+                vh = sigma_h;
+                
+            }
+            
+        }
+        tc.toc();
+        std::cout << bold << cyan << "Value recorded: " << tc << " seconds" << reset << std::endl;
+        seismogram_file << it << "," << std::setprecision(16) <<  vh(0,0) << "," << std::setprecision(16) <<  vh(1,0) << std::endl;
+        seismogram_file.flush();
+
+    }
+    
     
     /// Record data at provided point for one field vectorial approximation
     static void record_data_elastic_one_field(size_t it, std::pair<typename Mesh::point_type,size_t> & pt_cell_index, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof, std::ostream & seismogram_file = std::cout){
