@@ -113,7 +113,7 @@ void HHOOneFieldConvergenceExample(int argc, char **argv){
     sim_data.print_simulation_data();
 
     // Manufactured exact solution
-    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
+    bool quadratic_function_Q = false;
     bool Nonzero_Dirichlet_Q = false;
     RealType lambda = 1000.0;
     auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
@@ -314,7 +314,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
     sim_data.print_simulation_data();
 
     // Manufactured exact solution
-    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
+    bool quadratic_function_Q = false;
     bool Nonzero_Dirichlet_Q = false;
     RealType lambda = 1000.0;
     auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
@@ -523,7 +523,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv){
     sim_data.print_simulation_data();
 
     // Manufactured exact solution
-    bool quadratic_function_Q = sim_data.m_quadratic_function_Q;
+    bool quadratic_function_Q = false;
     bool Nonzero_Dirichlet_Q = false;
     RealType lambda = 1000.0;
     auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
