@@ -30,5 +30,6 @@ set(fitted_waves_headers ${fitted_waves_headers}
 	${CMAKE_CURRENT_SOURCE_DIR}/erk_butcher_tableau.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ssprk_shu_osher_tableau.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/lsrk_butcher_tableau.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/linear_elasticity_solver_c.hpp
 PARENT_SCOPE)
 

@@ -23,6 +23,9 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 #include <Eigen/SparseLU>
+#include <Spectra/GenEigsSolver.h>
+#include <Spectra/MatOp/SparseGenMatProd.h>
+#include <Eigen/Eigenvalues>
 using namespace Eigen;
 
 #include "timecounter.h"
@@ -96,13 +99,19 @@ void HeterogeneousPulseEHHOFirstOrder(char **argv);
 void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv);
 void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv);
 
+void EHHOFirstOrderCFL(int argc, char **argv);
+void EHHOFirstOrderEigenCFL(int argc, char **argv);
+
 int prototype_selector(char **argv, EAcousticPrototype prototype);
 
 void print_prototype_description();
 
 int main(int argc, char **argv)
 {
+//    EHHOFirstOrderCFL(argc,argv);
+//    EHHOFirstOrderEigenCFL(argc,argv);
     HeterogeneousGar6more2DIHHOFirstOrder(argc,argv);
+//    HeterogeneousGar6more2DIHHOSecondOrder(argc,argv);
     return 0;
     EAcousticPrototype prototype;
     const char* const short_opts = "p:h:";
@@ -2677,7 +2686,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
         xc = 0.0;
         yc = 2.0/3.0;
         c = 10.0;
-        lp = 1.0*std::sqrt(9.0)/10.0;
+        lp = 1.0*std::sqrt(64.0)/c;
         r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
         wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
         factor = (lp*lp/(2.0*M_PI*M_PI));
@@ -2706,8 +2715,10 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
         rho = 1.0;
         if (y < 0.0) {
             vp = 1.0*std::sqrt(3.0);
+            rho = 1.0/3.0;
         }else{
-            vp = 1.0*std::sqrt(9.0);
+            vp = 1.0*std::sqrt(64.0);
+            rho = 1.0/64.0;
         }
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
@@ -2746,9 +2757,9 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
     std::ofstream sensor_1_log("s1_acoustic_one_field_h.csv");
     std::ofstream sensor_2_log("s2_acoustic_one_field_h.csv");
     std::ofstream sensor_3_log("s3_acoustic_one_field_h.csv");
-    typename mesh_type::point_type s1_pt(-1.0/3.0, -1.0/3.0);
-    typename mesh_type::point_type s2_pt( 0.0, -1.0/3.0);
-    typename mesh_type::point_type s3_pt(+1.0/3.0, -1.0/3.0);
+    typename mesh_type::point_type s1_pt(+3.0/4.0, -1.0/3.0);
+    typename mesh_type::point_type s2_pt( 0.0, +1.0/3.0);
+    typename mesh_type::point_type s3_pt(+3.0/4.0, +1.0/3.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
@@ -2866,6 +2877,7 @@ void HeterogeneousGar6more2DIHHOSecondOrder(int argc, char **argv){
 
 void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
     
+    bool reference_Q = false;
     using RealType = double;
     simulation_data sim_data = preprocessor::process_args(argc, argv);
     sim_data.print_simulation_data();
@@ -2874,8 +2886,13 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
     timecounter tc;
     tc.tic();
 
-    RealType lx = 3.0;
-    RealType ly = 3.0;
+    RealType scal = 1.0;
+    if (reference_Q) {
+        scal = 3.0;
+    }
+    
+    RealType lx = 3.0*scal;
+    RealType ly = 3.0*scal;
     size_t nx = 3;
     size_t ny = 3;
     
@@ -2884,7 +2901,7 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
 
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
     mesh_builder.refine_mesh(sim_data.m_n_divs);
-    mesh_builder.set_translation_data(-1.5, -1.5);
+    mesh_builder.set_translation_data(-1.5*scal, -1.5*scal);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
     
@@ -2913,7 +2930,7 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
         xc = 0.0;
         yc = 2.0/3.0;
         c = 10.0;
-        lp = std::sqrt(9.0)/10.0;
+        lp = std::sqrt(9.0)/c;
         r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
         wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
         vx = -wave*(x-xc);
@@ -2946,8 +2963,10 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
         rho = 1.0;
         if (y < 0.0) {
             vp = 1.0*std::sqrt(3.0);
+            rho = 1.0/3.0;
         }else{
             vp = 1.0*std::sqrt(9.0);
+            rho = 1.0/9.0;
         }
         mat_data[0] = rho; // rho
         mat_data[1] = vp; // seismic compressional velocity vp
@@ -2988,9 +3007,9 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
     std::ofstream sensor_1_log("s1_acoustic_two_fields_h.csv");
     std::ofstream sensor_2_log("s2_acoustic_two_fields_h.csv");
     std::ofstream sensor_3_log("s3_acoustic_two_fields_h.csv");
-    typename mesh_type::point_type s1_pt(-1.0/3.0, +1.0/3.0);
+    typename mesh_type::point_type s1_pt(+3.0/4.0, -1.0/3.0);
     typename mesh_type::point_type s2_pt( 0.0, +1.0/3.0);
-    typename mesh_type::point_type s3_pt(+1.0/3.0, +1.0/3.0);
+    typename mesh_type::point_type s3_pt(+3.0/4.0, +1.0/3.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
@@ -3108,5 +3127,382 @@ void HeterogeneousGar6more2DIHHOFirstOrder(int argc, char **argv){
     simulation_log << "Number of time steps =  " << nt << std::endl;
     simulation_log << "Step size =  " << dt << std::endl;
     simulation_log.flush();
+    
+}
+
+
+void EHHOFirstOrderCFL(int argc, char **argv){
+    
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+    
+    int k_ind = sim_data.m_k_degree;
+    std::vector<RealType> tf_vec;
+    
+    if(sim_data.m_hdg_stabilization_Q){
+       tf_vec = {0.5,0.4,0.3,0.2};
+    }else{
+       tf_vec = {0.5/4,0.4/4,0.3/4,0.2/4};
+    }
+    
+    RealType ti = 0.0;
+    RealType tf = tf_vec[k_ind];
+    int nt_base = sim_data.m_nt_divs;
+    
+    scal_analytic_functions functions;
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    RealType t = ti;
+    auto exact_vel_fun      = functions.Evaluate_v(t);
+    auto exact_flux_fun     = functions.Evaluate_q(t);
+    auto rhs_fun            = functions.Evaluate_f(t);
+    
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t cell_k_degree = sim_data.m_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,sim_data.m_k_degree);
+    std::ofstream simulation_log("acoustic_two_fields_explicit_cfl.txt");
+    
+    for (int s = 1; s < 5; s++) {
+        simulation_log << " ******************************* " << std::endl;
+        simulation_log << " number of stages s =  " << s << std::endl;
+        simulation_log << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
+                
+                // Building a cartesian mesh
+                timecounter tc;
+                tc.tic();
+
+                RealType lx = 1.0;
+                RealType ly = 1.0;
+                size_t nx = 10+l;
+                size_t ny = 10+l;
+                typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+                typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+                mesh_type msh;
+
+                cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+                mesh_builder.build_mesh();
+                mesh_builder.move_to_mesh_storage(msh);
+                std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+                
+                // Time controls : Final time value 1.0
+                size_t nt = nt_base;
+                for (unsigned int i = 0; i < sim_data.m_nt_divs; i++) {
+                
+                    RealType dt     = (tf-ti)/nt;
+                    
+                    // Solving a primal HHO mixed problem
+                    boundary_type bnd(msh);
+                    bnd.addDirichletEverywhere(exact_vel_fun);
+                    tc.tic();
+                    auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+                    assembler.load_material_data(msh);
+                    if(sim_data.m_hdg_stabilization_Q){
+                        assembler.set_hdg_stabilization();
+                    }
+                    if(sim_data.m_scaled_stabilization_Q){
+                        assembler.set_scaled_stabilization();
+                    }
+                    tc.toc();
+                    std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+                    
+                    tc.tic();
+                    assembler.assemble_mass(msh);
+                    tc.toc();
+                    std::cout << bold << cyan << "Mass Assembly completed: " << tc << " seconds" << reset << std::endl;
+                    
+                    // Projecting initial data
+                    Matrix<RealType, Dynamic, 1> x_dof;
+                    assembler.project_over_cells(msh, x_dof, exact_vel_fun, exact_flux_fun);
+                    assembler.project_over_faces(msh, x_dof, exact_vel_fun);
+                    
+                    
+                    if (sim_data.m_render_silo_files_Q) {
+                        size_t it = 0;
+                        std::string silo_file_name = "e_scalar_mixed_";
+                        postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+                    }
+                    
+                    RealType energy_0 = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, ti, x_dof, simulation_log);
+                    
+                    // Solving a first order equation HDG/HHO propagation problem
+                    Matrix<RealType, Dynamic, Dynamic> a;
+                    Matrix<RealType, Dynamic, 1> b;
+                    Matrix<RealType, Dynamic, 1> c;
+                    erk_butcher_tableau::erk_tables(s, a, b, c);
+        //            erk_butcher_tableau::ssprk_tables(s, a, b, c);
+
+                    tc.tic();
+                    assembler.assemble(msh, rhs_fun);
+                    tc.toc();
+                    std::cout << bold << cyan << "Stiffness and rhs assembly completed: " << tc << " seconds" << reset << std::endl;
+                    size_t n_face_dof = assembler.get_n_face_dof();
+                    tc.tic();
+                    erk_hho_scheme<RealType> erk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+                    erk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                    if(sim_data.m_hdg_stabilization_Q){
+                        erk_an.Sff_inverse(std::make_pair(assembler.get_n_faces(), assembler.get_face_basis_data()));
+                    }else{
+        //                erk_an.setIterativeSolver();
+                        erk_an.DecomposeFaceTerm();
+                    }
+                    tc.toc();
+                    std::cout << bold << cyan << "ERK analysis created: " << tc << " seconds" << reset << std::endl;
+                    
+                    erk_an.refresh_faces_unknowns(x_dof);
+                    Matrix<RealType, Dynamic, 1> x_dof_n;
+                    bool approx_fail_check_Q = false;
+                    RealType energy = energy_0;;
+                    for(size_t it = 1; it <= nt; it++){
+
+                        std::cout << bold << yellow << "Time step number : " << it << " being executed." << reset << std::endl;
+                        
+                        RealType tn = dt*(it-1)+ti;
+                        // ERK step
+                        tc.tic();
+                        {
+                            size_t n_dof = x_dof.rows();
+                            Matrix<RealType, Dynamic, Dynamic> k = Matrix<RealType, Dynamic, Dynamic>::Zero(n_dof, s);
+                            Matrix<RealType, Dynamic, 1> Fg, Fg_c,xd;
+                            xd = Matrix<RealType, Dynamic, 1>::Zero(n_dof, 1);
+                            
+                            Matrix<RealType, Dynamic, 1> yn, ki;
+
+                            x_dof_n = x_dof;
+                            for (int i = 0; i < s; i++) {
+                                
+                                yn = x_dof;
+                                for (int j = 0; j < s - 1; j++) {
+                                    yn += a(i,j) * dt * k.block(0, j, n_dof, 1);
+                                }
+                                
+                                {
+                                    RealType t = tn + c(i,0) * dt;
+                                    auto exact_vel_fun      = functions.Evaluate_v(t);
+                                    auto rhs_fun            = functions.Evaluate_f(t);
+                                    assembler.get_bc_conditions().updateDirichletFunction(exact_vel_fun, 0);
+                                    assembler.assemble_rhs(msh, rhs_fun);
+                                    assembler.apply_bc(msh);
+                                    erk_an.SetFg(assembler.RHS);
+                                    erk_an.erk_weight(yn, ki);
+                                }
+
+                                // Accumulated solution
+                                x_dof_n += dt*b(i,0)*ki;
+                                k.block(0, i, n_dof, 1) = ki;
+                            }
+                        }
+                        tc.toc();
+                        std::cout << bold << cyan << "ERK step completed: " << tc << " seconds" << reset << std::endl;
+                        x_dof = x_dof_n;
+
+                        t = tn + dt;
+                        auto exact_vel_fun = functions.Evaluate_v(t);
+                        auto exact_flux_fun = functions.Evaluate_q(t);
+                        
+                        if (sim_data.m_render_silo_files_Q) {
+                            std::string silo_file_name = "e_scalar_mixed_";
+                            postprocessor<mesh_type>::write_silo_two_fields(silo_file_name, it, msh, hho_di, x_dof, exact_vel_fun, exact_flux_fun, false);
+                        }
+                        RealType energy_n = postprocessor<mesh_type>::compute_acoustic_energy_two_fields(msh, hho_di, assembler, t, x_dof, simulation_log);
+                        
+                        RealType relative_energy = (energy_n - energy) / energy;
+                        RealType relative_energy_0 = (energy_n - energy_0) / energy_0;
+                        bool unstable_check_Q = (relative_energy > 1.0e-2) || (relative_energy_0 >= 1.0e-2);
+                        if (unstable_check_Q) { // energy is increasing
+                            approx_fail_check_Q = true;
+                            // Computing errors
+                              postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                            break;
+                        }
+                        energy = energy_n;
+                        if(it == nt){
+                            // Computing errors
+                            postprocessor<mesh_type>::compute_errors_two_fields(msh, hho_di, assembler, x_dof, exact_vel_fun, exact_flux_fun,simulation_log);
+                        }
+                    }
+
+                    if(approx_fail_check_Q){
+                        simulation_log << std::endl;
+                        simulation_log << "Simulation is unstable for :"<< std::endl;
+                        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+                        simulation_log << "Number of ERK steps =  " << s << std::endl;
+                        simulation_log << "Number of time steps =  " << nt << std::endl;
+                        simulation_log << "dt size =  " << dt << std::endl;
+                        simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
+                        simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
+                        simulation_log << std::endl;
+                        simulation_log.flush();
+                        break;
+                    }else{
+                        simulation_log << "Simulation is stable for :"<< std::endl;
+                        simulation_log << "Number of equations : " << assembler.RHS.rows() << std::endl;
+                        simulation_log << "Number of ERK steps =  " << s << std::endl;
+                        simulation_log << "Number of time steps =  " << nt << std::endl;
+                        simulation_log << "dt size =  " << dt << std::endl;
+                        simulation_log << "h size =  " << lx/mesh_builder.get_nx() << std::endl;
+                        simulation_log << "CFL (dt/h) =  " << dt/(lx/mesh_builder.get_nx()) << std::endl;
+                        simulation_log << std::endl;
+                        simulation_log.flush();
+                        nt -= 5;
+                        continue;
+                    }
+                }
+            }
+        simulation_log << " ******************************* " << std::endl;
+        simulation_log << std::endl << std::endl;
+    }
+    
+}
+
+void EHHOFirstOrderEigenCFL(int argc, char **argv){
+    
+    using RealType = double;
+    simulation_data sim_data = preprocessor::process_args(argc, argv);
+    sim_data.print_simulation_data();
+        
+    scal_analytic_functions functions;
+    functions.set_function_type(scal_analytic_functions::EFunctionType::EFunctionNonPolynomial);
+    RealType t = 0.0;
+    auto exact_vel_fun      = functions.Evaluate_v(t);
+    auto exact_flux_fun     = functions.Evaluate_q(t);
+    auto rhs_fun            = functions.Evaluate_f(t);
+    
+    std::ofstream simulation_log("acoustic_two_fields_explicit_cfl.txt");
+    
+    for (int k = 0; k <= sim_data.m_k_degree; k++) {
+        
+        // Creating HHO approximation spaces and corresponding linear operator
+        size_t cell_k_degree = k;
+        if(sim_data.m_hdg_stabilization_Q){
+            cell_k_degree++;
+        }
+        disk::hho_degree_info hho_di(cell_k_degree,k);
+        
+        simulation_log << " ******************************* " << std::endl;
+        simulation_log << " Polynomial degree =  " << k << std::endl;
+        simulation_log << std::endl;
+        for(size_t l = 0; l <= sim_data.m_n_divs; l++){
+                
+                // Building a cartesian mesh
+                timecounter tc;
+                tc.tic();
+
+                RealType lx = 1.0;
+                RealType ly = 1.0;
+                size_t nx = 10;
+                size_t ny = 10;
+                for (unsigned int i = 0; i < l; i++) {
+                  nx *= 2;
+                  ny *= 2;
+                }
+                typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+                typedef disk::BoundaryConditions<mesh_type, true> boundary_type;
+                mesh_type msh;
+
+                cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
+                mesh_builder.build_mesh();
+                mesh_builder.move_to_mesh_storage(msh);
+                std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+            
+                // Solving a primal HHO mixed problem
+                boundary_type bnd(msh);
+                bnd.addDirichletEverywhere(exact_vel_fun);
+                tc.tic();
+                auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
+                auto acoustic_mat_fun = [](const typename mesh_type::point_type& pt) -> std::vector<RealType> {
+                    double x,y;
+                    x = pt.x();
+                    y = pt.y();
+                    std::vector<RealType> mat_data(2);
+                    RealType rho, vp;
+                    vp = 2.0;
+                    rho = 1.0/(vp*vp); // this is required to make both formulations compatible by keeping kappa = 1
+                    mat_data[0] = rho; // rho
+                    mat_data[1] = vp; // seismic compressional velocity vp
+                    return mat_data;
+                };
+                assembler.load_material_data(msh,acoustic_mat_fun);
+                if(sim_data.m_hdg_stabilization_Q){
+                    assembler.set_hdg_stabilization();
+                }
+                if(sim_data.m_scaled_stabilization_Q){
+                    assembler.set_scaled_stabilization();
+                }
+                tc.toc();
+                std::cout << bold << cyan << "Assembler generation: " << tc.to_double() << " seconds" << reset << std::endl;
+            
+                tc.tic();
+                assembler.assemble_mass(msh);
+                assembler.assemble(msh,rhs_fun);
+                tc.toc();
+                std::cout << bold << cyan << "Matrix assembly completed: " << tc << " seconds" << reset << std::endl;
+            
+                size_t n_face_dof = assembler.get_n_face_dof();
+                tc.tic();
+                erk_hho_scheme<RealType> erk_an(assembler.LHS,assembler.RHS,assembler.MASS,n_face_dof);
+                erk_an.Kcc_inverse(std::make_pair(msh.cells_size(), assembler.get_cell_basis_data()));
+                tc.toc();
+                std::cout << bold << cyan << "ERK analysis created: " << tc << " seconds" << reset << std::endl;
+            
+                RealType lambda_max = 0;
+                {
+                SparseMatrix<RealType> Kg = assembler.LHS;
+                SparseMatrix<RealType> Mg = assembler.MASS;
+                tc.tic();
+            //                for (int i = 0; i < n_cell_dof; i++) {
+            //                    for (int j = 0; j < n_cell_dof; j++) {
+            //                        Mg.coeffRef(i, j) = analysis.Mc_inv().coeffRef(i,j);
+            //                    }
+            //                }
+                Kg = erk_an.Mc_inv()*Kg;
+                
+                Spectra::SparseGenMatProd<RealType> op(Kg);
+                Spectra::GenEigsSolver< RealType, Spectra::LARGEST_MAGN,
+                                        Spectra::SparseGenMatProd<RealType> > max_eigs(&op, 1, 8);
+                tc.toc();
+                simulation_log << "Generalized Eigen Solver creation time: " << tc << " seconds" << std::endl;
+                
+                tc.tic();
+                max_eigs.init();
+                max_eigs.compute();
+                tc.toc();
+                if(max_eigs.info() == Spectra::SUCCESSFUL){
+                    lambda_max = max_eigs.eigenvalues()(0).real();
+                }
+                simulation_log << "Generalized Eigen Solver compute time: " << tc << " seconds" << std::endl;
+                    
+
+                RealType h_T = std::numeric_limits<RealType>::max();
+                for (auto& cell : msh) {
+                 
+                     RealType h = diameter(msh, cell);
+                     if (h < h_T) {
+                         h_T = h;
+                     }
+                }
+                    
+                auto beta_cfl = 1.0/(lambda_max);
+                simulation_log << "Number of equations : " << Kg.rows() << std::endl;
+                simulation_log << "Largest eigenvalue : " << lambda_max << std::endl;
+                simulation_log << "l :  " << l << std::endl;
+                simulation_log << "h :  " << h_T << std::endl;
+                simulation_log << "Beta-CFL :  " << beta_cfl << std::endl;
+                if(sim_data.m_scaled_stabilization_Q){
+                    simulation_log << "CFL :  " << beta_cfl/(h_T*h_T) << std::endl;
+                }else{
+                    simulation_log << "CFL :  " << beta_cfl/h_T << std::endl;
+                }
+                simulation_log << std::endl;
+                simulation_log.flush();
+            }
+        }
+    }
+    
+    simulation_log << " ******************************* " << std::endl;
+    simulation_log << std::endl << std::endl;
     
 }

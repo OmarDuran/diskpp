@@ -1358,7 +1358,7 @@ public:
         
         tc.toc();
         std::cout << bold << cyan << "Energy completed: " << tc << " seconds" << reset << std::endl;
-        energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
+//        energy_file << time << "   " << std::setprecision(16) << energy_h << std::endl;
         
         return energy_h;
     }
