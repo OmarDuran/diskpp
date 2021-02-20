@@ -102,8 +102,6 @@ void print_prototype_description();
 
 int main(int argc, char **argv)
 {
-    HeterogeneousGar6more2DIHHOFirstOrder(argc,argv);
-    return 0;
     EAcousticPrototype prototype;
     const char* const short_opts = "p:h:";
     const option long_opts[] = {
