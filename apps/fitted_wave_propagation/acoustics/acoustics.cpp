@@ -3143,7 +3143,7 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 1.0;
+    RealType tf = 1.5;
     RealType dt     = (tf-ti)/nt;
     
     auto null_fun = [](const mesh_type::point_type& pt) -> RealType {
