@@ -3143,7 +3143,7 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 2.0;
+    RealType tf = 1.0;
     RealType dt     = (tf-ti)/nt;
     
     auto null_fun = [](const mesh_type::point_type& pt) -> RealType {
@@ -3163,8 +3163,8 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
         lp = std::sqrt(1.0)/10.0;
         r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
         wave = (c)/(std::exp((1.0/(lp*lp))*r*r*M_PI*M_PI));
-        vx = -wave*(x-xc);
-        vy = -wave*(y-yc);
+        vx = -wave*(x-xc)*0.0;
+        vy = -wave*(y-yc)*0.0;
         std::vector<RealType> v = {vx,vy};
         return v;
     };
@@ -3205,8 +3205,7 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
     
     
     boundary_type bnd(msh);
-//    bnd.addDirichletEverywhere(null_fun);
-//    bnd.addDirichletBC(disk::DirichletType::DIRICHLET, bc_internal_id, null_fun);
+    bnd.addNeumannBC(disk::NeumannType::NEUMANN, bc_internal_id, null_fun);
     bnd.addDirichletBC(disk::DirichletType::DIRICHLET, bc_external_id, null_fun);
     tc.tic();
     auto assembler = acoustic_two_fields_assembler<mesh_type>(msh, hho_di, bnd);
@@ -3344,7 +3343,20 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
                 }
                 
                 {
+                    RealType t = tn + c(i,0) * dt;
+                    auto flux_fun = [&t](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+                        RealType x,y,vx,vy;
+                        x = pt.x();
+                        y = pt.y();
+                        vx = -20.0*std::cos(20.0*t - 20.0*x);
+                        vy = -0.0;
+                        static_vector<RealType, 2> v = {vx,vy};
+                        return v;
+                    };
+//                    assembler.get_bc_conditions().updateNeumannFunction(flux_fun, 0);
+                    
                     assembler.RHS.setZero(); // Optimization: this is a problem with (f = 0)
+                    assembler.apply_neumann_bc(msh,flux_fun);
                     dirk_an.SetFg(assembler.RHS);
                     dirk_an.irk_weight(yn, ki, dt, a(i,i),is_sdirk_Q);
                 }

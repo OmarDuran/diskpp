@@ -34,6 +34,7 @@ class acoustic_two_fields_assembler
     std::vector< Triplet<T> >           m_mass_triplets;
     std::vector< acoustic_material_data<T> > m_material;
     std::vector< size_t >               m_elements_with_bc_eges;
+    std::vector< size_t >               m_elements_with_neumann_bc_eges;
     
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
@@ -326,6 +327,57 @@ public:
         #endif
         
     }
+    
+    void apply_neumann_bc(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> flux_fun){
+        
+        
+
+        size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
+        size_t n_vec_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;
+        size_t n_cbs = n_scal_cbs + n_vec_cbs;
+        size_t facdeg   = m_hho_di.face_degree();
+        size_t n_fbs = disk::scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+        if (m_bnd.nb_faces_neumann() <= 0){
+            return;
+        }
+           
+        auto storage = msh.backend_storage();
+        for (auto& cell_ind : m_elements_with_neumann_bc_eges) {
+            auto& cell = storage->surfaces[cell_ind];
+            auto cell_faces = faces(msh,cell);
+            for (auto face :cell_faces) {
+                auto fc_id = msh.lookup(face);
+                if (m_bnd.is_neumann_face(fc_id)) {
+                    auto face_offset = disk::priv::offset(msh, face);
+                    auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(face_offset)*n_fbs;
+                   auto              fb = make_scalar_monomial_basis(msh, face, facdeg);
+                    Matrix<T, Dynamic, 1> neumann = neumman_bc_operator(msh, face, cell, flux_fun);
+                   assert(neumann.size() == n_fbs);
+                    RHS.segment(face_LHS_offset, n_fbs) += neumann;
+                }
+            }
+  
+        }
+        
+//        auto contribute = [this,&msh] (const typename Mesh::cell_type& cell){
+//
+//            auto fb = make_scalar_monomial_basis(msh, fc, m_hho_di.face_degree());
+//            auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(fc_id);
+//
+//            Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
+//            Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
+//            dirichlet_data.block(n_cbs + face_i*n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
+//
+//            Matrix<T, Dynamic, 1> f_loc = this->mixed_rhs(msh, cell, rhs_fun,di);
+//            this->scatter_rhs_data(msh, cell, f_loc);
+//        };
+//
+//        for (auto& cell : msh){
+//            contribute(cell);
+//        }
+        
+    }
             
     void assemble_rhs(const Mesh& msh, std::function<double(const typename Mesh::point_type& )> & rhs_fun, size_t di = 0){
         
@@ -407,6 +459,12 @@ public:
                 if (is_dirichlet_Q)
                 {
                     m_elements_with_bc_eges.push_back(cell_ind);
+                    break;
+                }
+                bool is_neumann_Q = m_bnd.is_neumann_face(fc_id);
+                if (is_neumann_Q)
+                {
+                    m_elements_with_neumann_bc_eges.push_back(cell_ind);
                     break;
                 }
             }
@@ -640,6 +698,31 @@ public:
         }
         ret.block(rbs,0,cell_basis.size(),1) = ret_loc;
         return ret;
+    }
+    
+    Matrix<T, Dynamic, Dynamic> neumman_bc_operator(const Mesh& msh, const typename Mesh::face_type& face, const typename Mesh::cell_type& cell, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> flux_fun){
+
+        Matrix<T, Dynamic, Dynamic> neumann_operator;
+        auto facdeg = m_hho_di.face_degree();
+        auto sfbs = disk::scalar_basis_size(facdeg, Mesh::dimension - 1);
+
+        neumann_operator = Matrix<T, Dynamic, Dynamic>::Zero(sfbs, 1);
+        
+        auto vfb = make_vector_monomial_basis(msh, face, facdeg);
+        auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
+        const auto qps = integrate(msh, face, facdeg);
+        const auto n = disk::normal(msh, cell, face);
+        for (auto& qp : qps)
+        {
+            const auto v_f_phi = vfb.eval_functions(qp.point());
+            const auto s_f_phi = sfb.eval_functions(qp.point());
+
+            assert(s_f_phi.rows() == sfbs);
+            const auto n_dot_v_f = disk::priv::inner_product(flux_fun(qp.point()),disk::priv::inner_product(qp.weight(), n));
+            const auto result = disk::priv::inner_product(n_dot_v_f, s_f_phi);
+            neumann_operator += result;
+        }
+        return neumann_operator;
     }
      
     void load_material_data(const Mesh& msh){
