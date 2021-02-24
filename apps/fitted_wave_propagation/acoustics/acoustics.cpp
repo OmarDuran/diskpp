@@ -3128,7 +3128,8 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
 //    std::string mesh_file = "meshes/airfoil_polymesh_nel_223.txt";
 //    std::string mesh_file = "meshes/airfoil_polymesh_nel_652.txt";
 //    std::string mesh_file = "meshes/airfoil_polymesh_nel_2681.txt";
-    std::string mesh_file = "meshes/airfoil_polymesh_nel_5993.txt";
+//    std::string mesh_file = "meshes/airfoil_polymesh_nel_5993.txt";
+    std::string mesh_file = "meshes/airfoil_polymesh_nel_7805.txt";
     
     // Reading the polygonal mesh
     mesh_builder.set_poly_mesh_file(mesh_file);
@@ -3143,7 +3144,7 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
         nt *= 2;
     }
     RealType ti = 0.0;
-    RealType tf = 1.5;
+    RealType tf = 2.0;
     RealType dt     = (tf-ti)/nt;
     
     auto null_fun = [](const mesh_type::point_type& pt) -> RealType {
