@@ -257,6 +257,20 @@ class erk_hho_scheme
         }
     
     }
+
+    void refresh_faces_unknowns(Matrix<T, Dynamic, 1> & x, Matrix<T, Dynamic, 1> & RHSf){
+           
+        // Faces update from cells data
+        if (m_sff_is_block_diagonal_Q) {
+            x.block(m_n_c_dof, 0, m_n_f_dof, 1) = - m_Sff_inv * RHSf;
+        }else{
+            if (m_iterative_solver_Q) {
+                x.block(m_n_c_dof, 0, m_n_f_dof, 1) = -m_analysis_cg.solve(RHSf); // new state
+            }else{
+                x.block(m_n_c_dof, 0, m_n_f_dof, 1) = -FacesAnalysis().solve(RHSf); // new state
+            }
+        }
+    }
     
     void erk_weight(Matrix<T, Dynamic, 1> & y, Matrix<T, Dynamic, 1> & k){
         

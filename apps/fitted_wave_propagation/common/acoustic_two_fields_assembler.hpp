@@ -330,12 +330,10 @@ public:
     
     void apply_neumann_bc(const Mesh& msh, std::function<static_vector<T, 2>(const typename Mesh::point_type& )> flux_fun){
         
-        
-
         size_t n_scal_cbs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension);
         size_t n_vec_cbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension)-1;
         size_t n_cbs = n_scal_cbs + n_vec_cbs;
-        size_t facdeg   = m_hho_di.face_degree();
+        size_t facdeg = m_hho_di.face_degree();
         size_t n_fbs = disk::scalar_basis_size(facdeg, Mesh::dimension - 1);
 
         if (m_bnd.nb_faces_neumann() <= 0){
@@ -357,25 +355,7 @@ public:
                     RHS.segment(face_LHS_offset, n_fbs) += neumann;
                 }
             }
-  
         }
-        
-//        auto contribute = [this,&msh] (const typename Mesh::cell_type& cell){
-//
-//            auto fb = make_scalar_monomial_basis(msh, fc, m_hho_di.face_degree());
-//            auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(fc_id);
-//
-//            Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh, fc, fb);
-//            Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
-//            dirichlet_data.block(n_cbs + face_i*n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
-//
-//            Matrix<T, Dynamic, 1> f_loc = this->mixed_rhs(msh, cell, rhs_fun,di);
-//            this->scatter_rhs_data(msh, cell, f_loc);
-//        };
-//
-//        for (auto& cell : msh){
-//            contribute(cell);
-//        }
         
     }
             
@@ -708,15 +688,12 @@ public:
 
         neumann_operator = Matrix<T, Dynamic, Dynamic>::Zero(sfbs, 1);
         
-        auto vfb = make_vector_monomial_basis(msh, face, facdeg);
         auto sfb = make_scalar_monomial_basis(msh, face, facdeg);
         const auto qps = integrate(msh, face, facdeg);
         const auto n = disk::normal(msh, cell, face);
         for (auto& qp : qps)
         {
-            const auto v_f_phi = vfb.eval_functions(qp.point());
             const auto s_f_phi = sfb.eval_functions(qp.point());
-
             assert(s_f_phi.rows() == sfbs);
             const auto n_dot_v_f = disk::priv::inner_product(flux_fun(qp.point()),disk::priv::inner_product(qp.weight(), n));
             const auto result = disk::priv::inner_product(n_dot_v_f, s_f_phi);
