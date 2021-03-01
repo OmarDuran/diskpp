@@ -2142,6 +2142,7 @@ void HeterogeneousPulseIHHOFirstOrder(char **argv){
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_10240.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_16384.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_65536.txt");
+        mesh_files.push_back("meshes/mexican_hat_polymesh_adapted_nel_8512.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_adapted_nel_9216.txt");
         
         // Reading the polygonal mesh
