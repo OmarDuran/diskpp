@@ -17,5 +17,6 @@ set(input_poly_meshes ${input_poly_meshes}
 	${CMAKE_CURRENT_SOURCE_DIR}/mexican_hat_polymesh_nel_16384.txt
 	${CMAKE_CURRENT_SOURCE_DIR}/mexican_hat_polymesh_nel_65536.txt
 	${CMAKE_CURRENT_SOURCE_DIR}/mexican_hat_polymesh_adapted_nel_8512.txt
+	${CMAKE_CURRENT_SOURCE_DIR}/mexican_hat_polymesh_adapted_nel_9216.txt
 PARENT_SCOPE)
 
