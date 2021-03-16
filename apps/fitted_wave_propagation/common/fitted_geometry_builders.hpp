@@ -304,6 +304,169 @@ public:
             
         return true;
     }
+    
+    // glue meshes by node ids
+    bool glue_meshes_by_nodes(mesh_type& msh_master, mesh_type& msh_slave, std::map<size_t,size_t> &map_s_m_node_ids){
+        
+        //reserve storage
+        {
+            size_t n_points = msh_master.points_size() + msh_slave.points_size() - map_s_m_node_ids.size();
+            points.reserve(n_points);
+            vertices.reserve(n_points);
+            
+            
+            size_t n_edges = msh_master.faces_size() + msh_slave.faces_size() - (map_s_m_node_ids.size()-1);
+            size_t n_bc_edges = msh_master.boundary_faces_size() + msh_slave.boundary_faces_size() - 2*(map_s_m_node_ids.size()-1);
+            size_t n_skel_edges = n_edges - n_bc_edges;
+            skeleton_edges.reserve(n_skel_edges);
+            boundary_edges.reserve(n_bc_edges);
+            
+            size_t n_polygons = msh_master.cells_size() + msh_slave.cells_size();
+            polygons.reserve(n_polygons);
+   
+        }
+                
+        // Transfer master nodes
+        size_t node_id = 0;
+        for (auto& point : msh_master.backend_storage()->points) {
+            points.push_back(point);
+            vertices.push_back(node_type(point_identifier<2>(node_id)));
+            node_id++;
+        }
+        // Transfer slaves nodes
+        std::map<size_t,size_t> map_node_ids;
+        size_t node_id_s = 0;
+        for (auto& point : msh_slave.backend_storage()->points) {
+            if (map_s_m_node_ids.find(node_id_s) == map_s_m_node_ids.end())
+            {
+                points.push_back(point);
+                vertices.push_back(node_type(point_identifier<2>(node_id)));
+                map_node_ids[node_id_s] = node_id;
+                node_id++;
+                node_id_s++;
+            }else{
+                map_node_ids[node_id_s] = map_s_m_node_ids[node_id_s];
+                node_id_s++;
+            }
+        }
+                
+        auto map_id =  [&map_node_ids](const size_t id) -> size_t {
+            bool ckeck_Q = id < map_node_ids.size();
+            assert(ckeck_Q);
+            return map_node_ids[id];
+        };
+        
+        // Transfer master edges
+        for (auto& edge : msh_master.backend_storage()->edges) {
+            auto node_ids = edge.point_ids();
+            size_t id_0 = node_ids[0];
+            size_t id_1 = node_ids[1];
+            std::array<size_t, 2> e = {id_0,id_1};
+            validate_edge(e);
+            facets.push_back(e);
+        }
+        
+        // Transfer slaves edges
+        for (auto& edge : msh_slave.backend_storage()->edges) {
+            auto node_ids = edge.point_ids();
+            size_t id_0 = node_ids[0];
+            size_t id_1 = node_ids[1];
+            
+            bool ckeck_0_Q = map_s_m_node_ids.find(node_ids[0]) != map_s_m_node_ids.end();
+            bool ckeck_1_Q = map_s_m_node_ids.find(node_ids[1]) != map_s_m_node_ids.end();
+            if (ckeck_0_Q && ckeck_1_Q)
+            {
+                continue;
+            }
+            
+            std::array<size_t, 2> e = {map_id(id_0),map_id(id_1)};
+            validate_edge(e);
+            facets.push_back(e);
+
+        }
+        
+        // Transfer master boundary edges
+        std::set<size_t> bc_nodes;
+        for (auto chunk : map_s_m_node_ids) {
+            bc_nodes.insert(chunk.second);
+        }
+        for (auto face_it = msh_master.boundary_faces_begin(); face_it != msh_master.boundary_faces_end(); face_it++) {
+            auto edge = *face_it;
+            
+            auto node_ids = edge.point_ids();
+            size_t id_0 = node_ids[0];
+            size_t id_1 = node_ids[1];
+            
+            bool ckeck_0_Q = bc_nodes.find(node_ids[0]) != bc_nodes.end();
+            bool ckeck_1_Q = bc_nodes.find(node_ids[1]) != bc_nodes.end();
+            if (ckeck_0_Q && ckeck_1_Q)
+            {
+                continue;
+            }
+            
+            std::array<size_t, 2> e = {id_0,id_1};
+            validate_edge(e);
+            boundary_edges.push_back(e);
+        }
+        
+        // Transfer slave boundary edges
+        for (auto face_it = msh_slave.boundary_faces_begin(); face_it != msh_slave.boundary_faces_end(); face_it++) {
+            auto edge = *face_it;
+            
+            auto node_ids = edge.point_ids();
+            size_t id_0 = node_ids[0];
+            size_t id_1 = node_ids[1];
+            
+            bool ckeck_0_Q = map_s_m_node_ids.find(node_ids[0]) != map_s_m_node_ids.end();
+            bool ckeck_1_Q = map_s_m_node_ids.find(node_ids[1]) != map_s_m_node_ids.end();
+            if (ckeck_0_Q && ckeck_1_Q)
+            {
+                continue;
+            }
+            
+            std::array<size_t, 2> e = {map_id(id_0),map_id(id_1)};
+            validate_edge(e);
+            boundary_edges.push_back(e);
+        }
+        
+        // Transfer master surfaces
+        for (auto & surface : msh_master.backend_storage()->surfaces) {
+            polygon_2d polygon;
+            auto nodes = surface.point_ids();
+            for(int i = 0; i < nodes.size(); i++){
+                polygon.m_member_nodes.push_back(nodes[i]);
+            }
+            std::vector<size_t> chunk = polygon.m_member_nodes;
+            chunk.resize(chunk.size()+1);
+            chunk[chunk.size()-1] = chunk[0];
+            for (int i = 0; i < chunk.size() - 1; i++) {
+                std::array<size_t, 2> e = {chunk[i],chunk[i+1]};
+                validate_edge(e);
+                polygon.m_member_edges.insert(e);
+            }
+            polygons.push_back( polygon );
+        }
+        
+        // Transfer slave surfaces
+        for (auto & surface : msh_slave.backend_storage()->surfaces) {
+            polygon_2d polygon;
+            auto nodes = surface.point_ids();
+            for(int i = 0; i < nodes.size(); i++){
+                polygon.m_member_nodes.push_back(map_id(nodes[i]));
+            }
+            std::vector<size_t> chunk = polygon.m_member_nodes;
+            chunk.resize(chunk.size()+1);
+            chunk[chunk.size()-1] = chunk[0];
+            for (int i = 0; i < chunk.size() - 1; i++) {
+                std::array<size_t, 2> e = {chunk[i],chunk[i+1]};
+                validate_edge(e);
+                polygon.m_member_edges.insert(e);
+            }
+            polygons.push_back( polygon );
+        }
+               
+        return true;
+    }
 
 
     

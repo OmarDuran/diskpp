@@ -46,6 +46,9 @@ class linear_solver
     
     ConjugateGradient<SparseMatrix<T>> m_analysis_cg;
     BiCGSTAB<SparseMatrix<T>> m_analysis_bi_cg;
+    
+//    ConjugateGradient<SparseMatrix<T>, Eigen::Lower, IncompleteCholesky<T>> m_analysis_cg;
+//    BiCGSTAB<SparseMatrix<T>,Eigen::IncompleteLUT<T>> m_analysis_bi_cg;
     Matrix<T, Dynamic, 1> m_x_ini;
     
     size_t m_n_c_dof;
@@ -71,13 +74,15 @@ class linear_solver
     Matrix<T, Dynamic, 1> solve_global(Matrix<T, Dynamic, 1> & Fg){
         if (m_iterative_solver_Q.first) {
             if (m_iterative_solver_Q.second) {
-                Matrix<T, Dynamic, 1> x_dof = m_analysis_cg.solveWithGuess(Fg,m_x_ini);
+                Matrix<T, Dynamic, 1> x_dof = m_analysis_cg.solve(Fg);
+//                Matrix<T, Dynamic, 1> x_dof = m_analysis_cg.solveWithGuess(Fg,m_x_ini);
                 std::cout << "Number of iterations (CG): " << m_analysis_cg.iterations() << std::endl;
                 std::cout << "Estimated error: " << m_analysis_cg.error() << std::endl;
                 m_x_ini=x_dof;
                 return x_dof;
             }else{
-                Matrix<T, Dynamic, 1> x_dof = m_analysis_bi_cg.solveWithGuess(Fg,m_x_ini);
+                Matrix<T, Dynamic, 1> x_dof = m_analysis_bi_cg.solve(Fg);
+//                Matrix<T, Dynamic, 1> x_dof = m_analysis_bi_cg.solveWithGuess(Fg,m_x_ini);
                 std::cout << "Number of iterations (BiCG): " << m_analysis_bi_cg.iterations() << std::endl;
                 std::cout << "Estimated error: " << m_analysis_bi_cg.error() << std::endl;
                 m_x_ini=x_dof;
@@ -111,11 +116,13 @@ class linear_solver
         Matrix<T, Dynamic, 1> x_n_f_dof;
         if (m_iterative_solver_Q.first) {
             if (m_iterative_solver_Q.second) {
-                x_n_f_dof = m_analysis_cg.solveWithGuess(m_F,m_x_ini);
+                x_n_f_dof = m_analysis_cg.solve(m_F);
+//                x_n_f_dof = m_analysis_cg.solveWithGuess(m_F,m_x_ini);
                 std::cout << "Number of iterations (CG): " << m_analysis_cg.iterations() << std::endl;
                 std::cout << "Estimated error: " << m_analysis_cg.error() << std::endl;
             }else{
-                x_n_f_dof = m_analysis_bi_cg.solveWithGuess(m_F,m_x_ini);
+                x_n_f_dof = m_analysis_bi_cg.solve(m_F);
+//                x_n_f_dof = m_analysis_bi_cg.solveWithGuess(m_F,m_x_ini);
                 std::cout << "Number of iterations (BiCG): " << m_analysis_bi_cg.iterations() << std::endl;
                 std::cout << "Estimated error: " << m_analysis_bi_cg.error() << std::endl;
             }
@@ -185,7 +192,7 @@ class linear_solver
         m_iterative_solver_Q = std::make_pair(false,symmetric_matrix_Q);
     }
     
-    void set_iterative_solver(bool symmetric_matrix_Q = false, T tolerance = 1.0e-11){
+    void set_iterative_solver(bool symmetric_matrix_Q = false, T tolerance = 1.0e-3){
         m_iterative_solver_Q = std::make_pair(true,symmetric_matrix_Q);
         m_is_decomposed_Q    = true;
         m_tolerance = tolerance;
@@ -314,6 +321,7 @@ class linear_solver
                     m_analysis_cg.setTolerance(m_tolerance);
                     m_analysis_cg.setMaxIterations(m_K.rows());
                 }else{
+//                    m_analysis_bi_cg.preconditioner().setDroptol(0.001);
                     m_analysis_bi_cg.compute(m_K);
                     m_analysis_bi_cg.setTolerance(m_tolerance);
                     m_analysis_bi_cg.setMaxIterations(m_K.rows());

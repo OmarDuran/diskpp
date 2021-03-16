@@ -77,8 +77,7 @@ void HHOThreeFieldsConvergenceExample(int argc, char **argv);
 int main(int argc, char **argv)
 {
 
-    HeterogeneousGar6more2DIHHOFirstOrderTwoFields(argc, argv);
-    
+//    HeterogeneousGar6more2DIHHOFirstOrderTwoFields(argc, argv);
 //    HeterogeneousGar6more2DIHHOFirstOrder(argc, argv);
 //    HeterogeneousGar6more2DIHHOSecondOrder(argc, argv);
 
@@ -97,7 +96,7 @@ int main(int argc, char **argv)
     // Primal HHO
 //    HHOOneFieldConvergenceExample(argc, argv);
     // Dual HHO
-//    HHOTwoFieldsConvergenceExample(argc, argv);
+    HHOTwoFieldsConvergenceExample(argc, argv);
 //    HHOThreeFieldsConvergenceExample(argc, argv);
     
     return 0;
@@ -316,7 +315,7 @@ void HHOTwoFieldsConvergenceExample(int argc, char **argv){
     // Manufactured exact solution
     bool quadratic_function_Q = false;
     bool Nonzero_Dirichlet_Q = false;
-    RealType lambda = 1000.0;
+    RealType lambda = 1.0;
     auto exact_vec_fun = [quadratic_function_Q,Nonzero_Dirichlet_Q](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
         RealType x,y;
         x = pt.x();

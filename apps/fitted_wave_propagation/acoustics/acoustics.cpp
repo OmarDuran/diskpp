@@ -86,6 +86,7 @@ void EHHOFirstOrder(char **argv);
 void HeterogeneousIHHOSecondOrder(char **argv);
 void HeterogeneousIHHOFirstOrder(char **argv);
 void HeterogeneousEHHOFirstOrder(char **argv);
+void GlueMeshes(cartesian_2d_mesh_builder<RealType> &mesh_builder, simulation_data &sim_data);
 
 // Simulation for a heterogeneous acoustics problem on polygonal meshes
 void HeterogeneousPulseIHHOSecondOrder(char **argv);
@@ -1269,11 +1270,8 @@ void HeterogeneousIHHOSecondOrder(char **argv){
     
     mesh_type msh;
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh_x_direction(sim_data.m_n_divs);
-    mesh_builder.set_translation_data(0.0, 0.0);
-    mesh_builder.build_mesh();
+    GlueMeshes(mesh_builder,sim_data);
     mesh_builder.move_to_mesh_storage(msh);
-
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Time controls : Final time value 0.5
@@ -1466,15 +1464,10 @@ void HeterogeneousIHHOFirstOrder(char **argv){
     size_t nx = 10;
     size_t ny = 1;
     
-    
     mesh_type msh;
-
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh_x_direction(sim_data.m_n_divs);
-    mesh_builder.set_translation_data(0.0, 0.0);
-    mesh_builder.build_mesh();
+    GlueMeshes(mesh_builder,sim_data);
     mesh_builder.move_to_mesh_storage(msh);
-    
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Time controls : Final time value 0.5
@@ -1513,7 +1506,7 @@ void HeterogeneousIHHOFirstOrder(char **argv){
         std::vector<RealType> mat_data(2);
         RealType rho, vp;
         if (x < 0.5) {
-            vp = 3.0;
+            vp = 1.0;
         }else{
             vp = 1.0;
         }
@@ -1690,15 +1683,10 @@ void HeterogeneousEHHOFirstOrder(char **argv){
     size_t nx = 10;
     size_t ny = 1;
     
-    
     mesh_type msh;
-
     cartesian_2d_mesh_builder<RealType> mesh_builder(lx,ly,nx,ny);
-    mesh_builder.refine_mesh_x_direction(sim_data.m_n_divs);
-    mesh_builder.set_translation_data(0.0, 0.0);
-    mesh_builder.build_mesh();
+    GlueMeshes(mesh_builder,sim_data);
     mesh_builder.move_to_mesh_storage(msh);
-    
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // Time controls : Final time value 0.5
@@ -1872,6 +1860,80 @@ void HeterogeneousEHHOFirstOrder(char **argv){
     
 }
 
+void GlueMeshes(cartesian_2d_mesh_builder<RealType> &mesh_builder, simulation_data &sim_data){
+    
+    RealType lx = 1.0;
+    RealType ly = 0.2;
+    size_t nx = 10;
+    size_t ny = 1;
+    
+    size_t n_divs_m = 5;
+    mesh_type msh_m;
+    cartesian_2d_mesh_builder<RealType> mesh_builder_m(0.5,ly,nx,ny);
+    mesh_builder_m.refine_mesh_x_direction(n_divs_m);
+    mesh_builder_m.set_translation_data(0.0, 0.0);
+    mesh_builder_m.build_mesh();
+    mesh_builder_m.move_to_mesh_storage(msh_m);
+    
+    mesh_type msh_s;
+    cartesian_2d_mesh_builder<RealType> mesh_builder_s(0.5,ly,nx,ny);
+    mesh_builder_s.refine_mesh_x_direction(sim_data.m_n_divs);
+    mesh_builder_s.set_translation_data(0.5, 0.0);
+    mesh_builder_s.build_mesh();
+    mesh_builder_s.move_to_mesh_storage(msh_s);
+    
+    // detect nodes along x = 0
+    auto diff =  [](const typename mesh_type::point_type& p, const RealType val_x ) -> RealType {
+        RealType dx = (p.x() - val_x);
+        RealType diff = std::fabs(dx);
+        return diff;
+    };
+    
+    auto norm =  [](const typename mesh_type::point_type& a, const typename mesh_type::point_type& b ) -> RealType {
+        RealType dx = (b.x() - a.x());
+        RealType dy = (b.y() - a.y());
+        RealType norm = std::sqrt(dx*dx + dy*dy);
+        return norm;
+    };
+    
+    RealType tol = 1.0e-8;
+    RealType val_x = 0;
+    
+    size_t ip = 0;
+    std::set<RealType> set_m;
+    for (auto& point : msh_m.backend_storage()->points)
+    {
+        RealType dist = diff(point,val_x);
+        if (dist < tol) {
+            set_m.insert(ip);
+        }
+        ip++;
+    }
+    
+    ip = 0;
+    std::set<RealType> set_s;
+    for (auto& point : msh_s.backend_storage()->points)
+    {
+        RealType dist = diff(point,val_x);
+        if (dist < tol) {
+            set_s.insert(ip);
+        }
+        ip++;
+    }
+    
+    std::map<size_t,size_t> map_s_m_node_ids;
+    for (auto & id_m : set_m) {
+        typename mesh_type::point_type point_m = msh_m.backend_storage()->points.at(id_m);
+        for (auto & id_s : set_s) {
+            typename mesh_type::point_type point_s = msh_s.backend_storage()->points.at(id_s);
+            RealType diff = norm(point_m,point_s);
+            if (diff < tol) {
+                map_s_m_node_ids[id_s] = id_m;
+            }
+        }
+    }
+    mesh_builder.glue_meshes_by_nodes(msh_m,msh_s,map_s_m_node_ids);
+}
 
 void HeterogeneousPulseIHHOSecondOrder(char **argv){
     
@@ -1902,6 +1964,7 @@ void HeterogeneousPulseIHHOSecondOrder(char **argv){
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_10240.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_16384.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_65536.txt");
+        mesh_files.push_back("meshes/mexican_hat_polymesh_adapted_nel_8512.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_adapted_nel_9216.txt");
         
         // Reading the polygonal mesh
@@ -2416,6 +2479,7 @@ void HeterogeneousPulseEHHOFirstOrder(char **argv){
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_10240.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_16384.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_nel_65536.txt");
+        mesh_files.push_back("meshes/mexican_hat_polymesh_adapted_nel_8512.txt");
         mesh_files.push_back("meshes/mexican_hat_polymesh_adapted_nel_9216.txt");
         
         // Reading the polygonal mesh
@@ -3421,8 +3485,8 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
 
     polygon_2d_mesh_reader<RealType> mesh_builder;
 //    std::string mesh_file = "meshes/airfoil_polymesh_nel_6297.txt";
-//    std::string mesh_file = "meshes/airfoil_polymesh_nel_10077.txt";
-    std::string mesh_file = "meshes/airfoil_polymesh_nel_14875.txt";
+    std::string mesh_file = "meshes/airfoil_polymesh_nel_10077.txt";
+//    std::string mesh_file = "meshes/airfoil_polymesh_nel_14875.txt";
     
     // Reading the polygonal mesh
     mesh_builder.set_poly_mesh_file(mesh_file);
@@ -3542,7 +3606,7 @@ void ScatteringAirfoilIHHOFirstOrder(char **argv){
     std::ofstream sensor_3_log("s3_airfoil_acoustic_two_fields_h.csv");
     typename mesh_type::point_type s1_pt( 0.0, +1.0/2);
     typename mesh_type::point_type s2_pt( 0.0, -1.0/2);
-    typename mesh_type::point_type s3_pt(+1.0/2, 0.0);
+    typename mesh_type::point_type s3_pt(+3.0/2, 0.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
@@ -3687,8 +3751,8 @@ void ScatteringAirfoilEHHOFirstOrder(char **argv){
     mesh_type msh;
     polygon_2d_mesh_reader<RealType> mesh_builder;
 //    std::string mesh_file = "meshes/airfoil_polymesh_nel_6297.txt";
-//    std::string mesh_file = "meshes/airfoil_polymesh_nel_10077.txt";
-    std::string mesh_file = "meshes/airfoil_polymesh_nel_14875.txt";
+    std::string mesh_file = "meshes/airfoil_polymesh_nel_10077.txt";
+//    std::string mesh_file = "meshes/airfoil_polymesh_nel_14875.txt";
     
     // Reading the polygonal mesh
     mesh_builder.set_poly_mesh_file(mesh_file);
@@ -3716,6 +3780,17 @@ void ScatteringAirfoilEHHOFirstOrder(char **argv){
     auto flux_fun = [](const mesh_type::point_type& pt) -> std::vector<RealType> {
         std::vector<RealType> v = {0.0,0.0};
         return v;
+    };
+    
+    auto vel_fun = [](const mesh_type::point_type& pt) -> RealType {
+            RealType x,y,xc,yc,r,wave;
+            x = pt.x();
+            y = pt.y();
+            xc = 0.5;
+            yc = 0.25;
+            r = std::sqrt((x-xc)*(x-xc)+(y-yc)*(y-yc));
+            wave = 0.1*(-4*std::sqrt(10.0/3.0)*(-1 + 1600.0*r*r))/(std::exp(800*r*r)*std::pow(M_PI,0.25));
+            return wave;
     };
     
     RealType t = ti;
@@ -3789,8 +3864,8 @@ void ScatteringAirfoilEHHOFirstOrder(char **argv){
     
     // Projecting initial data
     Matrix<RealType, Dynamic, 1> x_dof;
-    assembler.project_over_cells(msh, x_dof, null_fun, flux_fun);
-    assembler.project_over_faces(msh, x_dof, null_fun);
+    assembler.project_over_cells(msh, x_dof, vel_fun, flux_fun);
+    assembler.project_over_faces(msh, x_dof, vel_fun);
     
     
     if (sim_data.m_render_silo_files_Q) {
@@ -3806,7 +3881,7 @@ void ScatteringAirfoilEHHOFirstOrder(char **argv){
     std::ofstream sensor_3_log("s3_airfoil_e_acoustic_two_fields_h.csv");
     typename mesh_type::point_type s1_pt( 0.0, +1.0/2);
     typename mesh_type::point_type s2_pt( 0.0, -1.0/2);
-    typename mesh_type::point_type s3_pt(+1.0/2, 0.0);
+    typename mesh_type::point_type s3_pt(+3.0/2, 0.0);
     std::pair<typename mesh_type::point_type,size_t> s1_pt_cell = std::make_pair(s1_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s2_pt_cell = std::make_pair(s2_pt, -1);
     std::pair<typename mesh_type::point_type,size_t> s3_pt_cell = std::make_pair(s3_pt, -1);
@@ -3846,7 +3921,7 @@ void ScatteringAirfoilEHHOFirstOrder(char **argv){
     std::cout << bold << cyan << "ERK analysis created: " << tc << " seconds" << reset << std::endl;
     
     erk_an.refresh_faces_unknowns(x_dof);
-    if(1){
+    if(0){
         RealType t = 0.0;
         auto flux_fun = [&t](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
             RealType x,y,vx,vy;
