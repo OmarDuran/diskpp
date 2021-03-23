@@ -1,13 +1,13 @@
 //
-//  elastodynamic_two_fields_assembler.hpp
+//  elastic_two_fields_assembler.hpp
 //  elastodynamics
 //
-//  Created by Omar Durán on 4/25/20.
+//  Created by Omar Durán on 22/03/21.
 //
 
 #pragma once
-#ifndef elastodynamic_two_fields_assembler_hpp
-#define elastodynamic_two_fields_assembler_hpp
+#ifndef elastic_two_fields_assembler_hpp
+#define elastic_two_fields_assembler_hpp
 
 #include "bases/bases.hpp"
 #include "methods/hho"
@@ -19,12 +19,15 @@
 #endif
 
 template<typename Mesh>
-class elastodynamic_two_fields_assembler
+class elastic_two_fields_assembler
 {
     
     
     typedef disk::BoundaryConditions<Mesh, false>    boundary_type;
     using T = typename Mesh::coordinate_type;
+    using point_type = typename Mesh::point_type;
+    using node_type = typename Mesh::node_type;
+    using edge_type = typename Mesh::edge_type;
 
     std::vector<size_t>                 m_compress_indexes;
     std::vector<size_t>                 m_expand_indexes;
@@ -32,9 +35,10 @@ class elastodynamic_two_fields_assembler
     disk::hho_degree_info               m_hho_di;
     boundary_type                       m_bnd;
     std::vector< Triplet<T> >           m_triplets;
-    std::vector< Triplet<T> >           m_mass_triplets;
+    std::vector< Triplet<T> >           m_mass_triplets; // Candidate for deletion
     std::vector< elastic_material_data<T> > m_material;
     std::vector< size_t >               m_elements_with_bc_eges;
+    std::vector< edge_type >            m_fracture_eges;
 
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
@@ -47,13 +51,15 @@ public:
     Matrix<T, Dynamic, 1>   RHS;
     SparseMatrix<T>         MASS;
 
-    elastodynamic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd)
-        : m_hho_di(hho_di), m_bnd(bnd), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
+    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector< edge_type > & fracture_eges)
+        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_eges(fracture_eges), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
 
             auto fc_id = msh.lookup(fc);
+            bool is_dir_Q = bnd.is_dirichlet_face(fc_id);
+            auto dir_type = m_bnd.dirichlet_boundary_type(fc_id);
             return bnd.is_dirichlet_face(fc_id);
         };
 
@@ -167,15 +173,37 @@ public:
             auto fc = fcs[face_i];
             auto face_offset = disk::priv::offset(msh, fc);
             auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(face_offset)*n_fbs;
-
             auto fc_id = msh.lookup(fc);
             bool dirichlet = m_bnd.is_dirichlet_face(fc_id);
-
-            for (size_t i = 0; i < n_fbs; i++)
-                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
-            
             if (dirichlet)
              {
+                 switch (m_bnd.dirichlet_boundary_type(fc_id)) {
+                    case disk::DIRICHLET: {
+                        for (size_t i = 0; i < n_fbs; i++){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                        }
+                        break;
+                    }
+                    case disk::DX: {
+                         for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                             asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                             asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
+                         }
+                        break;
+                    }
+                    case disk::DY: {
+                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, false) );
+                        }
+                        break;
+                    }
+                     default: {
+                        throw std::logic_error("Unknown Dirichlet Conditions.");
+                        break;
+                     }
+                 }
+                 
                  auto fb = make_vector_monomial_basis(msh, fc, m_hho_di.face_degree());
                  auto dirichlet_fun  = m_bnd.dirichlet_boundary_func(fc_id);
 
@@ -183,6 +211,10 @@ public:
                  Matrix<T, Dynamic, 1> rhs = make_rhs(msh, fc, fb, dirichlet_fun);
                  dirichlet_data.block(n_cbs + face_i*n_fbs, 0, n_fbs, 1) = mass.llt().solve(rhs);
              }
+            else{
+                for (size_t i = 0; i < n_fbs; i++)
+                asm_map.push_back( assembly_index(face_LHS_offset+i, true));
+            }
             
         }
 
@@ -275,7 +307,7 @@ public:
             
     void apply_bc(const Mesh& msh){
         
-        #ifdef HAVE_INTEL_TBB
+        #ifdef HAVE_INTEL_TBB2
                 size_t n_cells = m_elements_with_bc_eges.size();
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
                     [this,&msh] (size_t & i){
@@ -339,10 +371,8 @@ public:
             
         elastic_material_data<T> & material = m_material[cell_ind];
         T rho = material.rho();
-        T vp = material.vp();
-        T vs = material.vs();
-        T mu = rho * vs * vs;
-        T lambda = rho * vp * vp - 2*mu;
+        T mu = material.mu();
+        T lambda = material.l();
         
         auto reconstruction_operator   = strain_tensor_reconstruction(msh, cell);
         Matrix<T, Dynamic, Dynamic> R_operator = reconstruction_operator.second;
@@ -363,8 +393,12 @@ public:
             auto n_s_cols = stabilization_operator.cols();
             S_operator.block(n_rows-n_s_rows, n_cols-n_s_cols, n_s_rows, n_s_cols) = stabilization_operator;
         }
+        
+        Matrix<T, Dynamic, Dynamic> mass = mass_operator(cell_ind, msh, cell, false);
+        Matrix<T, Dynamic, Dynamic> M_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
+        M_operator.block(0,0,mass.rows(),mass.cols()) = mass;
 
-        return R_operator + (rho*vs)*S_operator;
+        return M_operator + R_operator + (rho*mu)*S_operator;
     }
             
     Matrix<T, Dynamic, Dynamic>
@@ -463,10 +497,8 @@ public:
             
         elastic_material_data<T> & material = m_material[cell_ind];
         T rho = material.rho();
-        T vp = material.vp();
-        T vs = material.vs();
-        T mu = rho * vs * vs;
-        T lambda = rho * vp * vp - 2*mu;
+        T mu = material.mu();
+        T lambda = material.l();
     
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(n_cbs, n_cbs);
         
@@ -874,4 +906,4 @@ public:
     }
 };
 
-#endif /* elastodynamic_two_fields_assembler_hpp */
+#endif /* elastic_two_fields_assembler_hpp */

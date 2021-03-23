@@ -2,7 +2,7 @@
 //  elastic_material_data.hpp
 //  acoustics
 //
-//  Created by Omar Durán on 4/14/20.
+//  Created by Omar Durán on 22/03/21.
 //
 
 #ifndef elastic_material_data_hpp
@@ -16,26 +16,26 @@ class elastic_material_data {
     /// Fluid density
     T m_rho;
     
-    /// Compressional P-wave velocity
-    T m_vp;
+    /// First lame parameter
+    T m_l;
     
-    /// Shear S-wave velocity
-    T m_vs;
+    /// Second lame parameter
+    T m_mu;
     
 public:
     
     /// Default constructor
-    elastic_material_data(T rho, T vp, T vs){
+    elastic_material_data(T rho, T l, T mu){
         m_rho = rho;
-        m_vp = vp;
-        m_vs = vs;
+        m_l = l;
+        m_mu = mu;
     }
     
     /// Copy constructor
     elastic_material_data(const elastic_material_data & other){
         m_rho       = other.m_rho;
-        m_vp         = other.m_vp;
-        m_vs         = other.m_vs;
+        m_l         = other.m_l;
+        m_mu        = other.m_mu;
     }
     
     /// Assignement constructor
@@ -47,8 +47,8 @@ public:
         }
         
         m_rho       = other.m_rho;
-        m_vp         = other.m_vp;
-        m_vs         = other.m_vs;
+        m_l         = other.m_l;
+        m_mu        = other.m_mu;
         return *this;
         
     }
@@ -61,8 +61,8 @@ public:
     /// Print class attributes
     virtual void Print(std::ostream &out = std::cout) const{
         out << "\n density = " << m_rho;
-        out << "\n p-wave velocity = " << m_vp;
-        out << "\n s-wave velocity = " << m_vs;
+        out << "\n first lame paremeter = " << m_l;
+        out << "\n second lame paremeter = " << m_mu;
     }
     
     /// Print class attributes
@@ -82,24 +82,24 @@ public:
     }
     
     
-    void Set_vp(T vp)
+    void Set_l(T l)
     {
-        m_vp = vp;
+        m_l = l;
     }
     
-    T vp()
+    T l()
     {
-        return m_vp;
+        return m_l;
     }
     
-    void Set_vs(T vs)
+    void Set_mu(T mu)
     {
-        m_vs = vs;
+        m_mu = mu;
     }
     
-    T vs()
+    T mu()
     {
-        return m_vs;
+        return m_mu;
     }
     
 };

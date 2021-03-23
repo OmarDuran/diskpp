@@ -37,11 +37,244 @@ using namespace Eigen;
 #include "../common/preprocessor.hpp"
 #include "../common/postprocessor.hpp"
 
+// ----- common data types ------------------------------
+using RealType = double;
+typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
+
 void CrackExample(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
 //    CrackExample(argc, argv);
+    
+    simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
+    sim_data.print_simulation_data();
+    
+    timecounter tc;
+    
+    // Reading the polygonal mesh
+    tc.tic();
+    mesh_type msh;
+    polygon_2d_mesh_reader<RealType> mesh_builder;
+    
+    // Reading the polygonal mesh
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
+    mesh_builder.set_poly_mesh_file(mesh_file);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    typedef typename mesh_type::point_type  point_type;
+    typedef typename mesh_type::node_type   node_type;
+    typedef typename mesh_type::edge_type   edge_type;
+    std::vector<edge_type> fracture_edges;
+    auto storage = msh.backend_storage();
+    
+    auto node1 = typename node_type::id_type(2);
+    auto node2 = typename node_type::id_type(3);
+    auto frac_e = edge_type{{node1, node2}};
+    for (auto &egde : storage->edges)
+    {
+        auto points = egde.point_ids();
+        
+        bool are_equal_Q = frac_e == egde;
+        if(are_equal_Q){
+            fracture_edges.push_back(frac_e);
+        }
+    }
+    tc.toc();
+    std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    // Constant elastic properties
+    RealType rho,l,mu;
+    rho = 1.0;
+    l = 1.0;
+    mu = 1.0;
+    elastic_material_data<RealType> material(rho,l,mu);
+
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t face_k_degree = sim_data.m_k_degree;
+    size_t cell_k_degree = face_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
+    }
+    disk::hho_degree_info hho_di(cell_k_degree,face_k_degree);
+
+    // Solving a scalar primal HHO problem
+    auto null_v_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+        RealType x,y;
+        x = pt.x();
+        y = pt.y();
+        RealType ux = 0.0;
+        RealType uy = 0.0;
+        return static_vector<RealType, 2>{ux, uy};
+    };
+    auto u_top_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+        RealType x,y;
+        x = pt.x();
+        y = pt.y();
+        RealType ux = 0.0;
+        RealType uy = -0.1;
+        return static_vector<RealType, 2>{ux, uy};
+    };
+    
+    auto rhs_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+        RealType x,y;
+        x = pt.x();
+        y = pt.y();
+        RealType rx = 0.0;
+        RealType ry = 0.0;
+        return static_vector<RealType, 2>{rx, ry};
+    };
+    
+    boundary_type bnd(msh);
+    // defining boundary conditions
+    {
+        size_t bc_D_bot_id = 0;
+        size_t bc_N_right_id = 1;
+        size_t bc_D_top_id = 2;
+        size_t bc_N_left_id = 3;
+        RealType eps = 1.0e-8;
+        
+        for (auto face_it = msh.boundary_faces_begin(); face_it != msh.boundary_faces_end(); face_it++)
+        {
+            auto face = *face_it;
+            mesh_type::point_type bar = barycenter(msh, face);
+            auto fc_id = msh.lookup(face);
+            if (std::fabs(bar.y()-0.0) < eps) {
+                disk::bnd_info bi{bc_D_bot_id, true};
+                msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                continue;
+            }
+            
+            if(std::fabs(bar.x()-2.0) < eps){
+                disk::bnd_info bi{bc_N_right_id, true};
+                msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                continue;
+            }
+            
+            if (std::fabs(bar.y()-4.0) < eps) {
+                disk::bnd_info bi{bc_D_top_id, true};
+                msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                continue;
+            }
+            
+            if (std::fabs(bar.x()-0.0) < eps) {
+                disk::bnd_info bi{bc_N_left_id, true};
+                msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                continue;
+            }
+        }
+        
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+    }
+
+    tc.tic();
+    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_edges);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
+    }
+    assembler.load_material_data(msh,material);
+    assembler.assemble(msh, rhs_fun);
+    assembler.assemble_mass(msh, false);
+    assembler.apply_bc(msh);
+    tc.toc();
+    std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    // Solving LS
+    Matrix<RealType, Dynamic, 1> x_dof;
+    tc.tic();
+    linear_solver<RealType> analysis(assembler.LHS);
+    tc.toc();
+    std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    analysis.factorize();
+    tc.toc();
+    std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    tc.tic();
+    x_dof = analysis.solve(assembler.RHS);
+    tc.toc();
+    std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
+    std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
+    
+    // render silo
+    {
+        std::string silo_file_name = "single_fracture";
+        
+        timecounter tc;
+        tc.tic();
+        
+        auto dim = mesh_type::dimension;
+        auto num_cells = msh.cells_size();
+        auto num_points = msh.points_size();
+        using RealType = double;
+        std::vector<RealType> approx_ux, approx_uy;
+        size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
+        size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),dim, dim);
+        size_t cell_dof = n_ten_cbs + n_vec_cbs;
+
+        approx_ux.reserve( num_points );
+        approx_uy.reserve( num_points );
+        
+        // scan for selected cells, common cells are discardable
+        std::map<size_t, size_t> point_to_cell;
+        size_t cell_i = 0;
+        for (auto& cell : msh)
+        {
+            auto points = cell.point_ids();
+            size_t n_p = points.size();
+            for (size_t l = 0; l < n_p; l++)
+            {
+                auto pt_id = points[l];
+                point_to_cell[pt_id] = cell_i;
+            }
+            cell_i++;
+        }
+
+        for (auto& pt_id : point_to_cell)
+        {
+            auto bar = *std::next(msh.points_begin(), pt_id.first);
+            cell_i = pt_id.second;
+            auto cell = *std::next(msh.cells_begin(), cell_i);
+            
+            // vector evaluation
+            {
+                auto cell_basis = make_vector_monomial_basis(msh, cell, hho_di.cell_degree());
+                Matrix<RealType, Dynamic, 1> vec_x_cell_dof = x_dof.block(cell_i*cell_dof + n_ten_cbs, 0, n_vec_cbs, 1);
+                auto t_phi = cell_basis.eval_functions( bar );
+                assert(t_phi.rows() == cell_basis.size());
+                auto uh = disk::eval(vec_x_cell_dof, t_phi);
+                approx_ux.push_back(uh(0,0));
+                approx_uy.push_back(uh(1,0));
+            }
+        }
+
+        disk::silo_database silo;
+        silo_file_name += std::to_string(0) + ".silo";
+        silo.create(silo_file_name.c_str());
+        silo.add_mesh(msh, "mesh");
+        disk::silo_nodal_variable<double> vx_silo("ux", approx_ux);
+        disk::silo_nodal_variable<double> vy_silo("uy", approx_uy);
+        silo.add_variable("mesh", vx_silo);
+        silo.add_variable("mesh", vy_silo);
+
+        silo.close();
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+    }
     
     return 0;
 }
