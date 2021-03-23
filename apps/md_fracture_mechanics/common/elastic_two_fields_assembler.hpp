@@ -325,6 +325,28 @@ public:
         }
     
     }
+    
+    void scatter_mortar_mass_data(const Mesh& msh, const size_t & fracture_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
+    {
+        size_t n_f_sigma_bs = disk::vector_basis_size(m_sigma_degree, Mesh::dimension - 1, Mesh::dimension);
+        
+        std::vector<assembly_index> asm_map;
+        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + fracture_ind*n_f_sigma_bs;
+        
+        for (size_t i = 0; i < n_f_sigma_bs; i++)
+        asm_map.push_back( assembly_index(frac_LHS_offset+i, true));
+        
+        assert( asm_map.size() == mortar_mat.rows() && asm_map.size() == mortar_mat.cols() );
+
+        for (size_t i = 0; i < mortar_mat.rows(); i++)
+        {
+            for (size_t j = 0; j < mortar_mat.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j],mortar_mat(i,j)) );
+            }
+        }
+    
+    }
 
     void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
@@ -350,11 +372,18 @@ public:
         for (auto chunk : m_fracture_pairs) {
             auto& face_l = storage->edges[chunk.first];
             auto& face_r = storage->edges[chunk.second];
-            Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_mass_matrix(msh,face_l);
-            Matrix<T, Dynamic, Dynamic> mortar_r = +1.0*mortar_mass_matrix(msh,face_l);
+            Matrix<T, Dynamic, Dynamic> mortar_l = +1.0*mortar_coupling_matrix(msh,face_l);
+            Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,face_l);
             
             scatter_mortar_data(msh,chunk.first,fracture_ind,mortar_l);
             scatter_mortar_data(msh,chunk.second,fracture_ind,mortar_r);
+            
+            auto vec_basis = disk::make_vector_monomial_basis(msh, face_l, m_sigma_degree);
+            Matrix<T, Dynamic, Dynamic> mass_matrix = disk::make_mass_matrix(msh, face_l, vec_basis);
+            mass_matrix *= 0.1;
+            scatter_mortar_mass_data(msh,fracture_ind,mass_matrix);
+            
+            
             fracture_ind++;
         }
     }
@@ -568,7 +597,7 @@ public:
         return mass_matrix;
     }
     
-    Matrix<T, Dynamic, Dynamic> mortar_mass_matrix(const Mesh& msh, const typename Mesh::face_type& face, size_t di = 0)
+    Matrix<T, Dynamic, Dynamic> mortar_coupling_matrix(const Mesh& msh, const typename Mesh::face_type& face, size_t di = 0)
     {
         const auto degree     = m_hho_di.face_degree();
         
