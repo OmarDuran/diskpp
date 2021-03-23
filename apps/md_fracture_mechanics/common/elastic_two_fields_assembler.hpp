@@ -40,6 +40,7 @@ class elastic_two_fields_assembler
     std::vector< elastic_material_data<T> > m_material;
     std::vector< size_t >               m_elements_with_bc_eges;
     std::vector<std::pair<size_t,size_t>> m_fracture_pairs;
+    std::vector<std::pair<size_t,size_t>> m_elements_with_fractures_eges;
 
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
@@ -101,6 +102,7 @@ public:
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
             
         classify_cells(msh);
+        classify_fracture_cells(msh);
     }
 
     void scatter_data(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -639,6 +641,42 @@ public:
                 }
             }
             cell_ind++;
+        }
+    }
+    
+    void classify_fracture_cells(const Mesh& msh){
+
+        m_elements_with_fractures_eges.clear();
+        size_t cell_l, cell_r;
+        for (auto chunk : m_fracture_pairs) {
+            size_t cell_ind = 0;
+            for (auto& cell : msh)
+            {
+                auto face_list = faces(msh, cell);
+                for (size_t face_i = 0; face_i < face_list.size(); face_i++)
+                {
+                    
+                    auto fc = face_list[face_i];
+                    auto fc_id = msh.lookup(fc);
+                    
+                    bool is_left_fracture_Q = fc_id == chunk.first;
+                    if (is_left_fracture_Q)
+                    {
+                        cell_l = cell_ind;
+                        break;
+                    }
+                    
+                    bool is_right_fracture_Q = fc_id == chunk.second;
+                    if (is_right_fracture_Q)
+                    {
+                        cell_r = cell_ind;
+                        break;
+                    }
+                    
+                }
+                cell_ind++;
+            }
+            m_elements_with_fractures_eges.push_back(cell_l,cell_r);
         }
     }
             
