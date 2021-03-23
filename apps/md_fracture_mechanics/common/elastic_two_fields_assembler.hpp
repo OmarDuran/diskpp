@@ -57,8 +57,6 @@ public:
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
 
             auto fc_id = msh.lookup(fc);
-            bool is_dir_Q = bnd.is_dirichlet_face(fc_id);
-            auto dir_type = m_bnd.dirichlet_boundary_type(fc_id);
             return bnd.is_dirichlet_face(fc_id);
         };
 
@@ -68,24 +66,22 @@ public:
         m_compress_indexes.resize( m_n_edges );
         m_expand_indexes.resize( m_n_edges - m_n_essential_edges );
 
-        size_t compressed_offset = 0;
-        for (size_t i = 0; i < m_n_edges; i++)
+        size_t n_face_dof = 0;
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
         {
-            auto fc = *std::next(msh.faces_begin(), i);
-            if ( !is_dirichlet(fc) )
-            {
-                m_compress_indexes.at(i) = compressed_offset;
-                m_expand_indexes.at(compressed_offset) = i;
-                compressed_offset++;
-            }
+            m_compress_indexes.at(face_id) = n_face_dof;
+//                m_expand_indexes.at(compressed_offset) = face_id;
+            const auto non_essential_dofs = n_fbs - m_bnd.dirichlet_imposed_dofs(face_id, m_hho_di.face_degree());
+            n_face_dof += non_essential_dofs;
         }
-
+        
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
-        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+
             
-        size_t system_size = n_cbs * msh.cells_size() + n_fbs * (m_n_edges - m_n_essential_edges);
+        size_t system_size = n_cbs * msh.cells_size() + n_face_dof;
 
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
@@ -115,9 +111,8 @@ public:
         {
             auto fc = fcs[face_i];
             auto face_offset = disk::priv::offset(msh, fc);
-            auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(face_offset)*n_fbs;
-
             auto fc_id = msh.lookup(fc);
+            auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(fc_id);
             bool dirichlet = m_bnd.is_dirichlet_face(fc_id);
 
             for (size_t i = 0; i < n_fbs; i++)
@@ -170,8 +165,8 @@ public:
         {
             auto fc = fcs[face_i];
             auto face_offset = disk::priv::offset(msh, fc);
-            auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(face_offset)*n_fbs;
             auto fc_id = msh.lookup(fc);
+            auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(fc_id);
             bool dirichlet = m_bnd.is_dirichlet_face(fc_id);
             if (dirichlet)
              {
@@ -183,16 +178,16 @@ public:
                         break;
                     }
                     case disk::DX: {
-                         for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                         for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
                              asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
                              asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
                          }
                         break;
                     }
                     case disk::DY: {
-                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                        for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
                         }
                         break;
                     }
@@ -275,7 +270,7 @@ public:
             
     void apply_bc(const Mesh& msh){
         
-        #ifdef HAVE_INTEL_TBB
+        #ifdef HAVE_INTEL_TBB2
                 size_t n_cells = m_elements_with_bc_eges.size();
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
                     [this,&msh] (size_t & i){

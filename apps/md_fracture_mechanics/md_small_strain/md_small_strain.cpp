@@ -74,16 +74,22 @@ int main(int argc, char **argv)
     std::vector<edge_type> fracture_edges;
     auto storage = msh.backend_storage();
     
-    auto node1 = typename node_type::id_type(2);
-    auto node2 = typename node_type::id_type(3);
-    auto frac_e = edge_type{{node1, node2}};
-    for (auto &egde : storage->edges)
-    {
-        auto points = egde.point_ids();
-        
-        bool are_equal_Q = frac_e == egde;
-        if(are_equal_Q){
-            fracture_edges.push_back(frac_e);
+    std::vector<std::pair<size_t,size_t>> fracture_nodes;
+    fracture_nodes.push_back(std::make_pair(3, 4));
+    fracture_nodes.push_back(std::make_pair(4, 5));
+    
+    for (auto& nodes : fracture_nodes) {
+        auto node1 = typename node_type::id_type(nodes.first);
+        auto node2 = typename node_type::id_type(nodes.second);
+        auto frac_e = edge_type{{node1, node2}};
+        for (auto &egde : storage->edges)
+        {
+            auto points = egde.point_ids();
+            
+            bool are_equal_Q = frac_e == egde;
+            if(are_equal_Q){
+                fracture_edges.push_back(frac_e);
+            }
         }
     }
     tc.toc();
