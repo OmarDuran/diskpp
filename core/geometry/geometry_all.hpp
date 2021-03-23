@@ -294,6 +294,24 @@ normal(const Mesh<T, 3, Storage>& msh,
     return n/n.norm();
 }
 
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+static_vector<T, 2>
+tanget(const Mesh<T,2,Storage>& msh,
+       const typename Mesh<T,2,Storage>::cell& cl,
+       const typename Mesh<T,2,Storage>::face& fc)
+{
+    auto pts = points(msh, fc);
+    assert(pts.size() == 2);
+    auto tv = (point<T,3>({0, 0, 1})).to_vector();
+    auto n2d = normal(msh,cl,fc);
+    auto n = (point<T,3>({n2d.x(), n2d.y(), 0})).to_vector();
+    auto tf = tv.cross(n);
+    auto t = (point<T,2>({tf.x(), tf.y()})).to_vector();
+    
+    return t/t.norm();
+}
+
 } // namespace disk
 
 #endif /* _GEOMETRY_ALL_HPP_ */

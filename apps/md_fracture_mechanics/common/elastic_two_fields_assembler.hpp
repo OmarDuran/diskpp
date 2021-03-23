@@ -78,7 +78,8 @@ public:
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         
         m_sigma_degree = m_hho_di.face_degree()-1;
-        size_t n_f_sigma_bs = disk::vector_basis_size(m_sigma_degree, Mesh::dimension - 1, Mesh::dimension);
+        size_t n_f_sigma_n_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
+        size_t n_f_sigma_t_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
 
         for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
         {
@@ -89,7 +90,7 @@ public:
             m_n_faces_dof += non_essential_dofs;
         }
         
-        m_n_hybrid_dof = n_f_sigma_bs * m_fracture_pairs.size();
+        m_n_hybrid_dof = (n_f_sigma_n_bs + n_f_sigma_t_bs) * m_fracture_pairs.size();
         
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -303,7 +304,7 @@ public:
     void scatter_mortar_data(const Mesh& msh, const size_t & face_id, const size_t & fracture_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
     {
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
-        size_t n_f_sigma_bs = disk::vector_basis_size(m_sigma_degree, Mesh::dimension - 1, Mesh::dimension);
+        size_t n_f_sigma_bs = 2.0*disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
@@ -330,7 +331,7 @@ public:
     
     void scatter_mortar_mass_data(const Mesh& msh, const size_t & fracture_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
     {
-        size_t n_f_sigma_bs = disk::vector_basis_size(m_sigma_degree, Mesh::dimension - 1, Mesh::dimension);
+        size_t n_f_sigma_bs = 2.0*disk::scalar_basis_size(m_sigma_degree, Mesh::dimension-1);
         
         std::vector<assembly_index> asm_map;
         auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + fracture_ind*n_f_sigma_bs;
@@ -372,23 +373,30 @@ public:
         auto storage = msh.backend_storage();
         size_t fracture_ind = 0;
         for (auto chunk : m_fracture_pairs) {
+            
+            size_t cell_ind_l = m_elements_with_fractures_eges[fracture_ind].first;
+            size_t cell_ind_r = m_elements_with_fractures_eges[fracture_ind].second;
             auto& face_l = storage->edges[chunk.first];
             auto& face_r = storage->edges[chunk.second];
-            Matrix<T, Dynamic, Dynamic> mortar_l = +1.0*mortar_coupling_matrix(msh,face_l);
-            Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,face_l);
+            auto& cell_l = storage->surfaces[cell_ind_l];
+            auto& cell_r = storage->surfaces[cell_ind_r];
+            
+            Matrix<T, Dynamic, Dynamic> mortar_l = +1.0*mortar_coupling_matrix(msh,cell_l,face_l);
+            Matrix<T, Dynamic, Dynamic> mortar_r = +1.0*mortar_coupling_matrix(msh,cell_r,face_r);
             
             scatter_mortar_data(msh,chunk.first,fracture_ind,mortar_l);
             scatter_mortar_data(msh,chunk.second,fracture_ind,mortar_r);
             
-            auto vec_basis = disk::make_vector_monomial_basis(msh, face_l, m_sigma_degree);
-            Matrix<T, Dynamic, Dynamic> mass_matrix = disk::make_mass_matrix(msh, face_l, vec_basis);
-            mass_matrix *= 0.1;
+            Matrix<T, Dynamic, Dynamic> mass_matrix = sigma_mass_matrix(msh, face_l, face_r);
             scatter_mortar_mass_data(msh,fracture_ind,mass_matrix);
             
             
             fracture_ind++;
         }
     }
+    
+    
+    
     void apply_bc(const Mesh& msh){
         
         #ifdef HAVE_INTEL_TBB2
@@ -599,24 +607,66 @@ public:
         return mass_matrix;
     }
     
-    Matrix<T, Dynamic, Dynamic> mortar_coupling_matrix(const Mesh& msh, const typename Mesh::face_type& face, size_t di = 0)
+    Matrix<T, Dynamic, Dynamic> mortar_coupling_matrix(const Mesh& msh, const typename Mesh::cell_type& cell, const typename Mesh::face_type& face, size_t di = 0)
     {
         const auto degree     = m_hho_di.face_degree();
         
         auto vec_u_basis = disk::make_vector_monomial_basis(msh, face, m_hho_di.face_degree());
-        auto vec_s_basis = disk::make_vector_monomial_basis(msh, face, m_sigma_degree);
+        auto sn_basis = disk::make_scalar_monomial_basis(msh, face, m_sigma_degree);
+        auto st_basis = disk::make_scalar_monomial_basis(msh, face, m_sigma_degree);
         
-
-        Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(vec_s_basis.size(), vec_u_basis.size());
+        size_t n_s_basis = sn_basis.size() + st_basis.size();
+        Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, vec_u_basis.size());
 
         const auto qps = integrate(msh, face, 2 * (degree+di));
-
+        const auto n = disk::normal(msh, cell, face);
+        const auto t = disk::tanget(msh, cell, face);
         for (auto& qp : qps)
         {
-            const auto phi_i    = vec_s_basis.eval_functions(qp.point());
-            const auto phi_j    = vec_u_basis.eval_functions(qp.point());
-            const auto qp_phi = disk::priv::inner_product(qp.weight(), phi_i);
-            ret += disk::priv::outer_product(qp_phi, phi_j);
+            const auto u_f_phi = vec_u_basis.eval_functions(qp.point());
+            const auto sn_f_phi = sn_basis.eval_functions(qp.point());
+            const auto st_f_phi = st_basis.eval_functions(qp.point());
+            
+            const auto w_n_dot_u_f_phi = disk::priv::inner_product(u_f_phi,disk::priv::inner_product(qp.weight(), n));
+            const auto s_n_opt = disk::priv::outer_product(sn_f_phi, w_n_dot_u_f_phi);
+            
+            const auto w_t_dot_u_f_phi = disk::priv::inner_product(u_f_phi,disk::priv::inner_product(qp.weight(), t));
+            const auto s_t_opt = disk::priv::outer_product(st_f_phi, w_t_dot_u_f_phi);
+
+            ret.block(0,0,sn_basis.size(),vec_u_basis.size()) += s_n_opt;
+            ret.block(sn_basis.size(),0,st_basis.size(),vec_u_basis.size()) += s_t_opt;
+        }
+
+        return ret;
+    }
+    
+    Matrix<T, Dynamic, Dynamic> sigma_mass_matrix(const Mesh& msh, const typename Mesh::face_type& face_l, const typename Mesh::face_type& face_r, size_t di = 0)
+    {
+        const auto degree     = m_sigma_degree;
+        auto sn_basis = disk::make_scalar_monomial_basis(msh, face_l, m_sigma_degree);
+        auto st_basis = disk::make_scalar_monomial_basis(msh, face_r, m_sigma_degree);
+        
+        size_t n_s_basis = sn_basis.size() + st_basis.size();
+        Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, n_s_basis);
+
+        T c_perp = 0.1;
+        const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
+        for (auto& qp : qps_l)
+        {
+            const auto sn_f_phi = sn_basis.eval_functions(qp.point());
+            const auto w_sn_f_phi = disk::priv::inner_product(qp.weight(), sn_f_phi);
+            const auto s_n_opt = disk::priv::outer_product(sn_f_phi, w_sn_f_phi);
+            ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
+        }
+        
+        T c_para = 0.0;
+        const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
+        for (auto& qp : qps_r)
+        {
+            const auto st_f_phi = st_basis.eval_functions(qp.point());
+            const auto w_st_f_phi = disk::priv::inner_product(qp.weight(), st_f_phi);
+            const auto s_t_opt = disk::priv::outer_product(st_f_phi, w_st_f_phi);
+            ret.block(sn_basis.size(),sn_basis.size(),st_basis.size(),st_basis.size()) += c_para * s_t_opt;
         }
 
         return ret;
@@ -676,7 +726,7 @@ public:
                 }
                 cell_ind++;
             }
-            m_elements_with_fractures_eges.push_back(cell_l,cell_r);
+            m_elements_with_fractures_eges.push_back(std::make_pair(cell_l,cell_r));
         }
     }
             
