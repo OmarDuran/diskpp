@@ -49,7 +49,6 @@ public:
 
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
-    SparseMatrix<T>         MASS;
 
     elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector< edge_type > & fracture_eges)
         : m_hho_di(hho_di), m_bnd(bnd), m_fracture_eges(fracture_eges), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
@@ -90,7 +89,6 @@ public:
 
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
-        MASS = SparseMatrix<T>( system_size, system_size );
             
         classify_cells(msh);
     }
@@ -259,36 +257,6 @@ public:
         }
 
     }
-            
-    void scatter_mass_data(const Mesh& msh, const typename Mesh::cell_type& cl,
-    const Matrix<T, Dynamic, Dynamic>& mass_matrix)
-    {
-        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
-        size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
-        size_t n_cbs = n_ten_cbs + n_vec_cbs;
-        std::vector<assembly_index> asm_map;
-        asm_map.reserve(n_cbs);
-
-        auto cell_offset        = disk::priv::offset(msh, cl);
-        auto cell_LHS_offset    = cell_offset * n_cbs;
-
-        for (size_t i = 0; i < n_cbs; i++)
-            asm_map.push_back( assembly_index(cell_LHS_offset+i, true) );
-
-        assert( asm_map.size() == mass_matrix.rows() && asm_map.size() == mass_matrix.cols() );
-
-        for (size_t i = 0; i < mass_matrix.rows(); i++)
-        {
-            if (!asm_map[i].assemble())
-                continue;
-
-            for (size_t j = 0; j < mass_matrix.cols(); j++)
-            {
-                if ( asm_map[j].assemble() )
-                    m_mass_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], mass_matrix(i,j)) );
-            }
-        }
-    }
 
     void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
@@ -307,7 +275,7 @@ public:
             
     void apply_bc(const Mesh& msh){
         
-        #ifdef HAVE_INTEL_TBB2
+        #ifdef HAVE_INTEL_TBB
                 size_t n_cells = m_elements_with_bc_eges.size();
                 tbb::parallel_for(size_t(0), size_t(n_cells), size_t(1),
                     [this,&msh] (size_t & i){
@@ -353,18 +321,6 @@ public:
         }
     #endif
         apply_bc(msh);
-    }
-            
-    void assemble_mass(const Mesh& msh, bool add_vector_mass_Q = true){
-    
-        MASS.setZero();
-        for (size_t cell_ind = 0; cell_ind < msh.cells_size(); cell_ind++)
-        {
-            auto& cell = msh.backend_storage()->surfaces[cell_ind];
-            Matrix<T, Dynamic, Dynamic> mass_matrix = mass_operator(cell_ind, msh, cell, add_vector_mass_Q);
-            scatter_mass_data(msh, cell, mass_matrix);
-        }
-        finalize_mass();
     }
             
     Matrix<T, Dynamic, Dynamic> mixed_operator(size_t & cell_ind, const Mesh& msh, const typename Mesh::cell_type& cell){
@@ -550,7 +506,7 @@ public:
     }
             
     void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
-        size_t n_dof = MASS.rows();
+        size_t n_dof = LHS.rows();
         x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -615,12 +571,6 @@ public:
     {
         LHS.setFromTriplets( m_triplets.begin(), m_triplets.end() );
         m_triplets.clear();
-    }
-            
-    void finalize_mass(void)
-    {
-        MASS.setFromTriplets( m_mass_triplets.begin(), m_mass_triplets.end() );
-        m_mass_triplets.clear();
     }
 
     Matrix<T, Dynamic, 1>
