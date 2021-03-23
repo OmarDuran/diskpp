@@ -115,8 +115,39 @@ public:
             auto face_LHS_offset = n_cbs * msh.cells_size() + m_compress_indexes.at(fc_id);
             bool dirichlet = m_bnd.is_dirichlet_face(fc_id);
 
-            for (size_t i = 0; i < n_fbs; i++)
-                asm_map.push_back( assembly_index(face_LHS_offset+i, !dirichlet) );
+            if (dirichlet)
+             {
+                 switch (m_bnd.dirichlet_boundary_type(fc_id)) {
+                    case disk::DIRICHLET: {
+                        for (size_t i = 0; i < n_fbs; i++){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                        }
+                        break;
+                    }
+                    case disk::DX: {
+                         for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
+                             asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                         }
+                        break;
+                    }
+                    case disk::DY: {
+                        for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                        }
+                        break;
+                    }
+                     default: {
+                        throw std::logic_error("Unknown Dirichlet Conditions.");
+                        break;
+                     }
+                 }
+             }
+            else{
+                for (size_t i = 0; i < n_fbs; i++)
+                    asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+            }
             
         }
 
@@ -180,7 +211,7 @@ public:
                     case disk::DX: {
                          for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
                              asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
+                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
                          }
                         break;
                     }
