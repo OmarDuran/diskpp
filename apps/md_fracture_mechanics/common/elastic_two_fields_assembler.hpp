@@ -30,6 +30,7 @@ class elastic_two_fields_assembler
     using edge_type = typename Mesh::edge_type;
 
     std::vector<size_t>                 m_compress_indexes;
+    std::vector<size_t>                 m_compress_sigma_indexes;
     std::vector<size_t>                 m_expand_indexes;
 
     disk::hho_degree_info               m_hho_di;
@@ -38,10 +39,14 @@ class elastic_two_fields_assembler
     std::vector< Triplet<T> >           m_mass_triplets; // Candidate for deletion
     std::vector< elastic_material_data<T> > m_material;
     std::vector< size_t >               m_elements_with_bc_eges;
-    std::vector< edge_type >            m_fracture_eges;
+    std::vector<std::pair<size_t,size_t>> m_fracture_pairs;
 
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
+    size_t      m_n_cells_dof;
+    size_t      m_n_faces_dof;
+    size_t      m_n_hybrid_dof;
+    size_t      m_sigma_degree;
     bool        m_hho_stabilization_Q;
     bool        m_scaled_stabilization_Q;
     
@@ -50,8 +55,8 @@ public:
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
 
-    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector< edge_type > & fracture_eges)
-        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_eges(fracture_eges), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
+    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs)
+        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
@@ -66,22 +71,31 @@ public:
         m_compress_indexes.resize( m_n_edges );
         m_expand_indexes.resize( m_n_edges - m_n_essential_edges );
 
-        size_t n_face_dof = 0;
+        m_n_faces_dof = 0;
+        m_n_hybrid_dof = 0;
+        
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        
+        m_sigma_degree = m_hho_di.face_degree()-1;
+        size_t n_f_sigma_bs = disk::vector_basis_size(m_sigma_degree, Mesh::dimension - 1, Mesh::dimension);
+
         for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
         {
-            m_compress_indexes.at(face_id) = n_face_dof;
+            m_compress_indexes.at(face_id) = m_n_faces_dof;
 //                m_expand_indexes.at(compressed_offset) = face_id;
-            const auto non_essential_dofs = n_fbs - m_bnd.dirichlet_imposed_dofs(face_id, m_hho_di.face_degree());
-            n_face_dof += non_essential_dofs;
+            auto non_essential_dofs = n_fbs - m_bnd.dirichlet_imposed_dofs(face_id, m_hho_di.face_degree());
+            
+            m_n_faces_dof += non_essential_dofs;
         }
+        
+        m_n_hybrid_dof = n_f_sigma_bs * m_fracture_pairs.size();
         
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
-
+        m_n_cells_dof = n_cbs * msh.cells_size();
             
-        size_t system_size = n_cbs * msh.cells_size() + n_face_dof;
+        size_t system_size = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof;
 
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
@@ -283,6 +297,34 @@ public:
         }
 
     }
+    
+    void scatter_mortar_data(const Mesh& msh, const size_t & face_id, const size_t & fracture_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
+    {
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        size_t n_f_sigma_bs = disk::vector_basis_size(m_sigma_degree, Mesh::dimension - 1, Mesh::dimension);
+        
+        std::vector<assembly_index> asm_map_i, asm_map_j;
+        auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
+        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + fracture_ind*n_f_sigma_bs;
+        
+        for (size_t i = 0; i < n_f_sigma_bs; i++)
+        asm_map_i.push_back( assembly_index(frac_LHS_offset+i, true));
+        
+        for (size_t i = 0; i < n_fbs; i++)
+        asm_map_j.push_back( assembly_index(face_LHS_offset+i, true));
+        
+        assert( asm_map_i.size() == mortar_mat.rows() && asm_map_j.size() == mortar_mat.cols() );
+
+        for (size_t i = 0; i < mortar_mat.rows(); i++)
+        {
+            for (size_t j = 0; j < mortar_mat.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], mortar_mat(i,j)) );
+            }
+        }
+    
+    }
 
     void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
@@ -296,9 +338,26 @@ public:
             scatter_data(msh, cell, mixed_operator_loc, f_loc);
             cell_ind++;
         }
+        // mortars assemble
+        assemble_mortars(msh);
+        
         finalize();
     }
+
+    void assemble_mortars(const Mesh& msh){
+        auto storage = msh.backend_storage();
+        size_t fracture_ind = 0;
+        for (auto chunk : m_fracture_pairs) {
+            auto& face_l = storage->edges[chunk.first];
+            auto& face_r = storage->edges[chunk.second];
+            Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_mass_matrix(msh,face_l);
+            Matrix<T, Dynamic, Dynamic> mortar_r = +1.0*mortar_mass_matrix(msh,face_l);
             
+            scatter_mortar_data(msh,chunk.first,fracture_ind,mortar_l);
+            scatter_mortar_data(msh,chunk.second,fracture_ind,mortar_r);
+            fracture_ind++;
+        }
+    }
     void apply_bc(const Mesh& msh){
         
         #ifdef HAVE_INTEL_TBB2
@@ -507,6 +566,29 @@ public:
         }
 
         return mass_matrix;
+    }
+    
+    Matrix<T, Dynamic, Dynamic> mortar_mass_matrix(const Mesh& msh, const typename Mesh::face_type& face, size_t di = 0)
+    {
+        const auto degree     = m_hho_di.face_degree();
+        
+        auto vec_u_basis = disk::make_vector_monomial_basis(msh, face, m_hho_di.face_degree());
+        auto vec_s_basis = disk::make_vector_monomial_basis(msh, face, m_sigma_degree);
+        
+
+        Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(vec_s_basis.size(), vec_u_basis.size());
+
+        const auto qps = integrate(msh, face, 2 * (degree+di));
+
+        for (auto& qp : qps)
+        {
+            const auto phi_i    = vec_s_basis.eval_functions(qp.point());
+            const auto phi_j    = vec_u_basis.eval_functions(qp.point());
+            const auto qp_phi = disk::priv::inner_product(qp.weight(), phi_i);
+            ret += disk::priv::outer_product(qp_phi, phi_j);
+        }
+
+        return ret;
     }
 
     void classify_cells(const Mesh& msh){

@@ -60,38 +60,42 @@ int main(int argc, char **argv)
     
     // Reading the polygonal mesh
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
     tc.toc();
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
+    
     tc.tic();
-    typedef typename mesh_type::point_type  point_type;
-    typedef typename mesh_type::node_type   node_type;
-    typedef typename mesh_type::edge_type   edge_type;
-    std::vector<edge_type> fracture_edges;
+    std::vector<std::pair<size_t,size_t>> fracture_pairs;
+    std::vector<mesh_type::point_type> fracture_bars;
+    fracture_bars.reserve(msh.faces_size());
     auto storage = msh.backend_storage();
+    for (size_t face_id = 0; face_id < msh.faces_size(); face_id++)
+    {
+        auto& egde = storage->edges[face_id];
+        mesh_type::point_type bar = barycenter(msh, egde);
+        fracture_bars.push_back(bar);
+    }
     
-    std::vector<std::pair<size_t,size_t>> fracture_nodes;
-    fracture_nodes.push_back(std::make_pair(3, 4));
-    fracture_nodes.push_back(std::make_pair(4, 5));
-    
-    for (auto& nodes : fracture_nodes) {
-        auto node1 = typename node_type::id_type(nodes.first);
-        auto node2 = typename node_type::id_type(nodes.second);
-        auto frac_e = edge_type{{node1, node2}};
-        for (auto &egde : storage->edges)
-        {
-            auto points = egde.point_ids();
-            
-            bool are_equal_Q = frac_e == egde;
-            if(are_equal_Q){
-                fracture_edges.push_back(frac_e);
-            }
+    auto are_equal_Q = [](const mesh_type::point_type& a, const mesh_type::point_type& b)-> bool {
+        bool check_Q = fabs(a.x() - b.x()) <= 1.0e-10 && fabs(a.y() - b.y()) <= 1.0e-10;
+        return check_Q;
+    };
+
+    for (size_t i = 0; i < fracture_bars.size(); i++) {
+        mesh_type::point_type bar_i = fracture_bars.at(i);
+        for (size_t j = i+1; j < fracture_bars.size(); j++) {
+            mesh_type::point_type bar_j = fracture_bars.at(j);
+             if (are_equal_Q(bar_i,bar_j)) {
+                 fracture_pairs.push_back(std::make_pair(i, j));
+             }
         }
     }
+    
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -183,7 +187,7 @@ int main(int argc, char **argv)
     }
 
     tc.tic();
-    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_edges);
+    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
@@ -195,6 +199,8 @@ int main(int argc, char **argv)
     assembler.apply_bc(msh);
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+    
+//    std::cout << "k = " << assembler.LHS.toDense() <<  std::endl;
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
