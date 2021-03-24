@@ -61,7 +61,8 @@ int main(int argc, char **argv)
     // Reading the polygonal mesh
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
@@ -127,8 +128,8 @@ int main(int argc, char **argv)
         RealType x,y;
         x = pt.x();
         y = pt.y();
-        RealType ux = 0.0;
-        RealType uy = -0.25;
+        RealType ux = -0.1;
+        RealType uy = -0.1;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -142,6 +143,8 @@ int main(int argc, char **argv)
     };
     
     boundary_type bnd(msh);
+    RealType lx = 7.0;
+    RealType ly = 6.0;
     // defining boundary conditions
     {
         size_t bc_D_bot_id = 0;
@@ -161,13 +164,13 @@ int main(int argc, char **argv)
                 continue;
             }
             
-            if(std::fabs(bar.x()-2.0) < eps){
+            if(std::fabs(bar.x()-lx) < eps){
                 disk::bnd_info bi{bc_N_right_id, true};
                 msh.backend_storage()->boundary_info.at(fc_id) = bi;
                 continue;
             }
             
-            if (std::fabs(bar.y()-4.0) < eps) {
+            if (std::fabs(bar.y()-ly) < eps) {
                 disk::bnd_info bi{bc_D_top_id, true};
                 msh.backend_storage()->boundary_info.at(fc_id) = bi;
                 continue;
@@ -182,7 +185,7 @@ int main(int argc, char **argv)
         
         bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_top_id, u_top_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 

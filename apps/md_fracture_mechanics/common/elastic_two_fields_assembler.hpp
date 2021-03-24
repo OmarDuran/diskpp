@@ -649,7 +649,7 @@ public:
         size_t n_s_basis = sn_basis.size() + st_basis.size();
         Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, n_s_basis);
 
-        T c_perp = 0.1;
+        T c_perp = 0.0;
         const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
         for (auto& qp : qps_l)
         {
