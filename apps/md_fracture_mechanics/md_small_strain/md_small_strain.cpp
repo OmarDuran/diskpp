@@ -63,11 +63,12 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
-//    std::string mesh_file = "meshes/base_polymesh_nel_215.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_fracture_nel_215.txt";
 //    std::string mesh_file = "meshes/base_polymesh_fracture_nel_831.txt";
-    std::string mesh_file = "meshes/base_polymesh_tilted_fracture_nel_986.txt";
+//    std::string mesh_file = "meshes/base_polymesh_tilted_fracture_nel_703.txt";
+    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
+//    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
     
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
@@ -195,10 +196,10 @@ int main(int argc, char **argv)
             }
         }   
         
-        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
         bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
     tc.tic();
