@@ -62,7 +62,13 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
+//    std::string mesh_file = "meshes/base_polymesh_nel_215.txt";
+    
+//    std::string mesh_file = "meshes/base_polymesh_fracture_nel_215.txt";
+//    std::string mesh_file = "meshes/base_polymesh_fracture_nel_831.txt";
+    std::string mesh_file = "meshes/base_polymesh_tilted_fracture_nel_986.txt";
+    
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
@@ -83,7 +89,7 @@ int main(int argc, char **argv)
     }
     
     auto are_equal_Q = [](const mesh_type::point_type& a, const mesh_type::point_type& b)-> bool {
-        bool check_Q = fabs(a.x() - b.x()) <= 1.0e-10 && fabs(a.y() - b.y()) <= 1.0e-10;
+        bool check_Q = fabs(a.x() - b.x()) <= 1.0e-4 && fabs(a.y() - b.y()) <= 1.0e-4;
         return check_Q;
     };
 
@@ -103,8 +109,8 @@ int main(int argc, char **argv)
     // Constant elastic properties
     RealType rho,l,mu;
     rho = 1.0;
-    l = 1.0;
-    mu = 1.0;
+    l = 1.0;//2000.0;
+    mu = 1.0;//2000.0;
     elastic_material_data<RealType> material(rho,l,mu);
 
     // Creating HHO approximation spaces and corresponding linear operator
@@ -128,7 +134,7 @@ int main(int argc, char **argv)
         RealType x,y;
         x = pt.x();
         y = pt.y();
-        RealType ux = -0.1;
+        RealType ux = -0.0;
         RealType uy = -0.1;
         return static_vector<RealType, 2>{ux, uy};
     };
@@ -143,50 +149,56 @@ int main(int argc, char **argv)
     };
     
     boundary_type bnd(msh);
-    RealType lx = 7.0;
-    RealType ly = 6.0;
+//    RealType minlx = 0.0;
+//    RealType minly = 0.0;
+//    RealType maxlx = 2.0;
+//    RealType maxly = 4.0;
+    RealType minlx = -10.0;
+    RealType minly = -10.0;
+    RealType maxlx = 10.0;
+    RealType maxly = 10.0;
     // defining boundary conditions
     {
         size_t bc_D_bot_id = 0;
         size_t bc_N_right_id = 1;
         size_t bc_D_top_id = 2;
         size_t bc_N_left_id = 3;
-        RealType eps = 1.0e-8;
+        RealType eps = 1.0e-4;
         
         for (auto face_it = msh.boundary_faces_begin(); face_it != msh.boundary_faces_end(); face_it++)
         {
             auto face = *face_it;
             mesh_type::point_type bar = barycenter(msh, face);
             auto fc_id = msh.lookup(face);
-            if (std::fabs(bar.y()-0.0) < eps) {
+            if (std::fabs(bar.y()-minly) < eps) {
                 disk::bnd_info bi{bc_D_bot_id, true};
                 msh.backend_storage()->boundary_info.at(fc_id) = bi;
                 continue;
             }
             
-            if(std::fabs(bar.x()-lx) < eps){
+            if(std::fabs(bar.x()-maxlx) < eps){
                 disk::bnd_info bi{bc_N_right_id, true};
                 msh.backend_storage()->boundary_info.at(fc_id) = bi;
                 continue;
             }
             
-            if (std::fabs(bar.y()-ly) < eps) {
+            if (std::fabs(bar.y()-maxly) < eps) {
                 disk::bnd_info bi{bc_D_top_id, true};
                 msh.backend_storage()->boundary_info.at(fc_id) = bi;
                 continue;
             }
             
-            if (std::fabs(bar.x()-0.0) < eps) {
+            if (std::fabs(bar.x()-minlx) < eps) {
                 disk::bnd_info bi{bc_N_left_id, true};
                 msh.backend_storage()->boundary_info.at(fc_id) = bi;
                 continue;
             }
-        }
+        }   
         
-        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DIRICHLET, bc_D_top_id, u_top_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
     }
 
     tc.tic();
@@ -209,6 +221,7 @@ int main(int argc, char **argv)
     Matrix<RealType, Dynamic, 1> x_dof;
     tc.tic();
     linear_solver<RealType> analysis(assembler.LHS);
+    analysis.set_direct_solver(true);
     tc.toc();
     std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
     

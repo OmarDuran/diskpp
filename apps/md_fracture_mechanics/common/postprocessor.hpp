@@ -32,12 +32,16 @@ public:
         auto num_points = msh.points_size();
         using RealType = double;
         std::vector<RealType> approx_ux, approx_uy;
+        std::vector<RealType> approx_sxx, approx_sxy, approx_syy;
         size_t n_ten_cbs = disk::sym_matrix_basis_size(hho_di.grad_degree(), dim, dim);
         size_t n_vec_cbs = disk::vector_basis_size(hho_di.cell_degree(),dim, dim);
         size_t cell_dof = n_ten_cbs + n_vec_cbs;
 
         approx_ux.reserve( num_points );
         approx_uy.reserve( num_points );
+        approx_sxx.reserve( num_points );
+        approx_sxy.reserve( num_points );
+        approx_syy.reserve( num_points );
         
         // scan for selected cells, common cells are discardable
         std::map<size_t, size_t> point_to_cell;
@@ -70,6 +74,20 @@ public:
                 approx_ux.push_back(uh(0,0));
                 approx_uy.push_back(uh(1,0));
             }
+            
+            // tensor evaluation
+            {
+                auto ten_basis = make_sym_matrix_monomial_basis(msh, cell, hho_di.grad_degree());
+                Matrix<RealType, Dynamic, 1> ten_x_cell_dof = x_dof.block(cell_i*cell_dof, 0, n_ten_cbs, 1);
+
+                auto t_ten_phi = ten_basis.eval_functions( bar );
+                assert(t_ten_phi.size() == ten_basis.size());
+                auto sigma_h = disk::eval(ten_x_cell_dof, t_ten_phi);
+                
+                approx_sxx.push_back(sigma_h(0,0));
+                approx_sxy.push_back(sigma_h(0,1));
+                approx_syy.push_back(sigma_h(1,1));
+            }
         }
 
         disk::silo_database silo;
@@ -78,8 +96,14 @@ public:
         silo.add_mesh(msh, "mesh");
         disk::silo_nodal_variable<double> vx_silo("ux", approx_ux);
         disk::silo_nodal_variable<double> vy_silo("uy", approx_uy);
+        disk::silo_nodal_variable<double> sxx_silo("sxx", approx_sxx);
+        disk::silo_nodal_variable<double> sxy_silo("sxy", approx_sxy);
+        disk::silo_nodal_variable<double> syy_silo("syy", approx_syy);
         silo.add_variable("mesh", vx_silo);
         silo.add_variable("mesh", vy_silo);
+        silo.add_variable("mesh", sxx_silo);
+        silo.add_variable("mesh", sxy_silo);
+        silo.add_variable("mesh", syy_silo);
 
         silo.close();
         tc.toc();
