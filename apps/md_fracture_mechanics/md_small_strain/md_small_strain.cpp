@@ -66,9 +66,13 @@ int main(int argc, char **argv)
     
 //    std::string mesh_file = "meshes/base_polymesh_fracture_nel_215.txt";
 //    std::string mesh_file = "meshes/base_polymesh_fracture_nel_831.txt";
-//    std::string mesh_file = "meshes/base_polymesh_tilted_fracture_nel_703.txt";
-    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
+    
+//    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
+//    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_88.txt";
+//    std::string mesh_file = "meshes/base_polymesh_cross_nel_88.txt";
+    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_352.txt";
+//    std::string mesh_file = "meshes/base_polymesh_cross_nel_352.txt";
     
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
@@ -222,7 +226,7 @@ int main(int argc, char **argv)
     Matrix<RealType, Dynamic, 1> x_dof;
     tc.tic();
     linear_solver<RealType> analysis(assembler.LHS);
-    analysis.set_direct_solver(true);
+    analysis.set_direct_solver(false);
     tc.toc();
     std::cout << bold << cyan << "Create analysis in : " << tc.to_double() << " seconds" << reset << std::endl;
     
@@ -241,6 +245,51 @@ int main(int argc, char **argv)
     size_t it = 0;
     std::string silo_file_name = "single_fracture";
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
+    
+    // sigma n
+    {
+        auto storage = msh.backend_storage();
+//        std::vector<std::pair<>>
+        size_t n_cells_dof = assembler.get_n_cells_dofs();
+        size_t n_faces_dofs = assembler.get_n_faces_dofs();
+        size_t fracture_ind = 0;
+        size_t sigma_degree = hho_di.face_degree()-1;
+        size_t n_f_sigma_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
+        size_t n_data = 2*fracture_pairs.size();
+        Matrix<RealType, Dynamic, 2> data = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 2);
+//        fracture_ind = 0
+        mesh_type::point_type p0;
+        for (auto chunk : fracture_pairs) {
+            auto& face_l = storage->edges[chunk.first];
+//            mesh_type::point_type bar = barycenter(msh, face_l);
+            auto points = face_l.point_ids();
+            
+            for (size_t ip = 0; ip < points.size(); ip++) {
+                auto pt_id = points[ip];
+                auto bar = *std::next(msh.points_begin(), pt_id);
+                
+                if ((ip == 0) && (fracture_ind == 0)) {
+                    p0 = bar;
+                }
+//                mesh_type::point_type bar =
+                // sigma normal evaluation
+                {
+                    auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
+                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs, 0, n_f_sigma_bs, 1);
+                    auto t_phi = face_basis.eval_functions( bar );
+                    assert(t_phi.rows() == face_basis.size());
+                    auto snh = disk::eval(sigma_n_x_dof, t_phi);
+//                    std::cout << "sh = " << snh << std::endl;
+                    RealType dv = (bar-p0).to_vector().norm();
+                    data(2*fracture_ind+ip,0) = dv;
+                    data(2*fracture_ind+ip,1) = snh;
+                }
+            }
+            
+            fracture_ind++;
+        }
+        std::cout << "data = " << data << std::endl;
+    }
     
     return 0;
 }

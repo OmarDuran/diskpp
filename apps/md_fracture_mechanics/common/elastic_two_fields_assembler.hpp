@@ -381,8 +381,8 @@ public:
             auto& cell_l = storage->surfaces[cell_ind_l];
             auto& cell_r = storage->surfaces[cell_ind_r];
             
-            Matrix<T, Dynamic, Dynamic> mortar_l = +1.0*mortar_coupling_matrix(msh,cell_l,face_l);
-            Matrix<T, Dynamic, Dynamic> mortar_r = +1.0*mortar_coupling_matrix(msh,cell_r,face_r);
+            Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_coupling_matrix(msh,cell_l,face_l);
+            Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,cell_r,face_r);
             
             scatter_mortar_data(msh,chunk.first,fracture_ind,mortar_l);
             scatter_mortar_data(msh,chunk.second,fracture_ind,mortar_r);
@@ -659,7 +659,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 10.0;
+        T c_para = 1000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -1079,6 +1079,14 @@ public:
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         return n_cbs;
     }
+    
+    size_t get_n_cells_dofs(){
+        return m_n_cells_dof;
+    }
+    size_t get_n_faces_dofs(){
+        return m_n_faces_dof;
+    }
+
 };
 
 #endif /* elastic_two_fields_assembler_hpp */
