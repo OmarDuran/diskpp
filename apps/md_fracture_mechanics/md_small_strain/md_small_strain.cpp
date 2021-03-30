@@ -64,15 +64,19 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
     
-//    std::string mesh_file = "meshes/base_polymesh_fracture_nel_215.txt";
-//    std::string mesh_file = "meshes/base_polymesh_fracture_nel_831.txt";
-    
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_88.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_88.txt";
-    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_352.txt";
+//    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_352.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_352.txt";
+    
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_111.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1776.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_nel_1776.txt";
     
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
