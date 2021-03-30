@@ -75,8 +75,8 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1776.txt";
-//    std::string mesh_file = "meshes/base_polymesh_internal_nel_1776.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
@@ -144,7 +144,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -0.01;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -204,9 +204,14 @@ int main(int argc, char **argv)
             }
         }   
         
-        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+//        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
+        
+        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
@@ -292,7 +297,8 @@ int main(int argc, char **argv)
             
             fracture_ind++;
         }
-        std::cout << "data = " << data << std::endl;
+        std::cout << "data: " << std::endl;
+        std::cout << data << std::endl;
     }
     
     return 0;

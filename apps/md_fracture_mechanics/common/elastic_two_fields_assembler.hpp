@@ -166,6 +166,17 @@ public:
                     asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
             }
             
+            bool neumann = m_bnd.is_neumann_face(fc_id);
+            if (neumann) {
+                auto bc_rhs = neumman_rhs(msh, fc, fc_id);
+                for (size_t i = 0; i < bc_rhs.rows(); i++)
+                {
+                    RHS(face_LHS_offset+face_i*n_fbs+i) += bc_rhs(i);
+                }
+            }
+            
+            
+            
         }
 
         assert( asm_map.size() == lhs.rows() && asm_map.size() == lhs.cols() );
@@ -659,7 +670,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 1000.0;
+        T c_para = 0.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -986,6 +997,30 @@ public:
             ret_loc += disk::priv::outer_product(phi, qp_f);
         }
         ret.block(ten_bs,0,vec_bs,1) = ret_loc;
+        return ret;
+    }
+    
+    Matrix<typename Mesh::coordinate_type, Dynamic, 1>
+    neumman_rhs(const Mesh& msh, const typename Mesh::face_type& face, size_t face_id, size_t di = 0)
+    {
+        auto recdeg = m_hho_di.grad_degree();
+        auto celdeg = m_hho_di.cell_degree();
+        auto facdeg = m_hho_di.face_degree();
+        
+        auto n_fbs   = disk::vector_basis_size(facdeg, Mesh::dimension - 1, Mesh::dimension);
+        auto face_basis   = make_vector_monomial_basis(msh, face, facdeg);
+        using T = typename Mesh::coordinate_type;
+
+        auto neumann_fun  = m_bnd.neumann_boundary_func(face_id);
+        Matrix<T, Dynamic, 1> ret = Matrix<T, Dynamic, 1>::Zero(n_fbs);
+        const auto qps = integrate(msh, face, 2 * (facdeg + di));
+
+        for (auto& qp : qps)
+        {
+            const auto phi  = face_basis.eval_functions(qp.point());
+            const auto qp_f = disk::priv::inner_product(qp.weight(), neumann_fun(qp.point()));
+            ret += disk::priv::outer_product(phi, qp_f);
+        }
         return ret;
     }
             
