@@ -62,6 +62,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
@@ -78,14 +79,13 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
-    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_1683.txt";
+//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
     
     mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
     tc.toc();
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
-    
     
     tc.tic();
     std::vector<std::pair<size_t,size_t>> fracture_pairs;
@@ -113,6 +113,36 @@ int main(int argc, char **argv)
              }
         }
     }
+    
+    // detect end point mortars
+    std::vector<std::pair<size_t,size_t>> end_point_mortars;
+    size_t fracture_cell_ind = 0;
+    for (auto chunk: fracture_pairs) {
+        
+        auto& edge_l = storage->edges[chunk.first];
+        auto& edge_r = storage->edges[chunk.second];
+        auto points_l = edge_l.point_ids();
+        auto points_r = edge_r.point_ids();
+        
+        std::vector<size_t> indexes;
+        for (auto index : points_l) {
+            indexes.push_back(index);
+        }
+        for (auto index : points_r) {
+            indexes.push_back(index);
+        }
+        
+        std::sort(indexes.begin(), indexes.end());
+        const auto duplicate = std::adjacent_find(indexes.begin(), indexes.end());
+        if (duplicate != indexes.end()){
+            size_t index = *duplicate;
+            std::cout << "Duplicate element = " << *duplicate << "\n";
+            end_point_mortars.push_back(std::make_pair(fracture_cell_ind, index));
+        }
+        fracture_cell_ind++;
+    }
+    
+    
     
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -146,7 +176,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -1.0/30.0;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -216,19 +246,19 @@ int main(int argc, char **argv)
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
-        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
-        
 //        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-//        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+//        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        
+        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
     tc.tic();
-    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs);
+    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs, end_point_mortars);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
@@ -241,7 +271,10 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-//    std::cout << "k = " << assembler.LHS.toDense() <<  std::endl;
+    std::ofstream mat_file;
+    mat_file.open ("matrix.txt");
+    mat_file << assembler.LHS.toDense() <<  std::endl;
+    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;

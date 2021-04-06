@@ -41,6 +41,7 @@ class elastic_two_fields_assembler
     std::vector< size_t >               m_elements_with_bc_eges;
     std::vector<std::pair<size_t,size_t>> m_fracture_pairs;
     std::vector<std::pair<size_t,size_t>> m_elements_with_fractures_eges;
+    std::vector<std::pair<size_t,size_t>> m_end_point_mortars;
 
     size_t      m_n_edges;
     size_t      m_n_essential_edges;
@@ -56,8 +57,8 @@ public:
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
 
-    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs)
-        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
+    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs, std::vector<std::pair<size_t,size_t>> & end_point_mortars)
+        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_end_point_mortars(end_point_mortars), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
@@ -171,7 +172,8 @@ public:
                 auto bc_rhs = neumman_rhs(msh, fc, fc_id);
                 for (size_t i = 0; i < bc_rhs.rows(); i++)
                 {
-                    RHS(face_LHS_offset+face_i*n_fbs+i) += bc_rhs(i);
+//                    RHS(face_LHS_offset+face_i*n_fbs+i) += bc_rhs(i);
+                    RHS(face_LHS_offset+i) += bc_rhs(i);
                 }
             }
             
@@ -670,7 +672,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 10000.0;
+        T c_para =  0.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
