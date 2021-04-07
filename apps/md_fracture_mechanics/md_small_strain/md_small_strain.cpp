@@ -76,7 +76,8 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_2847.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
@@ -176,7 +177,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -1/30.0;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -236,20 +237,20 @@ int main(int argc, char **argv)
             }
         }   
         
-//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-//        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
-//        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
-//        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
 //        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
 //        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
-        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
         
 //        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
@@ -396,17 +397,28 @@ int main(int argc, char **argv)
             std::cout << "sigma =  " << sigma_dof << std::endl;
         }
         
-        std::cout << "data n: " << std::endl;
-        std::cout << data_n << std::endl;
-        
-        std::cout << "data t: " << std::endl;
-        std::cout << data_t << std::endl;
-        
-        std::cout << "data ul: " << std::endl;
-        std::cout << data_u_l << std::endl;
-        
-        std::cout << "data ur: " << std::endl;
-        std::cout << data_u_r << std::endl;
+        {
+            std::ofstream sn_file;
+            sn_file.open ("sigma_n.txt");
+            sn_file << data_n <<  std::endl;
+            sn_file.close();
+            
+            std::ofstream st_file;
+            st_file.open ("sigma_t.txt");
+            st_file << data_t <<  std::endl;
+            st_file.close();
+            
+            std::ofstream ul_file;
+            ul_file.open ("u_l.txt");
+            ul_file << data_u_l <<  std::endl;
+            ul_file.close();
+            
+            std::ofstream ur_file;
+            ur_file.open ("u_r.txt");
+            ur_file << data_u_r <<  std::endl;
+            ur_file.close();
+            
+        }
         
     }
     
