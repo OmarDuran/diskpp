@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
         fracture_cell_ind++;
     }
     
-    
+//    end_point_mortars.clear();
     
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -176,7 +176,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -1.0/30.0;
+        RealType uy = -0.1;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -246,15 +246,15 @@ int main(int argc, char **argv)
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
-//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-//        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-//        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-//        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
-        
         bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        
+//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
     tc.tic();
@@ -271,10 +271,10 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    std::ofstream mat_file;
-    mat_file.open ("matrix.txt");
-    mat_file << assembler.LHS.toDense() <<  std::endl;
-    mat_file.close();
+//    std::ofstream mat_file;
+//    mat_file.open ("matrix.txt");
+//    mat_file << assembler.LHS.toDense() <<  std::endl;
+//    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
@@ -306,16 +306,24 @@ int main(int argc, char **argv)
 //        std::vector<std::pair<>>
         size_t n_cells_dof = assembler.get_n_cells_dofs();
         size_t n_faces_dofs = assembler.get_n_faces_dofs();
+        size_t n_hybrid_dofs = assembler.get_n_hybrid_dofs();
         size_t fracture_ind = 0;
         size_t sigma_degree = hho_di.face_degree()-1;
         size_t n_f_sigma_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
         size_t n_data = 2*fracture_pairs.size();
-        Matrix<RealType, Dynamic, 2> data = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 2);
-//        fracture_ind = 0
+        
+        Matrix<RealType, Dynamic, 2> data_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 2);
+        Matrix<RealType, Dynamic, 2> data_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 2);
+        
+        Matrix<RealType, Dynamic, 3> data_u_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        Matrix<RealType, Dynamic, 3> data_u_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        
         mesh_type::point_type p0;
         for (auto chunk : fracture_pairs) {
+            
             auto& face_l = storage->edges[chunk.first];
-//            mesh_type::point_type bar = barycenter(msh, face_l);
+            auto& face_r = storage->edges[chunk.second];
+            
             auto points = face_l.point_ids();
             
             for (size_t ip = 0; ip < points.size(); ip++) {
@@ -325,25 +333,81 @@ int main(int argc, char **argv)
                 if ((ip == 0) && (fracture_ind == 0)) {
                     p0 = bar;
                 }
-//                mesh_type::point_type bar =
+
                 // sigma normal evaluation
                 {
                     auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
                     Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs, 0, n_f_sigma_bs, 1);
+                    
+                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs, 0, n_f_sigma_bs, 1);
+                    
                     auto t_phi = face_basis.eval_functions( bar );
                     assert(t_phi.rows() == face_basis.size());
+                    
                     auto snh = disk::eval(sigma_n_x_dof, t_phi);
-//                    std::cout << "sh = " << snh << std::endl;
+                    auto sth = disk::eval(sigma_t_x_dof, t_phi);
+
                     RealType dv = (bar-p0).to_vector().norm();
-                    data(2*fracture_ind+ip,0) = dv;
-                    data(2*fracture_ind+ip,1) = snh;
+                    data_n(2*fracture_ind+ip,0) = dv;
+                    data_n(2*fracture_ind+ip,1) = snh;
+                    
+                    data_t(2*fracture_ind+ip,0) = dv;
+                    data_t(2*fracture_ind+ip,1) = sth;
                 }
-            }
+                
+                // u evaluation
+                {
+                    size_t face_l_offset = assembler.get_n_cells_dofs() + assembler.compress_indexes().at(chunk.first);
+                    
+                    size_t face_r_offset = assembler.get_n_cells_dofs() + assembler.compress_indexes().at(chunk.second);
+                    
+                    auto face_basis = make_vector_monomial_basis(msh, face_l, hho_di.face_degree());
+                    size_t n_u_bs = disk::vector_basis_size(hho_di.face_degree(), mesh_type::dimension - 1, mesh_type::dimension);
+                    
+                    Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_u_bs, 1);
+                    Matrix<RealType, Dynamic, 1> u_r_x_dof = x_dof.block(face_r_offset, 0, n_u_bs, 1);
+                    
+                    auto t_phi = face_basis.eval_functions( bar );
+                    assert(t_phi.rows() == face_basis.size());
+                    
+                    auto ul = disk::eval(u_l_x_dof, t_phi);
+                    auto ur = disk::eval(u_r_x_dof, t_phi);
+
+                    RealType dv = (bar-p0).to_vector().norm();
+                    data_u_l(2*fracture_ind+ip,0) = dv;
+                    data_u_l(2*fracture_ind+ip,1) = ul(0,0);
+                    data_u_l(2*fracture_ind+ip,2) = ul(1,0);
+                    
+                    data_u_r(2*fracture_ind+ip,0) = dv;
+                    data_u_r(2*fracture_ind+ip,1) = ur(0,0);
+                    data_u_r(2*fracture_ind+ip,2) = ur(1,0);
+                }
+                
+             }
             
             fracture_ind++;
         }
-        std::cout << "data: " << std::endl;
-        std::cout << data << std::endl;
+        
+        // sigma normal evaluation
+        {
+            size_t n_mortar_displacements = 4*end_point_mortars.size();
+            size_t points_offset = n_cells_dof + n_faces_dofs + n_hybrid_dofs - n_mortar_displacements;
+            Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
+            std::cout << "sigma =  " << sigma_dof << std::endl;
+        }
+        
+        std::cout << "data n: " << std::endl;
+        std::cout << data_n << std::endl;
+        
+        std::cout << "data t: " << std::endl;
+        std::cout << data_t << std::endl;
+        
+        std::cout << "data ul: " << std::endl;
+        std::cout << data_u_l << std::endl;
+        
+        std::cout << "data ur: " << std::endl;
+        std::cout << data_u_r << std::endl;
+        
     }
     
     return 0;

@@ -725,7 +725,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para =  0.0;
+        T c_para =  100.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -1209,7 +1209,14 @@ public:
     size_t get_n_faces_dofs(){
         return m_n_faces_dof;
     }
+    size_t get_n_hybrid_dofs(){
+        return m_n_hybrid_dof;
+    }
 
+    std::vector<size_t> & compress_indexes(){
+        return m_compress_indexes;
+    }
+    
 };
 
 #endif /* elastic_two_fields_assembler_hpp */
