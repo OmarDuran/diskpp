@@ -55,8 +55,8 @@ int main(int argc, char **argv)
     simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
     sim_data.print_simulation_data();
     
-    SurfaceStrain(sim_data);
-    return 0;
+//    SurfaceStrain(sim_data);
+//    return 0;
     
     timecounter tc;
     
