@@ -56,9 +56,10 @@ public:
 
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
+    SparseMatrix<T> m_skin_operator;
 
-    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs, std::vector<std::pair<size_t,size_t>> & end_point_mortars)
-        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_end_point_mortars(end_point_mortars), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
+    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs, std::vector<std::pair<size_t,size_t>> & end_point_mortars, SparseMatrix<T> & skin_operator)
+        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_end_point_mortars(end_point_mortars), m_skin_operator(skin_operator), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
@@ -100,6 +101,10 @@ public:
             
         size_t system_size = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof;
 
+        // skin data
+        size_t skin_size = 2*m_skin_operator.rows();
+        system_size += skin_size;
+        
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
             
@@ -392,6 +397,28 @@ public:
         }
     
     }
+    
+    void scatter_skin_data(const Mesh& msh, const size_t & skin_ind)
+    {
+        size_t n_skin_dof = m_skin_operator.rows();
+        
+        std::vector<assembly_index> asm_map;
+        auto LHS_offset = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof;
+        
+        for (size_t i = 0; i < n_skin_dof; i++)
+        asm_map.push_back( assembly_index(LHS_offset + skin_ind * n_skin_dof +i, true));
+        
+        assert( asm_map.size() == m_skin_operator.rows() && asm_map.size() == m_skin_operator.cols() );
+
+        for (size_t i = 0; i < m_skin_operator.rows(); i++)
+        {
+            for (size_t j = 0; j < m_skin_operator.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j],m_skin_operator.coeff(i,j)) );
+            }
+        }
+    
+    }
 
     void assemble(const Mesh& msh, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> rhs_fun){
         
@@ -408,7 +435,11 @@ public:
         // mortars assemble
         assemble_mortars(msh);
         
+        scatter_skin_data(msh, 0);
+        scatter_skin_data(msh, 1);
+        
         finalize();
+
     }
 
     void assemble_mortars(const Mesh& msh){
