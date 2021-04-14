@@ -347,6 +347,35 @@ public:
     
     }
     
+    void scatter_mortar_skin_data(const Mesh& msh, const size_t & face_id, const size_t & fracture_ind, const size_t & skin_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
+    {
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+        size_t n_f_sigma_bs = disk::scalar_basis_size(m_hho_di.cell_degree(), Mesh::dimension - 1);
+        size_t n_skin_bs = m_skin_operator.rows();
+        
+        std::vector<assembly_index> asm_map_i, asm_map_j;
+        auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
+        auto skin_LHS_offset = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof + skin_ind * n_skin_bs + fracture_ind*n_f_sigma_bs;
+        
+        for (size_t i = 0; i < n_f_sigma_bs; i++)
+        asm_map_i.push_back( assembly_index(skin_LHS_offset+i, true));
+        
+        for (size_t i = 0; i < n_fbs; i++)
+        asm_map_j.push_back( assembly_index(face_LHS_offset+i, true));
+        
+        assert( asm_map_i.size() == mortar_mat.rows() && asm_map_j.size() == mortar_mat.cols() );
+
+        for (size_t i = 0; i < mortar_mat.rows(); i++)
+        {
+            for (size_t j = 0; j < mortar_mat.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], mortar_mat(i,j)) );
+            }
+        }
+    
+    }
+    
     void scatter_point_mortar_data(const Mesh& msh, const size_t & face_id, const size_t & point_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
     {
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
@@ -438,6 +467,8 @@ public:
         scatter_skin_data(msh, 0);
         scatter_skin_data(msh, 1);
         
+        assemble_mortars_skin(msh);
+        
         finalize();
 
     }
@@ -490,6 +521,30 @@ public:
             
             point_mortar_ind++;
         }
+    }
+    
+    void assemble_mortars_skin(const Mesh& msh){
+        auto storage = msh.backend_storage();
+        
+        size_t fracture_ind = 0;
+        for (auto chunk : m_fracture_pairs) {
+            
+            size_t cell_ind_l = m_elements_with_fractures_eges[fracture_ind].first;
+            size_t cell_ind_r = m_elements_with_fractures_eges[fracture_ind].second;
+            auto& face_l = storage->edges[chunk.first];
+            auto& face_r = storage->edges[chunk.second];
+            auto& cell_l = storage->surfaces[cell_ind_l];
+            auto& cell_r = storage->surfaces[cell_ind_r];
+            
+            Matrix<T, Dynamic, Dynamic> mortar_l = +1.0*mortar_coupling_matrix_skin(msh,cell_l,face_l);
+            Matrix<T, Dynamic, Dynamic> mortar_r = +1.0*mortar_coupling_matrix_skin(msh,cell_r,face_r);
+            
+            scatter_mortar_skin_data(msh,chunk.first,fracture_ind,0,mortar_l);
+            scatter_mortar_skin_data(msh,chunk.second,fracture_ind,1,mortar_r);
+            
+            fracture_ind++;
+        }
+        
     }
     
     
@@ -732,6 +787,34 @@ public:
 
             ret.block(0,0,sn_basis.size(),vec_u_basis.size()) += s_n_opt;
             ret.block(sn_basis.size(),0,st_basis.size(),vec_u_basis.size()) += s_t_opt;
+        }
+
+        return ret;
+    }
+    
+    Matrix<T, Dynamic, Dynamic> mortar_coupling_matrix_skin(const Mesh& msh, const typename Mesh::cell_type& cell, const typename Mesh::face_type& face, size_t di = 0)
+    {
+        const auto degree     = m_hho_di.face_degree();
+        
+        auto vec_u_basis = disk::make_vector_monomial_basis(msh, face, m_hho_di.face_degree());
+        auto st_basis = disk::make_scalar_monomial_basis(msh, face, m_hho_di.cell_degree());
+        
+        size_t n_s_basis = st_basis.size();
+        Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, vec_u_basis.size());
+
+        const auto qps = integrate(msh, face, 2 * (degree+di));
+        const auto n = disk::normal(msh, cell, face);
+        const auto t = disk::tanget(msh, cell, face);
+        for (auto& qp : qps)
+        {
+            const auto u_f_phi = vec_u_basis.eval_functions(qp.point());
+
+            const auto st_f_phi = st_basis.eval_functions(qp.point());
+                        
+            const auto w_t_dot_u_f_phi = disk::priv::inner_product(u_f_phi,disk::priv::inner_product(qp.weight(), t));
+            const auto s_t_opt = disk::priv::outer_product(st_f_phi, w_t_dot_u_f_phi);
+
+            ret.block(0,0,n_s_basis,vec_u_basis.size()) += s_t_opt;
         }
 
         return ret;
