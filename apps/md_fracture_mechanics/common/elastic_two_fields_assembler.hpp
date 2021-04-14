@@ -464,11 +464,12 @@ public:
         // mortars assemble
         assemble_mortars(msh);
         
-        scatter_skin_data(msh, 0);
-        scatter_skin_data(msh, 1);
-        
-        assemble_mortars_skin(msh);
-        
+        if (m_skin_operator.rows() != 0) {
+            scatter_skin_data(msh, 0);
+            scatter_skin_data(msh, 1);
+            assemble_mortars_skin(msh);
+        }
+    
         finalize();
 
     }
@@ -829,7 +830,7 @@ public:
         size_t n_s_basis = sn_basis.size() + st_basis.size();
         Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, n_s_basis);
 
-        T c_perp = 1000.0;
+        T c_perp = 0.0;
         const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
         for (auto& qp : qps_l)
         {
@@ -839,7 +840,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para =  1000.0;
+        T c_para =  100.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {

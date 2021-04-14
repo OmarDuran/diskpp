@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_2847.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
@@ -280,7 +280,7 @@ int main(int argc, char **argv)
 //            mat_file.open ("matrix.txt");
 //            mat_file << assembler.LHS.toDense() <<  std::endl;
 //            mat_file.close();
-            skin_operator = assembler.LHS;
+//            skin_operator = assembler.LHS;
         }
 
     }
@@ -328,14 +328,14 @@ int main(int argc, char **argv)
     };
     
     boundary_type bnd(msh);
-    RealType minlx = 0.0;
-    RealType minly = 0.0;
-    RealType maxlx = 7.0;
-    RealType maxly = 6.0;
-//    RealType minlx = -10.0;
-//    RealType minly = -10.0;
-//    RealType maxlx = 10.0;
-//    RealType maxly = 10.0;
+//    RealType minlx = 0.0;
+//    RealType minly = 0.0;
+//    RealType maxlx = 7.0;
+//    RealType maxly = 6.0;
+    RealType minlx = -10.0;
+    RealType minly = -10.0;
+    RealType maxlx = 10.0;
+    RealType maxly = 10.0;
     // defining boundary conditions
     {
         size_t bc_D_bot_id = 0;
@@ -409,10 +409,10 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    std::ofstream mat_file;
-    mat_file.open ("matrix.txt");
-    mat_file << assembler.LHS.toDense() <<  std::endl;
-    mat_file.close();
+//    std::ofstream mat_file;
+//    mat_file.open ("matrix.txt");
+//    mat_file << assembler.LHS.toDense() <<  std::endl;
+//    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
