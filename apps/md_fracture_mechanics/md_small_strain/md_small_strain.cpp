@@ -40,9 +40,12 @@ using namespace Eigen;
 // ----- common data types ------------------------------
 using RealType = double;
 typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
+typedef disk::mesh<RealType, 1, disk::generic_mesh_storage<RealType, 1>>  mesh1d_type;
 typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
 
 void CrackExample(int argc, char **argv);
+
+void SurfaceStrain(simulation_data & sim_data);
 
 int main(int argc, char **argv)
 {
@@ -50,6 +53,9 @@ int main(int argc, char **argv)
     
     simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
     sim_data.print_simulation_data();
+    
+    SurfaceStrain(sim_data);
+    return 0;
     
     timecounter tc;
     
@@ -76,8 +82,8 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
-    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_2847.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_2847.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
@@ -177,7 +183,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -1/30.0;
+        RealType uy = -0.1;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -237,20 +243,20 @@ int main(int argc, char **argv)
             }
         }   
         
-        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
-        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+//        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
 //        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
 //        bnd.addDirichletBC(disk::DX, bc_N_right_id, null_v_fun);
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
-//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-//        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-//        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-//        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
         
 //        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
@@ -423,6 +429,39 @@ int main(int argc, char **argv)
     }
     
     return 0;
+}
+
+void SurfaceStrain(simulation_data & sim_data){
+    
+    mesh1d_type msh;
+    
+    line_1d_mesh_reader<RealType> mesh_builder;
+    std::string mesh_file = "meshes/base_line_nel_4.txt";
+    mesh_builder.set_line_mesh_file(mesh_file);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
+    
+    size_t cell_i = 0;
+    size_t cell_degree = 1;
+    for (auto& cell : msh)
+    {
+        auto cell_basis = make_scalar_monomial_basis(msh, cell, cell_degree);
+        
+        auto cell_basis_b = make_vector_monomial_basis(msh, cell, cell_degree);
+        auto points = cell.point_ids();
+        size_t n_p = points.size();
+        for (size_t l = 0; l < n_p; l++)
+        {
+            auto pt_id = points[l];
+            auto bar = barycenter(msh,cell);
+            auto t_phi = cell_basis.eval_functions(bar);
+            auto t_gphi = cell_basis.eval_gradients(bar);
+            std::cout << "phi = " << t_phi << std::endl;
+            std::cout << "gphi = " << t_gphi << std::endl;
+            int aka = 0;
+        }
+        cell_i++;
+    }
 }
 
 

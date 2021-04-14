@@ -707,6 +707,266 @@ public:
     
 };
 
+template<typename T>
+class line_1d_mesh_reader : public
+fitted_geometry_builder<disk::generic_mesh<T,1>>
+//fitted_geometry_builder<disk::mesh<T, 1, disk::generic_mesh_storage<T, 1>>>
+
+{
+    typedef disk::generic_mesh<T,1>                 mesh_type;
+//    typedef disk::mesh<T, 1, disk::generic_mesh_storage<T, 1>>                 mesh_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef typename mesh_type::node_type           node_type;
+    typedef typename mesh_type::edge_type           edge_type;
+    
+    struct line_cell
+    {
+        std::vector<size_t>                 m_member_nodes;
+        std::set<std::array<size_t, 2>>     m_member_edges;
+        bool operator<(const line_cell & other) {
+            return m_member_nodes < other.m_member_nodes;
+        }
+    };
+    
+    std::vector<point_type>                         points;
+    std::vector<node_type>                          vertices;
+    std::vector<std::array<size_t, 2>>              facets;
+    std::vector<std::array<size_t, 2>>              skeleton_edges;
+    std::vector<std::array<size_t, 2>>              boundary_edges;
+    std::vector<line_cell>                          lines;
+    std::string line_mesh_file;
+    std::set<size_t> bc_points;
+    
+    void clear_storage() {
+        points.clear();
+        vertices.clear();
+        skeleton_edges.clear();
+        boundary_edges.clear();
+        lines.clear();
+        bc_points.clear();
+    }
+    
+    void reserve_storage(){
+        
+        std::ifstream input;
+        input.open(line_mesh_file.c_str());
+        
+        size_t n_points, n_lines, n_bc_edges, n_edges;
+        if (input.is_open()) {
+            std::string line;
+            std::getline(input, line);
+            std::stringstream(line) >> n_points >> n_lines >> n_bc_edges;
+            for(size_t id = 0; id < n_points; id++){
+                if(std::getline(input, line)){
+
+                }
+                else{
+                    break;
+                }
+            }
+
+            n_edges = 0;
+            size_t n_line_vertices;
+            for(size_t line_id=0; line_id < n_lines; line_id++)
+            {
+                if(std::getline(input, line)){
+                    std::stringstream(line) >> n_line_vertices;
+                    n_edges += n_line_vertices;
+                  }
+                  else{
+                      break;
+                  }
+            }
+
+            bc_points.clear();
+            size_t bc_point_id;
+            for(size_t bc_id=0; bc_id < n_bc_edges; bc_id++)
+            {
+                if(std::getline(input, line)){
+                    std::stringstream input_line(line);
+                    while(!input_line.eof()){
+                        input_line >> bc_point_id;
+                        bc_point_id--;
+                        bc_points.insert(bc_point_id);
+                    }
+                }
+                else{
+                  break;
+                }
+            }
+            n_bc_edges = bc_points.size();
+
+            points.reserve(n_points);
+            vertices.reserve(n_points);
+
+            size_t n_skel_edges = n_edges - n_bc_edges;
+            skeleton_edges.reserve(n_skel_edges);
+            boundary_edges.reserve(n_bc_edges);
+            lines.reserve(n_lines);
+
+        }
+    }
+            
+    void validate_edge(std::array<size_t, 2> & edge){
+        assert(edge[0] != edge[1]);
+        if (edge[0] > edge[1]){
+            std::swap(edge[0], edge[1]);
+        }
+    }
+    
+public:
+
+    line_1d_mesh_reader() : fitted_geometry_builder<mesh_type>()
+    {
+        fitted_geometry_builder<mesh_type>::m_dimension = 1;
+    }
+    
+    void set_line_mesh_file(std::string mesh_file){
+        line_mesh_file = mesh_file;
+    }
+    
+    // build the mesh
+    bool build_mesh(){
+        
+        clear_storage();
+        reserve_storage();
+        
+        std::ifstream input;
+        input.open(line_mesh_file.c_str());
+        
+        size_t n_points, n_lines, n_bc_points;
+        if (input.is_open()) {
+            std::string line;
+            std::getline(input, line);
+            std::stringstream(line) >> n_points >> n_lines >> n_bc_points;
+
+            T xv, yv;
+            for(size_t id = 0; id < n_points; id++){
+                if(std::getline(input, line)){
+                    std::stringstream(line) >> xv >> yv;
+//                    point_type point(xv, yv);
+                    point_type point(xv);
+                    points.push_back(point);
+                    vertices.push_back(node_type(point_identifier<1>(id)));
+                }
+                else{
+                    break;
+                }
+            }
+
+            size_t n_line_vertices, id;
+            for(size_t line_id=0; line_id < n_lines; line_id++)
+            {
+                if(std::getline(input, line)){
+                    std::stringstream input_line(line);
+                    input_line >> n_line_vertices;
+
+                    line_cell line;
+                    std::vector<size_t> member_nodes;
+                    for (size_t i = 0; i < n_line_vertices; i++) {
+                        input_line >> id;
+                        id--;
+                        member_nodes.push_back(id);
+                    }
+                    line.m_member_nodes = member_nodes;
+
+                    assert(member_nodes.size() == n_line_vertices);
+
+                    std::set< std::array<size_t, 2> > member_edges;
+                    std::array<size_t, 2> edge;
+                    for (size_t i = 0; i < member_nodes.size()-1; i++) {
+
+                        edge = {member_nodes[i],member_nodes[i+1]};
+
+                        validate_edge(edge);
+                        facets.push_back( edge );
+                        member_edges.insert(edge);
+
+                        bool is_bc_point_l_Q = bc_points.find(member_nodes[i]) != bc_points.end();
+                        bool is_bc_point_r_Q = bc_points.find(edge.at(1)) != bc_points.end();
+                        if (is_bc_point_l_Q && is_bc_point_r_Q) {
+                            boundary_edges.push_back( edge );
+                        }
+                    }
+
+                    line.m_member_edges = member_edges;
+                    lines.push_back( line );
+
+                  }
+                  else{
+                      break;
+                  }
+            }
+        }
+          
+        // Duplicated facets are eliminated
+        std::sort( facets.begin(), facets.end() );
+        facets.erase( std::unique( facets.begin(), facets.end() ), facets.end() );
+        
+        return true;
+    }
+    
+    void move_to_mesh_storage(mesh_type& msh){
+        
+        auto storage = msh.backend_storage();
+        storage->points = std::move(points);
+        storage->nodes = std::move(vertices);
+        
+        std::vector<edge_type> edges;
+        edges.reserve(facets.size());
+        for (size_t i = 0; i < facets.size(); i++)
+        {
+            assert(facets[i][0] < facets[i][1]);
+            auto node1 = typename node_type::id_type(facets[i][0]);
+            auto node2 = typename node_type::id_type(facets[i][1]);
+
+            auto e = edge_type{{node1, node2}};
+
+            e.set_point_ids(facets[i].begin(), facets[i].end());
+            edges.push_back(e);
+        }
+        std::sort(edges.begin(), edges.end());
+
+//        storage->boundary_info.resize(vertices.size());
+//        for (size_t i = 0; i < boundary_edges.size(); i++)
+//        {
+//            assert(boundary_edges[i][0] < boundary_edges[i][1]);
+//            auto node1 = typename node_type::id_type(boundary_edges[i][0]);
+//            auto node2 = typename node_type::id_type(boundary_edges[i][1]);
+//
+//            auto e = edge_type{{node1, node2}};
+//
+//            auto position = find_element_id(edges.begin(), edges.end(), e);
+//
+//            if (position.first == false)
+//            {
+//                std::cout << "Bad bug at " << __FILE__ << "("
+//                          << __LINE__ << ")" << std::endl;
+//                return;
+//            }
+//
+//                disk::bnd_info bi{0, true};
+//                storage->boundary_info.at(position.second) = bi;
+//        }
+
+        storage->edges = std::move(edges);
+        
+    }
+            
+    // Print in log file relevant mesh information
+    void print_log_file(){
+        fitted_geometry_builder<mesh_type>::m_n_elements = lines.size();
+        std::ofstream file;
+        file.open (fitted_geometry_builder<mesh_type>::m_log_file.c_str());
+        file << "Number of surfaces : " << lines.size() << std::endl;
+        file << "Number of skeleton edges : " << skeleton_edges.size() << std::endl;
+        file << "Number of boundary edges : " << boundary_edges.size() << std::endl;
+        file << "Number of vertices : " << vertices.size() << std::endl;
+        file.close();
+    }
+    
+};
+
 #endif /* fitted_geometry_builder_hpp */
 
 
