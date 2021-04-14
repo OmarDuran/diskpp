@@ -731,8 +731,8 @@ fitted_geometry_builder<disk::generic_mesh<T,1>>
     std::vector<point_type>                         points;
     std::vector<node_type>                          vertices;
     std::vector<std::array<size_t, 2>>              facets;
-    std::vector<std::array<size_t, 2>>              skeleton_edges;
-    std::vector<std::array<size_t, 2>>              boundary_edges;
+    std::vector<size_t>                             skeleton_edges;
+    std::vector<size_t>                             boundary_edges;
     std::vector<line_cell>                          lines;
     std::string line_mesh_file;
     std::set<size_t> bc_points;
@@ -884,8 +884,11 @@ public:
 
                         bool is_bc_point_l_Q = bc_points.find(member_nodes[i]) != bc_points.end();
                         bool is_bc_point_r_Q = bc_points.find(edge.at(1)) != bc_points.end();
-                        if (is_bc_point_l_Q && is_bc_point_r_Q) {
-                            boundary_edges.push_back( edge );
+                        if (is_bc_point_l_Q) {
+                            boundary_edges.push_back( member_nodes[i] );
+                        }
+                        if (is_bc_point_r_Q) {
+                            boundary_edges.push_back( edge.at(1) );
                         }
                     }
 
@@ -910,7 +913,6 @@ public:
         
         auto storage = msh.backend_storage();
         storage->points = std::move(points);
-        storage->nodes = std::move(vertices);
         
         std::vector<edge_type> edges;
         edges.reserve(facets.size());
@@ -927,28 +929,24 @@ public:
         }
         std::sort(edges.begin(), edges.end());
 
-//        storage->boundary_info.resize(vertices.size());
-//        for (size_t i = 0; i < boundary_edges.size(); i++)
-//        {
-//            assert(boundary_edges[i][0] < boundary_edges[i][1]);
-//            auto node1 = typename node_type::id_type(boundary_edges[i][0]);
-//            auto node2 = typename node_type::id_type(boundary_edges[i][1]);
-//
-//            auto e = edge_type{{node1, node2}};
-//
-//            auto position = find_element_id(edges.begin(), edges.end(), e);
-//
-//            if (position.first == false)
-//            {
-//                std::cout << "Bad bug at " << __FILE__ << "("
-//                          << __LINE__ << ")" << std::endl;
-//                return;
-//            }
-//
-//                disk::bnd_info bi{0, true};
-//                storage->boundary_info.at(position.second) = bi;
-//        }
+        storage->boundary_info.resize(vertices.size());
+        for (size_t i = 0; i < boundary_edges.size(); i++)
+        {
+            auto node = node_type(point_identifier<1>(boundary_edges[i]));
+            auto position = find_element_id(vertices.begin(), vertices.end(), node);
 
+            if (position.first == false)
+            {
+                std::cout << "Bad bug at " << __FILE__ << "("
+                          << __LINE__ << ")" << std::endl;
+                return;
+            }
+
+            disk::bnd_info bi{0, true};
+            storage->boundary_info.at(position.second) = bi;
+        }
+        
+        storage->nodes = std::move(vertices);
         storage->edges = std::move(edges);
         
     }

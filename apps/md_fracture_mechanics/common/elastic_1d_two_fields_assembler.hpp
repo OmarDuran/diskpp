@@ -371,7 +371,11 @@ public:
         Matrix<T, Dynamic, Dynamic> mass = mass_operator(cell_ind, msh, cell);
         Matrix<T, Dynamic, Dynamic> M_operator = Matrix<T, Dynamic, Dynamic>::Zero(n_rows, n_cols);
         M_operator.block(0,0,mass.rows(),mass.cols()) = mass;
-
+        
+//        std::cout << "r = " << R_operator << std::endl;
+//        std::cout << "s = " << S_operator << std::endl;
+//        std::cout << "m = " << M_operator << std::endl;
+        
         return M_operator + R_operator + (rho*mu)*S_operator;
     }
     
@@ -398,12 +402,15 @@ public:
         const auto num_faces = howmany_faces(msh, cell);
 
         const matrix_type stiff  = make_stiffness_matrix(msh, cell, cb);
+        
         matrix_type gr_lhs = matrix_type::Zero(rbs-1, rbs-1);
         matrix_type gr_rhs = matrix_type::Zero(rbs-1, cbs + num_faces*fbs);
-
+        
         gr_lhs = stiff.block(1, 1, rbs-1, rbs-1);
         gr_rhs.block(0, 0, rbs-1, cbs) = stiff.block(1, 0, rbs-1, cbs);
 
+//        std::cout << " mass = " << stiff << std::endl;
+//        std::cout << " mass rhs = " << stiff.block(1, 0, rbs-1, cbs) << std::endl;
         const auto fcs = faces(msh, cell);
         for (size_t i = 0; i < fcs.size(); i++)
         {
@@ -414,8 +421,10 @@ public:
             auto point = barycenter(msh,fc);
             T weight = 1.0;
             vector_type c_phi_tmp = cb.eval_functions(point);
+//            std::cout << "c_phi_tmp = " << c_phi_tmp << std::endl;
             vector_type c_phi = c_phi_tmp.head(cbs);
             Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(point);
+//            std::cout << "c_dphi_tmp = " << c_dphi_tmp << std::endl;
             Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
             vector_type f_phi = fb.eval_functions(point);
             gr_rhs.block(0, cbs+i*fbs, rbs-1, fbs) += weight * (c_dphi * n) * f_phi.transpose();
@@ -485,13 +494,18 @@ public:
             tr.block(0, 0, fbs, cbs) = trace;
 
             oper.block(0, 0, fbs, cbs) = mass.ldlt().solve(trace);
+//            std::cout << "mass = " << mass << std::endl;
+//            std::cout << "tr = " << tr << std::endl;
+//            std::cout << "oper.transpose() = " << oper.transpose() << std::endl;
+//            std::cout << "oper.transpose() * tr = " << std::endl;
+//            std::cout << oper.transpose() * tr << std::endl;
             if (scaled_Q) {
                 data += oper.transpose() * tr / h;
             }else{
                 data += oper.transpose() * tr;
             }
         }
-
+//        std::cout << "data = " << data << std::endl;
         return data;
     }
             
@@ -591,6 +605,7 @@ public:
         size_t n_ten_cbs = disk::vector_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
+        size_t rbs = disk::scalar_basis_size(m_hho_di.reconstruction_degree(), Mesh::dimension);
             
         elastic_material_data<T> & material = m_material[cell_ind];
         T rho = material.rho();
@@ -599,8 +614,9 @@ public:
     
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(n_cbs, n_cbs);
         
-        auto scal_basis = disk::make_scalar_monomial_basis(msh, cell, m_hho_di.grad_degree());
-        Matrix<T, Dynamic, Dynamic> mass_matrix_sigma = disk::make_mass_matrix(msh, cell, scal_basis);
+        auto scal_basis = disk::make_scalar_monomial_basis(msh, cell, m_hho_di.reconstruction_degree());
+        Matrix<T, Dynamic, Dynamic> mass_matrix_sigma_full = disk::make_stiffness_matrix(msh, cell, scal_basis);
+        Matrix<T, Dynamic, Dynamic> mass_matrix_sigma = mass_matrix_sigma_full.block(1, 1, rbs-1, rbs-1);
         
         // Constitutive relationship inverse
         mass_matrix_sigma *= (1.0/(lambda+2.0*mu));
@@ -631,10 +647,10 @@ public:
         }
     }
             
-    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun, std::function<static_matrix<double, 2,2>(const typename Mesh::point_type& )> ten_fun){
+    void project_over_cells(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<double(const typename Mesh::point_type& )> vec_fun, std::function<double(const typename Mesh::point_type& )> ten_fun){
         size_t n_dof = LHS.rows();
         x_glob = Matrix<T, Dynamic, 1>::Zero(n_dof);
-        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_ten_cbs = disk::vector_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         for (auto& cell : msh)
@@ -648,32 +664,35 @@ public:
             scatter_cell_dof_data(msh, cell, x_glob, x_proj_dof);
         }
     }
-            
-    Matrix<T, Dynamic, 1> project_ten_function(const Mesh& msh, const typename Mesh::cell_type& cell,
-                      std::function<static_matrix<T, 2,2>(const typename Mesh::point_type& )> ten_fun){
     
-        Matrix<T, Dynamic, Dynamic> mass_matrix  = symmetric_tensor_mass_matrix(msh, cell);
-        size_t dim = Mesh::dimension;
-        auto gradeg = m_hho_di.grad_degree();
-        auto ten_bs = disk::sym_matrix_basis_size(gradeg, dim, dim);
-        auto ten_b = make_sym_matrix_monomial_basis(msh, cell, gradeg);
-        Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(ten_bs);
+    Matrix<T, Dynamic, 1> project_ten_function(const Mesh& msh, const typename Mesh::cell_type& cell,
+                      std::function<double(const typename Mesh::point_type& )> ten_fun){
+    
+            auto recdeg = m_hho_di.reconstruction_degree();
+            auto rec_basis = make_scalar_monomial_basis(msh, cell, recdeg);
+            auto rbs = disk::scalar_basis_size(recdeg, Mesh::dimension);
+            Matrix<T, Dynamic, Dynamic> mass_matrix_q_full  = make_stiffness_matrix(msh, cell, rec_basis);
+            Matrix<T, Dynamic, Dynamic> mass_matrix_q = Matrix<T, Dynamic, Dynamic>::Zero(rbs-1, rbs-1);
+            mass_matrix_q = mass_matrix_q_full.block(1, 1, rbs-1, rbs-1);
 
-        const auto qps = integrate(msh, cell, 2 * gradeg);
-        for (auto& qp : qps)
-        {
-            auto phi = ten_b.eval_functions(qp.point());
-            static_matrix<T, 2,2> sigma = ten_fun(qp.point());
-            for (size_t i = 0; i < ten_bs; i++){
-                auto qp_phi_i = disk::priv::inner_product(qp.weight(), phi[i]);
-                rhs(i,0) += disk::priv::inner_product(qp_phi_i,sigma);
+            Matrix<T, Dynamic, 1> rhs = Matrix<T, Dynamic, 1>::Zero(rbs-1);
+            const auto qps = integrate(msh, cell, 2*recdeg);
+            for (auto& qp : qps)
+            {
+              auto dphi = rec_basis.eval_gradients(qp.point());
+              auto flux = ten_fun(qp.point());
+              for (size_t i = 0; i < rbs-1; i++){
+              Matrix<T, 1, 1> phi_i = dphi.block(i+1, 0, 1, 1).transpose();
+                  int aka = 0;
+                  rhs(i) = rhs(i) + (qp.weight() * flux * phi_i(0,0));
+              }
+                
             }
-        }
-        Matrix<T, Dynamic, 1> x_dof = mass_matrix.llt().solve(rhs);
-        return x_dof;
+            Matrix<T, Dynamic, 1> x_dof = mass_matrix_q.llt().solve(rhs);
+            return x_dof;
     }
-            
-    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<static_vector<double, 2>(const typename Mesh::point_type& )> vec_fun){
+    
+    void project_over_faces(const Mesh& msh, Matrix<T, Dynamic, 1> & x_glob, std::function<double(const typename Mesh::point_type& )> vec_fun){
 
         for (auto& cell : msh)
         {
@@ -687,7 +706,9 @@ public:
                 {
                     continue;
                 }
-                Matrix<T, Dynamic, 1> x_proj_dof = project_function(msh, face, m_hho_di.face_degree(), vec_fun);
+                Matrix<T, Dynamic, 1> x_proj_dof = Matrix<T, Dynamic, Dynamic>::Zero(1, 1);
+                auto bar = barycenter(msh,face);
+                x_proj_dof(0,0) = vec_fun(bar);
                 scatter_face_dof_data(msh, face, x_glob, x_proj_dof);
             }
         }
@@ -743,7 +764,7 @@ public:
                     Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> & x_proj_dof) const
     {
         auto cell_ofs = disk::priv::offset(msh, cell);
-        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_ten_cbs = disk::vector_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         x_glob.block(cell_ofs * n_cbs, 0, n_cbs, 1) = x_proj_dof;
@@ -752,7 +773,7 @@ public:
     void scatter_face_dof_data(  const Mesh& msh, const typename Mesh::face_type& face,
                     Matrix<T, Dynamic, 1>& x_glob, Matrix<T, Dynamic, 1> & x_proj_dof) const
     {
-        size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
+        size_t n_ten_cbs = disk::vector_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);

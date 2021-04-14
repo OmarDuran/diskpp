@@ -257,7 +257,7 @@ make_stiffness_matrix(const Mesh& msh, const Element& elem, const Basis& basis)
 
     if(degree > 0)
     {
-        const auto qps = integrate(msh, elem, 2 * (degree - 1));
+        const auto qps = integrate(msh, elem, 2 * (degree));
 
         for (auto& qp : qps)
         {

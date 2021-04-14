@@ -450,7 +450,7 @@ void SurfaceStrain(simulation_data & sim_data){
     elastic_material_data<RealType> material(rho,l,mu);
 
     // Creating HHO approximation spaces and corresponding linear operator
-    size_t face_k_degree = 0;//sim_data.m_k_degree;
+    size_t face_k_degree = sim_data.m_k_degree;
     size_t cell_k_degree = face_k_degree;
     if(sim_data.m_hdg_stabilization_Q){
         cell_k_degree++;
@@ -460,11 +460,62 @@ void SurfaceStrain(simulation_data & sim_data){
     auto rhs_fun = [](const mesh1d_type::point_type& pt) -> RealType {
         RealType x;
         x = pt.x();
-        RealType r = 0.0;
+        RealType r = 6.0;
         return r;
     };
     
+    auto null_u_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+        RealType x;
+        x = pt.x();
+        RealType u = 0.0;
+        return u;
+    };
+    
+    auto u_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+        RealType x;
+        x = pt.x();
+        RealType u = x * (1-x);
+        return u;
+    };
+    
+    auto s_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+        RealType x;
+        x = pt.x();
+        RealType s = 3 - 6.0*x;
+        return s;
+    };
+    
     boundary_1d_type bnd(msh);
+    // defining boundary conditions
+    {
+        size_t bc_D_left_id = 0;
+        size_t bc_D_right_id = 1;
+        RealType eps = 1.0e-4;
+        RealType minlx = 0.0;
+        RealType maxlx = 1.0;
+        for (auto face_it = msh.boundary_faces_begin(); face_it != msh.boundary_faces_end(); face_it++)
+        {
+            auto face = *face_it;
+            mesh1d_type::point_type bar = barycenter(msh, face);
+            auto fc_id = msh.lookup(face);
+            if (std::fabs(bar.x()-minlx) < eps) {
+                disk::bnd_info bi{bc_D_left_id, true};
+                msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                continue;
+            }
+            
+            if(std::fabs(bar.x()-maxlx) < eps){
+                disk::bnd_info bi{bc_D_right_id, true};
+                msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                continue;
+            }
+        }
+                
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_left_id, null_u_fun);
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_right_id, null_u_fun);
+
+    }
+    
     auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
@@ -474,12 +525,28 @@ void SurfaceStrain(simulation_data & sim_data){
     }
     assembler.load_material_data(msh,material);
     assembler.assemble(msh, rhs_fun);
+
     
     std::ofstream mat_file;
     mat_file.open ("matrix.txt");
     mat_file << assembler.LHS.toDense() <<  std::endl;
     mat_file.close();
 
+    
+    // Solving LS
+    Matrix<RealType, Dynamic, 1> x_dof;
+    assembler.project_over_cells(msh, x_dof, u_fun, s_fun);
+    assembler.project_over_faces(msh, x_dof, u_fun);
+    
+    linear_solver<RealType> analysis(assembler.LHS);
+    analysis.set_direct_solver(false);
+    analysis.factorize();
+    x_dof = analysis.solve(assembler.RHS);
+    
+    // render silo
+    size_t it = 0;
+    std::string silo_file_name = "line_strain";
+    postprocessor<mesh1d_type>::write_silo_um_field(silo_file_name, it, msh, hho_di, x_dof);
     
 //    size_t cell_i = 0;
 //    size_t cell_degree = 1;

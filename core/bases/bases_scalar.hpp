@@ -177,8 +177,8 @@ class scaled_monomial_scalar_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
 
         for (size_t i = 1; i <= basis_degree; i++)
         {
-            const auto bv = iexp_pow(ep, i);
-            ret(i,0)        = scalar_type(i) * v_norm * bv / (diameter_h * diameter_h);
+            const auto bv = iexp_pow(ep, i-1);
+            ret(i,0)        = 4.0 * scalar_type(i) * v_norm * bv / ( diameter_h * diameter_h);
         }
         return ret;
     
