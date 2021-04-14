@@ -11,6 +11,7 @@
 
 #include <iomanip>
 #include "../common/elastic_two_fields_assembler.hpp"
+#include "../common/elastic_1d_two_fields_assembler.hpp"
 
 #ifdef HAVE_INTEL_TBB
 #include <tbb/parallel_for.h>

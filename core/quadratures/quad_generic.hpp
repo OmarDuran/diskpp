@@ -179,6 +179,17 @@ integrate(const disk::generic_mesh<T, 2>& msh, const typename disk::generic_mesh
     return priv::integrate_2D_face(msh, fc, degree);
 }
 
+template<typename T>
+std::vector<disk::quadrature_point<T, 1>>
+integrate(const disk::generic_mesh<T, 1>& msh, const typename disk::generic_mesh<T, 1>::cell& cell, const size_t degree)
+{
+    if (degree == 0)
+    {
+        return priv::integrate_degree0(msh, cell);
+    }
+
+    return priv::integrate_2D_face(msh, cell, degree);
+}
 
 namespace priv {
 

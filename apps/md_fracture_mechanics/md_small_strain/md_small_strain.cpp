@@ -42,6 +42,7 @@ using RealType = double;
 typedef disk::mesh<RealType, 2, disk::generic_mesh_storage<RealType, 2>>  mesh_type;
 typedef disk::mesh<RealType, 1, disk::generic_mesh_storage<RealType, 1>>  mesh1d_type;
 typedef disk::BoundaryConditions<mesh_type, false> boundary_type;
+typedef disk::BoundaryConditions<mesh1d_type, true> boundary_1d_type;
 
 void CrackExample(int argc, char **argv);
 
@@ -441,27 +442,65 @@ void SurfaceStrain(simulation_data & sim_data){
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
     
-    size_t cell_i = 0;
-    size_t cell_degree = 1;
-    for (auto& cell : msh)
-    {
-        auto cell_basis = make_scalar_monomial_basis(msh, cell, cell_degree);
-        
-        auto cell_basis_b = make_vector_monomial_basis(msh, cell, cell_degree);
-        auto points = cell.point_ids();
-        size_t n_p = points.size();
-        for (size_t l = 0; l < n_p; l++)
-        {
-            auto pt_id = points[l];
-            auto bar = barycenter(msh,cell);
-            auto t_phi = cell_basis.eval_functions(bar);
-            auto t_gphi = cell_basis.eval_gradients(bar);
-            std::cout << "phi = " << t_phi << std::endl;
-            std::cout << "gphi = " << t_gphi << std::endl;
-            int aka = 0;
-        }
-        cell_i++;
+    // Constant elastic properties
+    RealType rho,l,mu;
+    rho = 1.0;
+    l = 1.0;//2000.0;
+    mu = 1.0;//2000.0;
+    elastic_material_data<RealType> material(rho,l,mu);
+
+    // Creating HHO approximation spaces and corresponding linear operator
+    size_t face_k_degree = 0;//sim_data.m_k_degree;
+    size_t cell_k_degree = face_k_degree;
+    if(sim_data.m_hdg_stabilization_Q){
+        cell_k_degree++;
     }
+    disk::hho_degree_info hho_di(cell_k_degree,face_k_degree);
+    
+    auto rhs_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+        RealType x;
+        x = pt.x();
+        RealType r = 0.0;
+        return r;
+    };
+    
+    boundary_1d_type bnd(msh);
+    auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
+    if(sim_data.m_hdg_stabilization_Q){
+        assembler.set_hdg_stabilization();
+    }
+    if(sim_data.m_scaled_stabilization_Q){
+        assembler.set_scaled_stabilization();
+    }
+    assembler.load_material_data(msh,material);
+    assembler.assemble(msh, rhs_fun);
+    
+    std::ofstream mat_file;
+    mat_file.open ("matrix.txt");
+    mat_file << assembler.LHS.toDense() <<  std::endl;
+    mat_file.close();
+
+    
+//    size_t cell_i = 0;
+//    size_t cell_degree = 1;
+//    for (auto& cell : msh)
+//    {
+//        auto cell_basis = make_scalar_monomial_basis(msh, cell, cell_degree);
+//        
+//        auto points = cell.point_ids();
+//        size_t n_p = points.size();
+//        for (size_t l = 0; l < n_p; l++)
+//        {
+//            auto pt_id = points[l];
+//            auto bar = barycenter(msh,cell);
+//            auto t_phi = cell_basis.eval_functions(bar);
+//            auto t_gphi = cell_basis.eval_gradients(bar);
+//            std::cout << "phi = " << t_phi << std::endl;
+//            std::cout << "gphi = " << t_gphi << std::endl;
+//            int aka = 0;
+//        }
+//        cell_i++;
+//    }
 }
 
 

@@ -520,7 +520,7 @@ class scaled_monomial_vector_basis<Mesh<T, 1, Storage>, typename Mesh<T, 1, Stor
     function_type
     eval_functions(const point_type& pt) const
     {
-        function_type ret = function_type::Zero(basis_size, 2);
+        function_type ret = function_type::Zero(basis_size, 1);
 
         const auto phi = scalar_basis.eval_functions(pt);
 
