@@ -622,6 +622,21 @@ public:
         mass_matrix_sigma *= (1.0/(lambda+2.0*mu));
         mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
 
+        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh,cell,scal_basis);
+//        std::cout << "mass 1d" << mass << std::endl;
+        mass_matrix.block(n_ten_cbs,n_ten_cbs,n_vec_cbs,n_vec_cbs) = mass;
+        
+        // basis
+//        {
+//            auto pts = cell.point_ids();
+//            auto pt_id = pts[0];
+//            auto bar = *std::next(msh.points_begin(), pt_id);
+//            auto t_phi = scal_basis.eval_functions(bar);
+//            std::cout << "t_phi : " << std::endl;
+//            std::cout << t_phi << std::endl;
+//        }
+        
+        
         return mass_matrix;
     }
     

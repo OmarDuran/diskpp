@@ -150,14 +150,15 @@ int main(int argc, char **argv)
         fracture_cell_ind++;
     }
     
-//    end_point_mortars.clear();
+    end_point_mortars.clear();
     
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // create mesh and skin operator
     SparseMatrix<RealType> skin_operator;
-    bool skin_strain_Q = false;
+    bool skin_strain_Q = true;
+    std::pair<size_t,size_t> skin_n_dof;
     if(skin_strain_Q){
         auto storage = msh.backend_storage();
 
@@ -180,108 +181,224 @@ int main(int argc, char **argv)
         size_t n_points = n_cells + 1;
         size_t n_bc = end_point_mortars.size();
         
-        node_index = node_index_b;
-        std::map<size_t,size_t> node_map;
-        std::map<size_t,size_t> node_map_inv;
-        size_t node_c = 1;
-        node_map[node_index] = node_c;
-        node_map_inv[node_c] = node_index;
-        node_c++;
-        while (node_index_e != node_index) {
-            for (auto id : set_l) {
-                auto& face = storage->edges[id];
-                auto points = face.point_ids();
-                bool check_Q = points[0] == node_index || points[1] == node_index;
-                if (check_Q) {
-                    set_l.erase(id);
-                    if (points[0] == node_index) {
-                        node_index = points[1];
-                    }else{
-                        node_index = points[0];
+        // left case
+        {
+            node_index = node_index_b;
+            std::map<size_t,size_t> node_map;
+            std::map<size_t,size_t> node_map_inv;
+            size_t node_c = 1;
+            node_map[node_index] = node_c;
+            node_map_inv[node_c] = node_index;
+            node_c++;
+            while (node_index_e != node_index) {
+                for (auto id : set_l) {
+                    auto& face = storage->edges[id];
+                    auto points = face.point_ids();
+                    bool check_Q = points[0] == node_index || points[1] == node_index;
+                    if (check_Q) {
+                        set_l.erase(id);
+                        if (points[0] == node_index) {
+                            node_index = points[1];
+                        }else{
+                            node_index = points[0];
+                        }
+                        node_map[node_index] = node_c;
+                        node_map_inv[node_c] = node_index;
+                        node_c++;
+                        break;
                     }
-                    node_map[node_index] = node_c;
-                    node_map_inv[node_c] = node_index;
-                    node_c++;
-                    break;
                 }
             }
+            
+            std::ofstream mesh_file;
+            mesh_file.open ("meshes/base_line_l.txt");
+            mesh_file << n_points << " " << n_cells << " " << n_bc << std::endl;
+            mesh_type::point_type p0 = *std::next(msh.points_begin(), node_index_b);
+            for (auto chunk : node_map_inv) {
+                mesh_type::point_type p = *std::next(msh.points_begin(), chunk.second);
+                RealType dv = (p-p0).to_vector().norm();
+                mesh_file << dv << " " << 0.0 << std::endl;
+            }
+            for (auto chunk : fracture_pairs) {
+                auto& face = storage->edges[chunk.first];
+                auto points = face.point_ids();
+                mesh_file << points.size() << " " << node_map[points[0]] << " " << node_map[points[1]] << std::endl;
+            }
+            mesh_file << node_map[node_index_b] << std::endl;
+            mesh_file << node_map[node_index_e];
+            mesh_file.close();
+            
+            
+            {
+                mesh1d_type msh;
+        
+                line_1d_mesh_reader<RealType> mesh_builder;
+                std::string mesh_file = "meshes/base_line_l.txt";
+                mesh_builder.set_line_mesh_file(mesh_file);
+                mesh_builder.build_mesh();
+                mesh_builder.move_to_mesh_storage(msh);
+                
+                // Constant elastic properties
+                RealType rho,l,mu;
+                rho = 1.0;
+                l = 1.0;//2000.0;
+                mu = 1.0;//2000.0;
+                elastic_material_data<RealType> material(rho,l,mu);
+
+                // Creating HHO approximation spaces and corresponding linear operator
+                size_t face_k_degree = sim_data.m_k_degree;
+                size_t cell_k_degree = face_k_degree;
+                if(sim_data.m_hdg_stabilization_Q){
+                    cell_k_degree++;
+                }
+                disk::hho_degree_info hho_di(cell_k_degree,face_k_degree);
+                
+                auto rhs_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+                    RealType x;
+                    x = pt.x();
+                    RealType r = 0.0;
+                    return r;
+                };
+                
+                auto null_u_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+                    RealType x;
+                    x = pt.x();
+                    RealType u = 0.0;
+                    return u;
+                };
+                
+                boundary_1d_type bnd(msh);
+                
+                auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
+                if(sim_data.m_hdg_stabilization_Q){
+                    assembler.set_hdg_stabilization();
+                }
+                if(sim_data.m_scaled_stabilization_Q){
+                    assembler.set_scaled_stabilization();
+                }
+                assembler.load_material_data(msh,material);
+                assembler.assemble(msh, rhs_fun);
+
+                
+//                std::ofstream mat_file;
+//                mat_file.open ("skin_matrix_l.txt");
+//                mat_file << assembler.LHS.toDense() <<  std::endl;
+//                mat_file.close();
+                
+                
+                skin_operator = assembler.LHS;
+                skin_n_dof = std::make_pair(assembler.get_n_cells_dofs(), assembler.get_n_faces_dofs());
+            }
         }
         
-        std::ofstream mesh_file;
-        mesh_file.open ("meshes/base_line.txt");
-        mesh_file << n_points << " " << n_cells << " " << n_bc << std::endl;
-        mesh_type::point_type p0 = *std::next(msh.points_begin(), node_index_b);
-        for (auto chunk : node_map_inv) {
-            mesh_type::point_type p = *std::next(msh.points_begin(), chunk.second);
-            RealType dv = (p-p0).to_vector().norm();
-            mesh_file << dv << " " << 0.0 << std::endl;
-        }
-        for (auto chunk : fracture_pairs) {
-            auto& face = storage->edges[chunk.first];
-            auto points = face.point_ids();
-            mesh_file << points.size() << " " << node_map[points[0]] << " " << node_map[points[1]] << std::endl;
-        }
-        mesh_file << node_map[node_index_b] << std::endl;
-        mesh_file << node_map[node_index_e];
-        mesh_file.close();
-        
-        
+        // right case
         {
-            mesh1d_type msh;
-    
-            line_1d_mesh_reader<RealType> mesh_builder;
-            std::string mesh_file = "meshes/base_line.txt";
-            mesh_builder.set_line_mesh_file(mesh_file);
-            mesh_builder.build_mesh();
-            mesh_builder.move_to_mesh_storage(msh);
+            node_index = node_index_b;
+            std::map<size_t,size_t> node_map;
+            std::map<size_t,size_t> node_map_inv;
+            size_t node_c = 1;
+            node_map[node_index] = node_c;
+            node_map_inv[node_c] = node_index;
+            node_c++;
+            while (node_index_e != node_index) {
+                for (auto id : set_r) {
+                    auto& face = storage->edges[id];
+                    auto points = face.point_ids();
+                    bool check_Q = points[0] == node_index || points[1] == node_index;
+                    if (check_Q) {
+                        set_r.erase(id);
+                        if (points[0] == node_index) {
+                            node_index = points[1];
+                        }else{
+                            node_index = points[0];
+                        }
+                        node_map[node_index] = node_c;
+                        node_map_inv[node_c] = node_index;
+                        node_c++;
+                        break;
+                    }
+                }
+            }
             
-            // Constant elastic properties
-            RealType rho,l,mu;
-            rho = 1.0;
-            l = 1.0;//2000.0;
-            mu = 1.0;//2000.0;
-            elastic_material_data<RealType> material(rho,l,mu);
+            std::ofstream mesh_file;
+            mesh_file.open ("meshes/base_line_r.txt");
+            mesh_file << n_points << " " << n_cells << " " << n_bc << std::endl;
+            mesh_type::point_type p0 = *std::next(msh.points_begin(), node_index_b);
+            for (auto chunk : node_map_inv) {
+                mesh_type::point_type p = *std::next(msh.points_begin(), chunk.second);
+                RealType dv = (p-p0).to_vector().norm();
+                mesh_file << dv << " " << 0.0 << std::endl;
+            }
+            for (auto chunk : fracture_pairs) {
+                auto& face = storage->edges[chunk.second];
+                auto points = face.point_ids();
+                mesh_file << points.size() << " " << node_map[points[0]] << " " << node_map[points[1]] << std::endl;
+            }
+            mesh_file << node_map[node_index_b] << std::endl;
+            mesh_file << node_map[node_index_e];
+            mesh_file.close();
+            
+            
+            {
+                mesh1d_type msh;
+        
+                line_1d_mesh_reader<RealType> mesh_builder;
+                std::string mesh_file = "meshes/base_line_r.txt";
+                mesh_builder.set_line_mesh_file(mesh_file);
+                mesh_builder.build_mesh();
+                mesh_builder.move_to_mesh_storage(msh);
+                
+                // Constant elastic properties
+                RealType rho,l,mu;
+                rho = 1.0;
+                l = 1.0;//2000.0;
+                mu = 1.0;//2000.0;
+                elastic_material_data<RealType> material(rho,l,mu);
 
-            // Creating HHO approximation spaces and corresponding linear operator
-            size_t face_k_degree = sim_data.m_k_degree;
-            size_t cell_k_degree = face_k_degree;
-            if(sim_data.m_hdg_stabilization_Q){
-                cell_k_degree++;
-            }
-            disk::hho_degree_info hho_di(cell_k_degree,face_k_degree);
-            
-            auto rhs_fun = [](const mesh1d_type::point_type& pt) -> RealType {
-                RealType x;
-                x = pt.x();
-                RealType r = 0.0;
-                return r;
-            };
-            
-            auto null_u_fun = [](const mesh1d_type::point_type& pt) -> RealType {
-                RealType x;
-                x = pt.x();
-                RealType u = 0.0;
-                return u;
-            };
-            
-            boundary_1d_type bnd(msh);
-            
-            auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
-            if(sim_data.m_hdg_stabilization_Q){
-                assembler.set_hdg_stabilization();
-            }
-            if(sim_data.m_scaled_stabilization_Q){
-                assembler.set_scaled_stabilization();
-            }
-            assembler.load_material_data(msh,material);
-            assembler.assemble(msh, rhs_fun);
+                // Creating HHO approximation spaces and corresponding linear operator
+                size_t face_k_degree = sim_data.m_k_degree;
+                size_t cell_k_degree = face_k_degree;
+                if(sim_data.m_hdg_stabilization_Q){
+                    cell_k_degree++;
+                }
+                disk::hho_degree_info hho_di(cell_k_degree,face_k_degree);
+                
+                auto rhs_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+                    RealType x;
+                    x = pt.x();
+                    RealType r = 0.0;
+                    return r;
+                };
+                
+                auto null_u_fun = [](const mesh1d_type::point_type& pt) -> RealType {
+                    RealType x;
+                    x = pt.x();
+                    RealType u = 0.0;
+                    return u;
+                };
+                
+                boundary_1d_type bnd(msh);
+                
+                auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
+                if(sim_data.m_hdg_stabilization_Q){
+                    assembler.set_hdg_stabilization();
+                }
+                if(sim_data.m_scaled_stabilization_Q){
+                    assembler.set_scaled_stabilization();
+                }
+                assembler.load_material_data(msh,material);
+                assembler.assemble(msh, rhs_fun);
 
-            
-//            std::ofstream mat_file;
-//            mat_file.open ("matrix.txt");
-//            mat_file << assembler.LHS.toDense() <<  std::endl;
-//            mat_file.close();
-            skin_operator = assembler.LHS;
+                
+//                std::ofstream mat_file;
+//                mat_file.open ("skin_matrix_r.txt");
+//                mat_file << assembler.LHS.toDense() <<  std::endl;
+//                mat_file.close();
+                
+                
+                skin_operator = assembler.LHS;
+                skin_n_dof = std::make_pair(assembler.get_n_cells_dofs(), assembler.get_n_faces_dofs());
+            }
         }
 
     }
@@ -397,7 +514,7 @@ int main(int argc, char **argv)
     }
 
     tc.tic();
-    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs, end_point_mortars, skin_operator);
+    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs, end_point_mortars, skin_operator, skin_n_dof);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
