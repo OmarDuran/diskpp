@@ -157,7 +157,8 @@ int main(int argc, char **argv)
     
     // create mesh and skin operator
     SparseMatrix<RealType> skin_operator;
-    {
+    bool skin_strain_Q = false;
+    if(skin_strain_Q){
         auto storage = msh.backend_storage();
 
         // left cells
@@ -280,7 +281,7 @@ int main(int argc, char **argv)
 //            mat_file.open ("matrix.txt");
 //            mat_file << assembler.LHS.toDense() <<  std::endl;
 //            mat_file.close();
-//            skin_operator = assembler.LHS;
+            skin_operator = assembler.LHS;
         }
 
     }
@@ -314,7 +315,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -0.1/30;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -384,15 +385,15 @@ int main(int argc, char **argv)
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
-        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
-        
 //        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-//        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+//        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
     tc.tic();

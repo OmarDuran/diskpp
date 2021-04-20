@@ -376,7 +376,7 @@ public:
 //        std::cout << "s = " << S_operator << std::endl;
 //        std::cout << "m = " << M_operator << std::endl;
         
-        return M_operator + R_operator + (rho*mu)*S_operator;
+        return M_operator + R_operator + 2.0*(rho*mu)*S_operator;
     }
     
     std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
