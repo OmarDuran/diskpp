@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
-//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_2847.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
@@ -410,10 +410,10 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-//    std::ofstream mat_file;
-//    mat_file.open ("matrix.txt");
-//    mat_file << assembler.LHS.toDense() <<  std::endl;
-//    mat_file.close();
+    std::ofstream mat_file;
+    mat_file.open ("matrix.txt");
+    mat_file << assembler.LHS.toDense() <<  std::endl;
+    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
@@ -439,10 +439,9 @@ int main(int argc, char **argv)
     std::string silo_file_name = "single_fracture";
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
     
-    // sigma n
+    // sigma n and t
     {
         auto storage = msh.backend_storage();
-//        std::vector<std::pair<>>
         size_t n_cells_dof = assembler.get_n_cells_dofs();
         size_t n_faces_dofs = assembler.get_n_faces_dofs();
         size_t n_hybrid_dofs = assembler.get_n_hybrid_dofs();
@@ -466,6 +465,7 @@ int main(int argc, char **argv)
             auto points = face_l.point_ids();
             
             for (size_t ip = 0; ip < points.size(); ip++) {
+                
                 auto pt_id = points[ip];
                 auto bar = *std::next(msh.points_begin(), pt_id);
                 
@@ -500,17 +500,20 @@ int main(int argc, char **argv)
                     
                     size_t face_r_offset = assembler.get_n_cells_dofs() + assembler.compress_indexes().at(chunk.second);
                     
-                    auto face_basis = make_vector_monomial_basis(msh, face_l, hho_di.face_degree());
+                    auto face_basis_l = make_vector_monomial_basis(msh, face_l, hho_di.face_degree());
+                    auto face_basis_r = make_vector_monomial_basis(msh, face_r, hho_di.face_degree());
                     size_t n_u_bs = disk::vector_basis_size(hho_di.face_degree(), mesh_type::dimension - 1, mesh_type::dimension);
                     
                     Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_u_bs, 1);
                     Matrix<RealType, Dynamic, 1> u_r_x_dof = x_dof.block(face_r_offset, 0, n_u_bs, 1);
                     
-                    auto t_phi = face_basis.eval_functions( bar );
-                    assert(t_phi.rows() == face_basis.size());
+                    auto t_phi_l = face_basis_l.eval_functions( bar );
+                    auto t_phi_r = face_basis_r.eval_functions( bar );
+                    assert(t_phi_l.rows() == face_basis_l.size());
+                    assert(t_phi_r.rows() == face_basis_r.size());
                     
-                    auto ul = disk::eval(u_l_x_dof, t_phi);
-                    auto ur = disk::eval(u_r_x_dof, t_phi);
+                    auto ul = disk::eval(u_l_x_dof, t_phi_l);
+                    auto ur = disk::eval(u_r_x_dof, t_phi_r);
 
                     RealType dv = (bar-p0).to_vector().norm();
                     data_u_l(2*fracture_ind+ip,0) = dv;
