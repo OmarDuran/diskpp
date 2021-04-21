@@ -376,7 +376,7 @@ public:
 //        std::cout << "s = " << S_operator << std::endl;
 //        std::cout << "m = " << M_operator << std::endl;
         
-        return M_operator + R_operator + 2.0*(rho*mu)*S_operator;
+        return M_operator + R_operator + 1.0*(rho*mu)*S_operator;
     }
     
     std::pair<   Matrix<typename Mesh::coordinate_type, Dynamic, Dynamic>,
@@ -421,10 +421,8 @@ public:
             auto point = barycenter(msh,fc);
             T weight = 1.0;
             vector_type c_phi_tmp = cb.eval_functions(point);
-//            std::cout << "c_phi_tmp = " << c_phi_tmp << std::endl;
             vector_type c_phi = c_phi_tmp.head(cbs);
             Matrix<T, Dynamic, DIM> c_dphi_tmp = cb.eval_gradients(point);
-//            std::cout << "c_dphi_tmp = " << c_dphi_tmp << std::endl;
             Matrix<T, Dynamic, DIM> c_dphi = c_dphi_tmp.block(1, 0, rbs-1, DIM);
             vector_type f_phi = fb.eval_functions(point);
             gr_rhs.block(0, cbs+i*fbs, rbs-1, fbs) += weight * (c_dphi * n) * f_phi.transpose();
@@ -622,7 +620,8 @@ public:
         mass_matrix_sigma *= (1.0/(lambda+2.0*mu));
         mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
 
-        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh,cell,scal_basis);
+        auto cell_scal_basis = disk::make_scalar_monomial_basis(msh, cell, m_hho_di.cell_degree());
+        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh,cell,cell_scal_basis);
 //        std::cout << "mass 1d" << mass << std::endl;
         mass_matrix.block(n_ten_cbs,n_ten_cbs,n_vec_cbs,n_vec_cbs) = mass;
         

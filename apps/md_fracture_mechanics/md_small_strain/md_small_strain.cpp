@@ -70,7 +70,8 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
         fracture_cell_ind++;
     }
     
-    end_point_mortars.clear();
+//    end_point_mortars.clear();
     
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -160,6 +161,8 @@ int main(int argc, char **argv)
     bool skin_strain_Q = true;
     std::pair<size_t,size_t> skin_n_dof;
     if(skin_strain_Q){
+        simulation_data sim_data_1d(sim_data);
+        sim_data_1d.m_k_degree -= 1;
         auto storage = msh.backend_storage();
 
         // left cells
@@ -246,9 +249,9 @@ int main(int argc, char **argv)
                 elastic_material_data<RealType> material(rho,l,mu);
 
                 // Creating HHO approximation spaces and corresponding linear operator
-                size_t face_k_degree = sim_data.m_k_degree;
+                size_t face_k_degree = sim_data_1d.m_k_degree;
                 size_t cell_k_degree = face_k_degree;
-                if(sim_data.m_hdg_stabilization_Q){
+                if(sim_data_1d.m_hdg_stabilization_Q){
                     cell_k_degree++;
                 }
                 disk::hho_degree_info hho_di(cell_k_degree,face_k_degree);
@@ -270,10 +273,10 @@ int main(int argc, char **argv)
                 boundary_1d_type bnd(msh);
                 
                 auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
-                if(sim_data.m_hdg_stabilization_Q){
+                if(sim_data_1d.m_hdg_stabilization_Q){
                     assembler.set_hdg_stabilization();
                 }
-                if(sim_data.m_scaled_stabilization_Q){
+                if(sim_data_1d.m_scaled_stabilization_Q){
                     assembler.set_scaled_stabilization();
                 }
                 assembler.load_material_data(msh,material);
@@ -292,7 +295,7 @@ int main(int argc, char **argv)
         }
         
         // right case
-        {
+        if(0){
             node_index = node_index_b;
             std::map<size_t,size_t> node_map;
             std::map<size_t,size_t> node_map_inv;
@@ -356,9 +359,9 @@ int main(int argc, char **argv)
                 elastic_material_data<RealType> material(rho,l,mu);
 
                 // Creating HHO approximation spaces and corresponding linear operator
-                size_t face_k_degree = sim_data.m_k_degree;
+                size_t face_k_degree = sim_data_1d.m_k_degree;
                 size_t cell_k_degree = face_k_degree;
-                if(sim_data.m_hdg_stabilization_Q){
+                if(sim_data_1d.m_hdg_stabilization_Q){
                     cell_k_degree++;
                 }
                 disk::hho_degree_info hho_di(cell_k_degree,face_k_degree);
@@ -380,10 +383,10 @@ int main(int argc, char **argv)
                 boundary_1d_type bnd(msh);
                 
                 auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
-                if(sim_data.m_hdg_stabilization_Q){
+                if(sim_data_1d.m_hdg_stabilization_Q){
                     assembler.set_hdg_stabilization();
                 }
-                if(sim_data.m_scaled_stabilization_Q){
+                if(sim_data_1d.m_scaled_stabilization_Q){
                     assembler.set_scaled_stabilization();
                 }
                 assembler.load_material_data(msh,material);
@@ -592,10 +595,12 @@ int main(int argc, char **argv)
 
                 // sigma normal evaluation
                 {
+                    size_t n_skin_bs = skin_operator.rows();
+                    size_t n_skin_h_bs = assembler.get_n_hybrid_dofs();
                     auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
-                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs, 0, n_f_sigma_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_skin_h_bs, 0, n_f_sigma_bs, 1);
                     
-                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs, 0, n_f_sigma_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs + 4 * n_skin_bs + n_skin_h_bs, 0, n_f_sigma_bs, 1);
                     
                     auto t_phi = face_basis.eval_functions( bar );
                     assert(t_phi.rows() == face_basis.size());
@@ -650,7 +655,8 @@ int main(int argc, char **argv)
         // sigma normal evaluation
         {
             size_t n_mortar_displacements = 4*end_point_mortars.size();
-            size_t points_offset = n_cells_dof + n_faces_dofs + n_hybrid_dofs - n_mortar_displacements;
+            size_t n_skin_bs = skin_operator.rows();
+            size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
             std::cout << "sigma =  " << sigma_dof << std::endl;
         }
@@ -738,7 +744,7 @@ void SurfaceStrain(simulation_data & sim_data){
     
     boundary_1d_type bnd(msh);
     // defining boundary conditions
-    if(0){
+    if(1){
         size_t bc_D_left_id = 0;
         size_t bc_D_right_id = 1;
         RealType eps = 1.0e-4;
@@ -789,36 +795,21 @@ void SurfaceStrain(simulation_data & sim_data){
     assembler.project_over_cells(msh, x_dof, u_fun, s_fun);
     assembler.project_over_faces(msh, x_dof, u_fun);
     
+    std::cout << "r = " << assembler.LHS * x_dof - assembler.RHS << std::endl;
+//    std::cout << "r = " << assembler.RHS << std::endl;
+    
     linear_solver<RealType> analysis(assembler.LHS);
     analysis.set_direct_solver(false);
     analysis.factorize();
     x_dof = analysis.solve(assembler.RHS);
+    
+    std::cout << "x = " << x_dof << std::endl;
     
     // render silo
     size_t it = 0;
     std::string silo_file_name = "line_strain";
     postprocessor<mesh1d_type>::write_silo_um_field(silo_file_name, it, msh, hho_di, x_dof);
     
-//    size_t cell_i = 0;
-//    size_t cell_degree = 1;
-//    for (auto& cell : msh)
-//    {
-//        auto cell_basis = make_scalar_monomial_basis(msh, cell, cell_degree);
-//        
-//        auto points = cell.point_ids();
-//        size_t n_p = points.size();
-//        for (size_t l = 0; l < n_p; l++)
-//        {
-//            auto pt_id = points[l];
-//            auto bar = barycenter(msh,cell);
-//            auto t_phi = cell_basis.eval_functions(bar);
-//            auto t_gphi = cell_basis.eval_gradients(bar);
-//            std::cout << "phi = " << t_phi << std::endl;
-//            std::cout << "gphi = " << t_gphi << std::endl;
-//            int aka = 0;
-//        }
-//        cell_i++;
-//    }
 }
 
 
