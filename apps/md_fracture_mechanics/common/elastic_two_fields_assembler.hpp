@@ -781,11 +781,11 @@ public:
             auto mortar_l = mortar_coupling_matrix_skin(msh,cell_l,face_l);
             auto mortar_r = mortar_coupling_matrix_skin(msh,cell_r,face_r);
 
-//            scatter_mortar_skin_n_data(msh,chunk.first,fracture_ind,0,mortar_l.first);
-//            scatter_mortar_skin_t_data(msh,chunk.first,fracture_ind,0,mortar_l.second);
+            scatter_mortar_skin_n_data(msh,chunk.first,fracture_ind,0,mortar_l.first);
+            scatter_mortar_skin_t_data(msh,chunk.first,fracture_ind,0,mortar_l.second);
 
-//            scatter_mortar_skin_n_data(msh,chunk.second,fracture_ind,1,mortar_r.first);
-//            scatter_mortar_skin_t_data(msh,chunk.second,fracture_ind,1,mortar_r.second);
+            scatter_mortar_skin_n_data(msh,chunk.second,fracture_ind,1,mortar_r.first);
+            scatter_mortar_skin_t_data(msh,chunk.second,fracture_ind,1,mortar_r.second);
             
             Matrix<T, Dynamic, Dynamic> mortar_skin_l = +1.0*mortar_coupling_matrix_skin_jumps(msh,cell_l,face_l);
             Matrix<T, Dynamic, Dynamic> mortar_skin_r = +1.0*mortar_coupling_matrix_skin_jumps(msh,cell_r,face_r);
