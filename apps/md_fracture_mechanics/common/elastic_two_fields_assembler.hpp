@@ -794,7 +794,7 @@ public:
             scatter_mortar_skin_t_sigma_data(msh,chunk.second,fracture_ind,1,mortar_r.second);
             
             Matrix<T, Dynamic, Dynamic> mortar_skin_l = +1.0*mortar_coupling_matrix_skin_jumps(msh,cell_l,face_l);
-            Matrix<T, Dynamic, Dynamic> mortar_skin_r = -1.0*mortar_coupling_matrix_skin_jumps(msh,cell_r,face_r);
+            Matrix<T, Dynamic, Dynamic> mortar_skin_r = +1.0*mortar_coupling_matrix_skin_jumps(msh,cell_r,face_r);
             
             scatter_mortar_skin_n_coupling_data(msh,chunk.first,fracture_ind,0,mortar_skin_l);
             scatter_mortar_skin_t_coupling_data(msh,chunk.first,fracture_ind,0,mortar_skin_l);
@@ -1141,8 +1141,8 @@ public:
             const auto s_n_opt = disk::priv::outer_product(w_dot_u_f_phi,s_f_phi);
             const auto s_t_opt = disk::priv::outer_product(w_dot_u_f_phi,s_f_phi);
 
-            ret_n += -1.0*s_n_opt;
-            ret_t += -1.0*s_t_opt;
+            ret_n += s_n_opt;
+            ret_t += s_t_opt;
         }
 
         return std::make_pair(ret_n, ret_t);
