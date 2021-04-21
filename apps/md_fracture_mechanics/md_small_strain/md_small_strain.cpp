@@ -654,9 +654,9 @@ int main(int argc, char **argv)
         
         // sigma normal evaluation
         {
-            size_t n_mortar_displacements = 4*end_point_mortars.size();
+            size_t n_mortar_displacements = 2*end_point_mortars.size();
             size_t n_skin_bs = skin_operator.rows();
-            size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
+            size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs + n_mortar_displacements;
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
             std::cout << "sigma =  " << sigma_dof << std::endl;
         }
