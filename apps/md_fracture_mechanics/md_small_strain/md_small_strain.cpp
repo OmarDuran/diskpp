@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_2847.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
     std::pair<size_t,size_t> skin_n_dof;
     if(skin_strain_Q){
         simulation_data sim_data_1d(sim_data);
-        sim_data_1d.m_k_degree -= 1;
+//        sim_data_1d.m_k_degree -= 1;
         auto storage = msh.backend_storage();
 
         // left cells
@@ -530,10 +530,10 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    std::ofstream mat_file;
-    mat_file.open ("matrix.txt");
-    mat_file << assembler.LHS.toDense() <<  std::endl;
-    mat_file.close();
+//    std::ofstream mat_file;
+//    mat_file.open ("matrix.txt");
+//    mat_file << assembler.LHS.toDense() <<  std::endl;
+//    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
