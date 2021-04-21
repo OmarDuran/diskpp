@@ -435,7 +435,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1/30;
+        RealType uy = -0.1;
         return static_vector<RealType, 2>{ux, uy};
     };
     
