@@ -883,10 +883,10 @@ public:
                 auto mortar_r = mortar_coupling_matrix_skin_u(msh,cell_r,face_r);
 
 //                scatter_mortar_skin_n_data(msh,chunk.first,fracture_ind,0,mortar_l.first);
-                scatter_mortar_skin_t_data(msh,chunk.first,fracture_ind,0,mortar_l.second);
+//                scatter_mortar_skin_t_data(msh,chunk.first,fracture_ind,0,mortar_l.second);
 
 //                scatter_mortar_skin_n_data(msh,chunk.second,fracture_ind,1,mortar_r.first);
-                scatter_mortar_skin_t_data(msh,chunk.second,fracture_ind,1,mortar_r.second);
+//                scatter_mortar_skin_t_data(msh,chunk.second,fracture_ind,1,mortar_r.second);
             }
             
             
@@ -894,12 +894,12 @@ public:
             auto mortar_l = mortar_coupling_matrix_skin_sigma(msh,cell_l,face_l);
             auto mortar_r = mortar_coupling_matrix_skin_sigma(msh,cell_r,face_r);
 
-//            scatter_mortar_skin_n_sigma_data(msh,chunk.first,fracture_ind,0,mortar_l.first);
+            scatter_mortar_skin_n_sigma_data(msh,chunk.first,fracture_ind,0,mortar_l.first);
             scatter_mortar_skin_t_sigma_data(msh,chunk.first,fracture_ind,0,mortar_l.second);
             
             mortar_r.first  *= -1.0;
             mortar_r.second *= -1.0;
-//            scatter_mortar_skin_n_sigma_data(msh,chunk.second,fracture_ind,1,mortar_r.first);
+            scatter_mortar_skin_n_sigma_data(msh,chunk.second,fracture_ind,1,mortar_r.first);
             scatter_mortar_skin_t_sigma_data(msh,chunk.second,fracture_ind,1,mortar_r.second);
             
             {
@@ -907,9 +907,9 @@ public:
                 Matrix<T, Dynamic, Dynamic> mortar_skin_r = -1.0*mortar_coupling_matrix_skin_jumps(msh,cell_r,face_r);
 
                 scatter_mortar_skin_n_coupling_data(msh,chunk.first,fracture_ind,0,mortar_skin_l);
-                scatter_mortar_skin_t_coupling_data(msh,chunk.first,fracture_ind,0,mortar_skin_l);
+//                scatter_mortar_skin_t_coupling_data(msh,chunk.first,fracture_ind,0,mortar_skin_l);
                 scatter_mortar_skin_n_coupling_data(msh,chunk.second,fracture_ind,1,mortar_skin_r);
-                scatter_mortar_skin_t_coupling_data(msh,chunk.second,fracture_ind,1,mortar_skin_r);
+//                scatter_mortar_skin_t_coupling_data(msh,chunk.second,fracture_ind,1,mortar_skin_r);
             }
 //            auto mass_data = sigma_skin_mass_matrix(msh, face_l, face_r);
 //            scatter_mortar_skin_mass_n_data(msh,fracture_ind,mass_data.first);
@@ -1304,7 +1304,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para =  0.0;
+        T c_para =  100.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
