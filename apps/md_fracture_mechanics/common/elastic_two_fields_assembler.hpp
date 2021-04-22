@@ -884,7 +884,7 @@ public:
 
 //                scatter_mortar_skin_n_data(msh,chunk.first,fracture_ind,0,mortar_l.first);
 //                scatter_mortar_skin_t_data(msh,chunk.first,fracture_ind,0,mortar_l.second);
-
+//
 //                scatter_mortar_skin_n_data(msh,chunk.second,fracture_ind,1,mortar_r.first);
 //                scatter_mortar_skin_t_data(msh,chunk.second,fracture_ind,1,mortar_r.second);
             }

@@ -512,7 +512,7 @@ int main(int argc, char **argv)
         
         bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
@@ -578,6 +578,9 @@ int main(int argc, char **argv)
         
         Matrix<RealType, Dynamic, 3> data_u_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         Matrix<RealType, Dynamic, 3> data_u_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        
+        Matrix<RealType, Dynamic, 3> data_s_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        Matrix<RealType, Dynamic, 3> data_s_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         
         mesh_type::point_type p0;
         for (auto chunk : fracture_pairs) {
