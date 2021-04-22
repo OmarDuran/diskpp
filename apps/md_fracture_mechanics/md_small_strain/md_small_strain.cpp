@@ -576,6 +576,9 @@ int main(int argc, char **argv)
         Matrix<RealType, Dynamic, 3> data_u_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         Matrix<RealType, Dynamic, 3> data_u_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         
+        Matrix<RealType, Dynamic, 3> data_u_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        Matrix<RealType, Dynamic, 3> data_u_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        
         mesh_type::point_type p0;
         for (auto chunk : fracture_pairs) {
             
@@ -647,6 +650,76 @@ int main(int argc, char **argv)
                     data_u_r(2*fracture_ind+ip,2) = ur(1,0);
                 }
                 
+                // u normal skin evaluation
+                {
+                    size_t n_skin_bs = skin_operator.rows();
+                    size_t base_offset = assembler.get_n_cells_dofs() + assembler.get_n_faces_dofs();
+                    size_t sigma_degree = 0;
+                    
+                    size_t n_sigma_n_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
+                    size_t n_ten_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1)-1;
+                    size_t n_vec_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1);
+                    
+                    size_t face_l_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs ;
+                    size_t face_r_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs + 2*n_skin_bs;
+                    
+                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.cell_degree());
+                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.cell_degree());
+                    
+                    
+                    Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_vec_sigma_bs, 1);
+                    Matrix<RealType, Dynamic, 1> u_r_x_dof = x_dof.block(face_r_offset, 0, n_vec_sigma_bs, 1);
+                    
+                    auto t_phi_l = face_basis_l.eval_functions( bar );
+                    auto t_phi_r = face_basis_r.eval_functions( bar );
+                    assert(t_phi_l.rows() == face_basis_l.size());
+                    assert(t_phi_r.rows() == face_basis_r.size());
+                    
+                    auto unl = disk::eval(u_l_x_dof, t_phi_l);
+                    auto unr = disk::eval(u_r_x_dof, t_phi_r);
+
+                    RealType dv = (bar-p0).to_vector().norm();
+                    data_u_n(2*fracture_ind+ip,0) = dv;
+                    data_u_n(2*fracture_ind+ip,1) = unl;
+                    data_u_n(2*fracture_ind+ip,2) = unr;
+
+                }
+                
+                // u tangential skin evaluation
+                {
+                    size_t n_skin_bs = skin_operator.rows();
+                    size_t base_offset = assembler.get_n_cells_dofs() + assembler.get_n_faces_dofs();
+                    size_t sigma_degree = 0;
+                    
+                    size_t n_sigma_n_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
+                    size_t n_ten_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1)-1;
+                    size_t n_vec_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1);
+                    
+                    size_t face_l_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs + n_skin_bs;
+                    size_t face_r_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs + 2*n_skin_bs + n_skin_bs;
+                    
+                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.cell_degree());
+                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.cell_degree());
+                    
+                    
+                    Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_vec_sigma_bs, 1);
+                    Matrix<RealType, Dynamic, 1> u_r_x_dof = x_dof.block(face_r_offset, 0, n_vec_sigma_bs, 1);
+                    
+                    auto t_phi_l = face_basis_l.eval_functions( bar );
+                    auto t_phi_r = face_basis_r.eval_functions( bar );
+                    assert(t_phi_l.rows() == face_basis_l.size());
+                    assert(t_phi_r.rows() == face_basis_r.size());
+                    
+                    auto utl = disk::eval(u_l_x_dof, t_phi_l);
+                    auto utr = disk::eval(u_r_x_dof, t_phi_r);
+
+                    RealType dv = (bar-p0).to_vector().norm();
+                    data_u_t(2*fracture_ind+ip,0) = dv;
+                    data_u_t(2*fracture_ind+ip,1) = utl;
+                    data_u_t(2*fracture_ind+ip,2) = utr;
+
+                }
+                
              }
             
             fracture_ind++;
@@ -682,6 +755,18 @@ int main(int argc, char **argv)
             ur_file << data_u_r <<  std::endl;
             ur_file.close();
             
+        }
+        
+        {
+            std::ofstream un_file;
+            un_file.open ("u_n.txt");
+            un_file << data_u_n <<  std::endl;
+            un_file.close();
+            
+            std::ofstream ut_file;
+            ut_file.open ("u_t.txt");
+            ut_file << data_u_t <<  std::endl;
+            ut_file.close();
         }
         
     }
