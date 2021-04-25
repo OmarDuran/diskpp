@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
-//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
     
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
-    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
@@ -151,18 +151,19 @@ int main(int argc, char **argv)
         fracture_cell_ind++;
     }
     
-//    end_point_mortars.clear();
+    end_point_mortars.clear();
     
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // create mesh and skin operator
     SparseMatrix<RealType> skin_operator;
+    Matrix<RealType, Dynamic, 1> skin_rhs;
     bool skin_strain_Q = true;
     std::pair<size_t,size_t> skin_n_dof;
     if(skin_strain_Q){
         simulation_data sim_data_1d(sim_data);
-//        sim_data_1d.m_k_degree -= 1;
+        sim_data_1d.m_k_degree -= 1;
         auto storage = msh.backend_storage();
 
         // left cells
@@ -182,7 +183,7 @@ int main(int argc, char **argv)
         
         size_t n_cells = fracture_pairs.size();
         size_t n_points = n_cells + 1;
-        size_t n_bc = end_point_mortars.size();
+        size_t n_bc = 2;//end_point_mortars.size();
         
         // left case
         {
@@ -259,7 +260,7 @@ int main(int argc, char **argv)
                 auto rhs_fun = [](const mesh1d_type::point_type& pt) -> RealType {
                     RealType x;
                     x = pt.x();
-                    RealType r = 0.0;
+                    RealType r = 1.0;
                     return r;
                 };
                 
@@ -271,6 +272,27 @@ int main(int argc, char **argv)
                 };
                 
                 boundary_1d_type bnd(msh);
+                // defining boundary conditions
+                if(1){
+                    size_t bc_D_left_id = 0;
+                    size_t bc_D_right_id = 1;
+                    {
+                        auto face_it = msh.boundary_faces_begin();
+                        auto face = *face_it;
+                        auto fc_id = msh.lookup(face);
+                        disk::bnd_info bi{bc_D_left_id, true};
+                        msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                    }
+                    {
+                        auto fc_id = msh.faces_size()-1;
+                        disk::bnd_info bi{bc_D_right_id, true};
+                        msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                    }
+                            
+                    bnd.addDirichletBC(disk::DIRICHLET, bc_D_left_id, null_u_fun);
+                    bnd.addDirichletBC(disk::DIRICHLET, bc_D_right_id, null_u_fun);
+
+                }
                 
                 auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
                 if(sim_data_1d.m_hdg_stabilization_Q){
@@ -288,14 +310,15 @@ int main(int argc, char **argv)
 //                mat_file << assembler.LHS.toDense() <<  std::endl;
 //                mat_file.close();
                 
-                
+//                std::cout << "r = " << assembler.RHS << std::endl;
+                skin_rhs = assembler.RHS;
                 skin_operator = assembler.LHS;
                 skin_n_dof = std::make_pair(assembler.get_n_cells_dofs(), assembler.get_n_faces_dofs());
             }
         }
         
         // right case
-        if(0){
+        if(1){
             node_index = node_index_b;
             std::map<size_t,size_t> node_map;
             std::map<size_t,size_t> node_map_inv;
@@ -369,7 +392,7 @@ int main(int argc, char **argv)
                 auto rhs_fun = [](const mesh1d_type::point_type& pt) -> RealType {
                     RealType x;
                     x = pt.x();
-                    RealType r = 0.0;
+                    RealType r = 1.0;
                     return r;
                 };
                 
@@ -381,6 +404,27 @@ int main(int argc, char **argv)
                 };
                 
                 boundary_1d_type bnd(msh);
+                // defining boundary conditions
+                if(1){
+                    size_t bc_D_left_id = 0;
+                    size_t bc_D_right_id = 1;
+                    {
+                        auto face_it = msh.boundary_faces_begin();
+                        auto face = *face_it;
+                        auto fc_id = msh.lookup(face);
+                        disk::bnd_info bi{bc_D_left_id, true};
+                        msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                    }
+                    {
+                        auto fc_id = msh.faces_size()-1;
+                        disk::bnd_info bi{bc_D_right_id, true};
+                        msh.backend_storage()->boundary_info.at(fc_id) = bi;
+                    }
+                            
+                    bnd.addDirichletBC(disk::DIRICHLET, bc_D_left_id, null_u_fun);
+                    bnd.addDirichletBC(disk::DIRICHLET, bc_D_right_id, null_u_fun);
+
+                }
                 
                 auto assembler = elastic_1d_two_fields_assembler<mesh1d_type>(msh, hho_di, bnd);
                 if(sim_data_1d.m_hdg_stabilization_Q){
@@ -398,7 +442,7 @@ int main(int argc, char **argv)
 //                mat_file << assembler.LHS.toDense() <<  std::endl;
 //                mat_file.close();
                 
-                
+                skin_rhs = assembler.RHS;
                 skin_operator = assembler.LHS;
                 skin_n_dof = std::make_pair(assembler.get_n_cells_dofs(), assembler.get_n_faces_dofs());
             }
@@ -435,7 +479,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -0.0;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -512,7 +556,7 @@ int main(int argc, char **argv)
         
         bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_top_id, u_top_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
@@ -530,10 +574,10 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-//    std::ofstream mat_file;
-//    mat_file.open ("matrix.txt");
-//    mat_file << assembler.LHS.toDense() <<  std::endl;
-//    mat_file.close();
+    std::ofstream mat_file;
+    mat_file.open ("matrix.txt");
+    mat_file << assembler.LHS.toDense() <<  std::endl;
+    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
@@ -547,6 +591,19 @@ int main(int argc, char **argv)
     analysis.factorize();
     tc.toc();
     std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
+    
+    
+    // insert skin rhs
+    {
+        size_t n_cells_dof = assembler.get_n_cells_dofs();
+        size_t n_faces_dof = assembler.get_n_faces_dofs();
+        size_t n_skin_dof  = skin_operator.rows();
+        size_t base = n_cells_dof+n_faces_dof;
+        assembler.RHS.block(base + 0*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+        assembler.RHS.block(base + 1*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+        assembler.RHS.block(base + 2*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+        assembler.RHS.block(base + 3*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+    }
     
     tc.tic();
     x_dof = analysis.solve(assembler.RHS);
@@ -600,7 +657,7 @@ int main(int argc, char **argv)
                 }
 
                 // sigma normal evaluation
-                {
+                if(0){
                     size_t n_skin_bs = skin_operator.rows();
                     size_t n_skin_h_bs = assembler.get_n_hybrid_dofs();
                     auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
@@ -660,14 +717,14 @@ int main(int argc, char **argv)
                     size_t sigma_degree = 0;
                     
                     size_t n_sigma_n_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
-                    size_t n_ten_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1)-1;
-                    size_t n_vec_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1);
+                    size_t n_ten_sigma_bs = disk::scalar_basis_size(hho_di.face_degree(), mesh_type::dimension - 1)-1;
+                    size_t n_vec_sigma_bs = disk::scalar_basis_size(hho_di.face_degree(), mesh_type::dimension - 1);
                     
                     size_t face_l_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs ;
                     size_t face_r_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs + 2*n_skin_bs;
                     
-                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.cell_degree());
-                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.cell_degree());
+                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
+                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
                     
                     
                     Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_vec_sigma_bs, 1);
@@ -678,6 +735,8 @@ int main(int argc, char **argv)
                     assert(t_phi_l.rows() == face_basis_l.size());
                     assert(t_phi_r.rows() == face_basis_r.size());
                     
+//                    std::cout << "t_phi_l = " << t_phi_l << std::endl;
+//                    std::cout << "t_phi_r = " << t_phi_r << std::endl;
                     auto unl = disk::eval(u_l_x_dof, t_phi_l);
                     auto unr = disk::eval(u_r_x_dof, t_phi_r);
 
@@ -695,14 +754,14 @@ int main(int argc, char **argv)
                     size_t sigma_degree = 0;
                     
                     size_t n_sigma_n_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
-                    size_t n_ten_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1)-1;
-                    size_t n_vec_sigma_bs = disk::scalar_basis_size(hho_di.cell_degree(), mesh_type::dimension - 1);
+                    size_t n_ten_sigma_bs = disk::scalar_basis_size(hho_di.face_degree(), mesh_type::dimension - 1)-1;
+                    size_t n_vec_sigma_bs = disk::scalar_basis_size(hho_di.face_degree(), mesh_type::dimension - 1);
                     
                     size_t face_l_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs + n_skin_bs;
                     size_t face_r_offset = base_offset + fracture_ind * (n_ten_sigma_bs + n_vec_sigma_bs) + n_ten_sigma_bs + 2*n_skin_bs + n_skin_bs;
                     
-                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.cell_degree());
-                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.cell_degree());
+                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
+                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
                     
                     
                     Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_vec_sigma_bs, 1);

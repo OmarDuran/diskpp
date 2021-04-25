@@ -620,8 +620,8 @@ public:
         mass_matrix_sigma *= (1.0/(lambda+2.0*mu));
         mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
 
-//        auto cell_scal_basis = disk::make_scalar_monomial_basis(msh, cell, m_hho_di.cell_degree());
-//        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh,cell,cell_scal_basis);
+        auto cell_scal_basis = disk::make_scalar_monomial_basis(msh, cell, m_hho_di.cell_degree());
+        Matrix<T, Dynamic, Dynamic> mass = make_mass_matrix(msh,cell,cell_scal_basis);
 //        std::cout << "mass 1d" << mass << std::endl;
 //        mass_matrix.block(n_ten_cbs,n_ten_cbs,n_vec_cbs,n_vec_cbs) = mass;
         
