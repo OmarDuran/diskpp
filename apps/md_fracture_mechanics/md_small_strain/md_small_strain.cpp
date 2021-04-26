@@ -657,13 +657,13 @@ int main(int argc, char **argv)
                 }
 
                 // sigma normal evaluation
-                if(0){
-                    size_t n_skin_bs = skin_operator.rows();
-                    size_t n_skin_h_bs = assembler.get_n_hybrid_dofs();
+                if(1){
+                    size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+//                    size_t n_skin_h_bs = assembler.get_n_hybrid_dofs();
                     auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
-                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_skin_h_bs, 0, n_f_sigma_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + 4 * n_skin_bs, 0, n_f_sigma_bs, 1);
                     
-                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs + 4 * n_skin_bs + n_skin_h_bs, 0, n_f_sigma_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs + 4 * n_skin_bs, 0, n_f_sigma_bs, 1);
                     
                     auto t_phi = face_basis.eval_functions( bar );
                     assert(t_phi.rows() == face_basis.size());
