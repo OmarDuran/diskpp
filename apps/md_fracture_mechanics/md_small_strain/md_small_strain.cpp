@@ -159,7 +159,7 @@ int main(int argc, char **argv)
     // create mesh and skin operator
     SparseMatrix<RealType> skin_operator;
     Matrix<RealType, Dynamic, 1> skin_rhs;
-    bool skin_strain_Q = true;
+    bool skin_strain_Q = false;
     std::pair<size_t,size_t> skin_n_dof;
     if(skin_strain_Q){
         simulation_data sim_data_1d(sim_data);
@@ -479,7 +479,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.0;
+        RealType uy = -0.1;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -556,7 +556,7 @@ int main(int argc, char **argv)
         
         bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DIRICHLET, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
@@ -788,7 +788,7 @@ int main(int argc, char **argv)
         }
         
         // sigma normal evaluation
-        {
+        if(0){
             size_t n_mortar_displacements = 2*end_point_mortars.size();
             size_t n_skin_bs = skin_operator.rows();
             size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs + n_mortar_displacements;
