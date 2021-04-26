@@ -1962,48 +1962,106 @@ public:
     void skin_connected_cells(const Mesh& msh){
 
         auto storage = msh.backend_storage();
+                
+        std::set<size_t> set_l, set_r;
+        for (auto chunk : m_fracture_pairs) {
+            set_l.insert(chunk.first);
+            set_r.insert(chunk.second);
+        }
         
-        std::vector<size_t> ids_l, ids_r;
+
+        std::map<size_t,size_t> node_map_l;
+        {   // build connectivity map on left side
+            size_t index = m_end_point_mortars[0].first;
+            size_t node_index_b = m_end_point_mortars[0].second;
+            size_t node_index_e = m_end_point_mortars[1].second;
+            size_t node_index = node_index_b;
+            
+            size_t node_c = 1;
+            node_map_l[node_index] = node_c;
+            node_c++;
+            while (node_index_e != node_index) {
+                for (auto id : set_l) {
+                    auto& face = storage->edges[id];
+                    auto points = face.point_ids();
+                    bool check_Q = points[0] == node_index || points[1] == node_index;
+                    if (check_Q) {
+                        set_l.erase(id);
+                        if (points[0] == node_index) {
+                            node_index = points[1];
+                        }else{
+                            node_index = points[0];
+                        }
+                        node_map_l[node_index] = node_c;
+                        node_c++;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        std::map<size_t,size_t> node_map_r;
+        {   // build connectivity map on right side
+            size_t index = m_end_point_mortars[0].first;
+            size_t node_index_b = m_end_point_mortars[0].second;
+            size_t node_index_e = m_end_point_mortars[1].second;
+            size_t node_index = node_index_b;
+            
+            size_t node_c = 1;
+            node_map_r[node_index] = node_c;
+            node_c++;
+            while (node_index_e != node_index) {
+                for (auto id : set_r) {
+                    auto& face = storage->edges[id];
+                    auto points = face.point_ids();
+                    bool check_Q = points[0] == node_index || points[1] == node_index;
+                    if (check_Q) {
+                        set_r.erase(id);
+                        if (points[0] == node_index) {
+                            node_index = points[1];
+                        }else{
+                            node_index = points[0];
+                        }
+                        node_map_r[node_index] = node_c;
+                        node_c++;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        m_dof_dest_l.reserve(3*m_fracture_pairs.size());
+        m_dof_dest_r.reserve(3*m_fracture_pairs.size());
+        
+        auto dest_index = [](const size_t & id) -> size_t {
+            size_t dest = 2 * (id - 1);
+            return dest;
+        };
+        
         for (auto chunk : m_fracture_pairs) {
             
             auto& face_l = storage->edges[chunk.first];
             auto& face_r = storage->edges[chunk.second];
             
             auto points_l = face_l.point_ids();
-            ids_l.push_back(points_l[0]);
-            ids_l.push_back(points_l[1]);
-            
             auto points_r = face_r.point_ids();
-            ids_r.push_back(points_r[0]);
-            ids_r.push_back(points_r[1]);
             
-        }
-        
-        size_t cell_ind = 0;
-        m_dof_dest_l.reserve(3*m_fracture_pairs.size());
-        m_dof_dest_r.reserve(3*m_fracture_pairs.size());
-        
-        m_dof_dest_l.push_back(0);
-        m_dof_dest_r.push_back(0);
-        
-        size_t accum_l = 0;
-        for (size_t i = 0; i < ids_l.size()-1; i+=2) {
-            bool check_0_Q = ids_l[i] != ids_l[i+1];
-            bool check_1_Q = ids_l[i] != ids_l[i+2];
-            if (check_0_Q || check_1_Q) {
-                accum_l +=2;
-                m_dof_dest_l.push_back(accum_l);
+            if (node_map_l[points_l[0]] < node_map_l[points_l[1]]) {
+                size_t id = node_map_l[points_l[0]];
+                m_dof_dest_l.push_back(dest_index(id));
+            }else{
+                size_t id = node_map_l[points_l[1]];
+                m_dof_dest_l.push_back(dest_index(id));
             }
-        }
-        
-        size_t accum_r = 0;
-        for (size_t i = 0; i < ids_r.size()-1; i+=2) {
-            bool check_0_Q = ids_r[i] != ids_r[i+1];
-            bool check_1_Q = ids_r[i] != ids_r[i+2];
-            if (check_0_Q || check_1_Q) {
-                accum_r +=2;
-                m_dof_dest_r.push_back(accum_r);
+            
+            if (node_map_r[points_r[0]] < node_map_r[points_r[1]]) {
+                size_t id = node_map_r[points_r[0]];
+                m_dof_dest_r.push_back(dest_index(id));
+            }else{
+                size_t id = node_map_r[points_r[1]];
+                m_dof_dest_r.push_back(dest_index(id));
             }
+            
         }
 
     }

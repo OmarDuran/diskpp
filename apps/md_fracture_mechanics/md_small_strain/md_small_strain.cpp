@@ -453,8 +453,8 @@ int main(int argc, char **argv)
     // Constant elastic properties
     RealType rho,l,mu;
     rho = 1.0;
-    l = 1000.0;//2000.0;
-    mu = 1000.0;//2000.0;
+    l = 1.0;//2000.0;
+    mu = 1.0;//2000.0;
     elastic_material_data<RealType> material(rho,l,mu);
 
     // Creating HHO approximation spaces and corresponding linear operator
@@ -593,17 +593,17 @@ int main(int argc, char **argv)
     std::cout << bold << cyan << "Factorized in : " << tc.to_double() << " seconds" << reset << std::endl;
     
     
-    // insert skin rhs
-    {
-        size_t n_cells_dof = assembler.get_n_cells_dofs();
-        size_t n_faces_dof = assembler.get_n_faces_dofs();
-        size_t n_skin_dof  = skin_operator.rows();
-        size_t base = n_cells_dof+n_faces_dof;
-        assembler.RHS.block(base + 0*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
-        assembler.RHS.block(base + 1*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
-        assembler.RHS.block(base + 2*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
-        assembler.RHS.block(base + 3*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
-    }
+//    // insert skin rhs
+//    {
+//        size_t n_cells_dof = assembler.get_n_cells_dofs();
+//        size_t n_faces_dof = assembler.get_n_faces_dofs();
+//        size_t n_skin_dof  = skin_operator.rows();
+//        size_t base = n_cells_dof+n_faces_dof;
+//        assembler.RHS.block(base + 0*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+//        assembler.RHS.block(base + 1*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+//        assembler.RHS.block(base + 2*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+//        assembler.RHS.block(base + 3*n_skin_dof, 0, n_skin_dof, 1) = skin_rhs;
+//    }
     
     tc.tic();
     x_dof = analysis.solve(assembler.RHS);
