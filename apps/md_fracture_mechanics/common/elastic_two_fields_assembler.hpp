@@ -96,7 +96,6 @@ public:
         }
         
         m_n_hybrid_dof = (n_f_sigma_n_bs + n_f_sigma_t_bs) * m_fracture_pairs.size() + 4.0*m_end_point_mortars.size();
-//        m_n_skin_hybrid_dof = n_f_sigma_t_bs * m_fracture_pairs.size();
         
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -492,12 +491,12 @@ public:
     {
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         size_t n_f_sigma_bs = 2.0;
-        size_t n_skin_bs = m_skin_operator.rows();
+        size_t n_skin_bs = 2 * m_fracture_pairs.size() + 1;
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
         auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + m_fracture_pairs.size()*n_f_sigma_bs;
-        auto point_LHS_offset = frac_LHS_offset  + 4.0 * n_skin_bs + m_n_hybrid_dof + n_f_sigma_bs*point_ind;
+        auto point_LHS_offset = frac_LHS_offset  + 4.0 * n_skin_bs + n_f_sigma_bs*point_ind;
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map_i.push_back( assembly_index(point_LHS_offset+i, true));
@@ -1139,28 +1138,28 @@ public:
             fracture_ind++;
         }
         
-//        size_t point_mortar_ind = 0;
-//        for (auto p_chunk : m_end_point_mortars) {
-//
-//            auto chunk = m_fracture_pairs[p_chunk.first];
-//            auto& node = storage->nodes[p_chunk.second];
-//
-//            size_t cell_ind_l = m_elements_with_fractures_eges[p_chunk.first].first;
-//            size_t cell_ind_r = m_elements_with_fractures_eges[p_chunk.first].second;
-//            auto& face_l = storage->edges[chunk.first];
-//            auto& face_r = storage->edges[chunk.second];
-//            auto& cell_l = storage->surfaces[cell_ind_l];
-//            auto& cell_r = storage->surfaces[cell_ind_r];
-//
-//
-//            Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*point_mortar_coupling_matrix(msh,cell_l,face_l,node);
-//            Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*point_mortar_coupling_matrix(msh,cell_r,face_r,node);
-//
-//            scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
-//            scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);
-//
-//            point_mortar_ind++;
-//        }
+        size_t point_mortar_ind = 0;
+        for (auto p_chunk : m_end_point_mortars) {
+
+            auto chunk = m_fracture_pairs[p_chunk.first];
+            auto& node = storage->nodes[p_chunk.second];
+
+            size_t cell_ind_l = m_elements_with_fractures_eges[p_chunk.first].first;
+            size_t cell_ind_r = m_elements_with_fractures_eges[p_chunk.first].second;
+            auto& face_l = storage->edges[chunk.first];
+            auto& face_r = storage->edges[chunk.second];
+            auto& cell_l = storage->surfaces[cell_ind_l];
+            auto& cell_r = storage->surfaces[cell_ind_r];
+
+
+            Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*point_mortar_coupling_matrix(msh,cell_l,face_l,node);
+            Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*point_mortar_coupling_matrix(msh,cell_r,face_r,node);
+
+            scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
+            scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);
+
+            point_mortar_ind++;
+        }
     }
     
     void assemble_skins(const Mesh& msh){
