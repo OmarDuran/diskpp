@@ -151,7 +151,7 @@ int main(int argc, char **argv)
         fracture_cell_ind++;
     }
     
-    end_point_mortars.clear();
+//    end_point_mortars.clear();
     
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -453,8 +453,8 @@ int main(int argc, char **argv)
     // Constant elastic properties
     RealType rho,l,mu;
     rho = 1.0;
-    l = 10000.0;//2000.0;
-    mu = 10000.0;//2000.0;
+    l = 1000.0;//2000.0;
+    mu = 1000.0;//2000.0;
     elastic_material_data<RealType> material(rho,l,mu);
 
     // Creating HHO approximation spaces and corresponding linear operator

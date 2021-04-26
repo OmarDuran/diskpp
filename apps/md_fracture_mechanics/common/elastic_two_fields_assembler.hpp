@@ -1243,10 +1243,10 @@ public:
             
             size_t fracture_ind = map_face_l_frac[chunk.first];
             
-//            scatter_skins_point_mortar_ul_n_data(msh,chunk.first,fracture_ind,mortar_l.first);
-//            scatter_skins_point_mortar_ul_t_data(msh,chunk.first,fracture_ind,mortar_l.second);
-//            scatter_skins_point_mortar_ur_n_data(msh,chunk.second,fracture_ind,mortar_l.first);
-//            scatter_skins_point_mortar_ur_t_data(msh,chunk.second,fracture_ind,mortar_l.second);
+            scatter_skins_point_mortar_ul_n_data(msh,chunk.first,fracture_ind,mortar_l.first);
+            scatter_skins_point_mortar_ul_t_data(msh,chunk.first,fracture_ind,mortar_l.second);
+            scatter_skins_point_mortar_ur_n_data(msh,chunk.second,fracture_ind,mortar_l.first);
+            scatter_skins_point_mortar_ur_t_data(msh,chunk.second,fracture_ind,mortar_l.second);
             
             point_mortar_ind++;
         }
@@ -1929,8 +1929,8 @@ public:
             const auto w_t_dot_u_f_phi = disk::priv::inner_product(u_f_phi,disk::priv::inner_product(1.0, t));
             const auto s_t_opt = disk::priv::outer_product(s_f_phi, w_t_dot_u_f_phi);
 
-            ret_n += s_n_opt;
-            ret_t += s_t_opt;
+            ret_n += -1.0*s_n_opt;
+            ret_t += -1.0*s_t_opt;
         }
         return std::make_pair(ret_n, ret_t);
     }
