@@ -151,7 +151,7 @@ int main(int argc, char **argv)
         fracture_cell_ind++;
     }
     
-    end_point_mortars.clear();
+//    end_point_mortars.clear();
     
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
