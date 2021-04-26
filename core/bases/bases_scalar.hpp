@@ -466,14 +466,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     function_type
     eval_div_flux_functions(const point_type& pt) const
     {
-        Matrix<scalar_type, 2, 2> I = Matrix<scalar_type, 2, 2>::Zero(2,2);
-        I(0,0) = 1;
-        I(1,1) = 1;
         
         function_type ret = function_type::Zero(3);
 
         const auto v1 = (fpoints[0]-fpoints[1]).to_vector();
         const auto v2 = (fpoints[1]-fpoints[0]).to_vector();
+        const auto vunit = v2/v2.norm();
         
         const auto t1 = (pt-fpoints[1]).to_vector();
         const auto t2 = (pt-fpoints[0]).to_vector();
@@ -481,8 +479,8 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
         const auto phi_0 = t1.dot(v1)/(v1.norm()*v1.norm());
         const auto phi_2 = t2.dot(v2)/(v2.norm()*v2.norm());
 
-        const auto dphi_0 = v1.dot(v2)/(v1.norm()*v1.norm());
-        const auto dphi_2 = v2.dot(v2)/(v2.norm()*v2.norm());
+        const auto dphi_0 = v1.dot(vunit)/(v1.norm()*v1.norm());
+        const auto dphi_2 = v2.dot(vunit)/(v2.norm()*v2.norm());
         const auto dphi_1 = dphi_0 * phi_2 + phi_0 * dphi_2;
         
         ret(0) = dphi_0;
