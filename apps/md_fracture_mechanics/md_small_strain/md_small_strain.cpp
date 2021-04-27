@@ -71,7 +71,8 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
     
@@ -481,7 +482,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -0.0;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -558,7 +559,7 @@ int main(int argc, char **argv)
         
         bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DIRICHLET, bc_D_top_id, u_top_fun);
         bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
     }
 
@@ -576,12 +577,12 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-//    std::ofstream mat_file;
-//    mat_file.open ("matrix.txt");
-//    size_t n_cells_dof = assembler.get_n_cells_dofs();
-//    size_t n_dof = assembler.LHS.rows();
-//    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
-//    mat_file.close();
+    std::ofstream mat_file;
+    mat_file.open ("matrix.txt");
+    size_t n_cells_dof = assembler.get_n_cells_dofs();
+    size_t n_dof = assembler.LHS.rows();
+    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
+    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
