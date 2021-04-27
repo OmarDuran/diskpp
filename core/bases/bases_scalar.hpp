@@ -468,7 +468,7 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     {
         
         function_type ret = function_type::Zero(3);
-
+        
         const auto v1 = (fpoints[0]-fpoints[1]).to_vector();
         const auto v2 = (fpoints[1]-fpoints[0]).to_vector();
         const auto vunit = v2/v2.norm();
@@ -500,6 +500,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     degree() const
     {
         return basis_degree;
+    }
+    
+    void
+    swap_nodes()
+    {
+        std::swap(fpoints[0],fpoints[1]);
     }
 };
 
