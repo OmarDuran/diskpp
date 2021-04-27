@@ -1178,8 +1178,8 @@ public:
             Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*point_mortar_coupling_matrix(msh,cell_l,face_l,node);
             Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*point_mortar_coupling_matrix(msh,cell_r,face_r,node);
 
-//            scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
-//            scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);
+            scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
+            scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);
 
             point_mortar_ind++;
         }
@@ -1728,7 +1728,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 10000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -1776,10 +1776,10 @@ public:
     auto skin_weighted_mass_matrix(const Mesh& msh, const typename Mesh::face_type& face_l, const typename Mesh::face_type& face_r, const size_t & fracture_ind, size_t di = 0)
         {
 
-//            elastic_material_data<T> & material = m_material[0];
-            T rho = 1.0;//material.rho();
-            T mu = 1.0;//material.mu();
-            T lambda = 1.0;//material.l();
+            elastic_material_data<T> & material = m_material[0];
+            T rho = material.rho();
+            T mu = material.mu();
+            T lambda = material.l();
             
             auto degree = m_hho_di.face_degree();
             auto sl_basis = disk::make_scalar_monomial_basis(msh, face_l, degree);
