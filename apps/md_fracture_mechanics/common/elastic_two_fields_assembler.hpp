@@ -541,7 +541,7 @@ public:
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mortar_mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],mortar_mat(i,j)) );
             }
         }
     
@@ -599,7 +599,7 @@ public:
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mortar_mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],mortar_mat(i,j)) );
             }
         }
     
@@ -1151,8 +1151,8 @@ public:
             Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_coupling_matrix(msh,cell_l,face_l);
             Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,cell_r,face_r);
             
-//            scatter_mortar_data(msh,chunk.first,fracture_ind,mortar_l);
-//            scatter_mortar_data(msh,chunk.second,fracture_ind,mortar_r);
+            scatter_mortar_data(msh,chunk.first,fracture_ind,mortar_l);
+            scatter_mortar_data(msh,chunk.second,fracture_ind,mortar_r);
             
             Matrix<T, Dynamic, Dynamic> mass_matrix = sigma_mass_matrix(msh, face_l, face_r);
             scatter_mortar_mass_data(msh,fracture_ind,mass_matrix);
@@ -1178,8 +1178,8 @@ public:
             Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*point_mortar_coupling_matrix(msh,cell_l,face_l,node);
             Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*point_mortar_coupling_matrix(msh,cell_r,face_r,node);
 
-//            scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
-//            scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);
+            scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
+            scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);
 
             point_mortar_ind++;
         }
@@ -1205,25 +1205,20 @@ public:
             scatter_skin_weighted_mass_l_data(msh, fracture_ind, mass_matrix.first);
             scatter_skin_weighted_mass_r_data(msh, fracture_ind, mass_matrix.second);
             
-            std::cout << "ml = " << std::endl;
-            std::cout << mass_matrix.first << std::endl;
-            std::cout << "mr = " << std::endl;
-            std::cout << mass_matrix.second << std::endl;
-            
             auto ul_div_phi = skin_coupling_matrix_ul(msh, cell_l, face_l, fracture_ind);
             auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, fracture_ind);
             
-//            scatter_skin_weighted_ul_n_data(msh, chunk.first, fracture_ind, ul_div_phi.first);
-//            scatter_skin_weighted_ul_t_data(msh, chunk.first, fracture_ind, ul_div_phi.second);
+            scatter_skin_weighted_ul_n_data(msh, chunk.first, fracture_ind, ul_div_phi.first);
+            scatter_skin_weighted_ul_t_data(msh, chunk.first, fracture_ind, ul_div_phi.second);
             scatter_skin_weighted_ur_n_data(msh, chunk.second, fracture_ind, ur_div_phi.first);
             scatter_skin_weighted_ur_t_data(msh, chunk.second, fracture_ind, ur_div_phi.second);
             
-            // rhs
-            auto ul_rhs = skin_coupling_rhs_u(msh, cell_l, face_l);
-//            scatter_rhs_skin_weighted_u_data(msh, chunk.first, fracture_ind, ul_rhs.first);
-            
-            auto ur_rhs = skin_coupling_rhs_u(msh, cell_r, face_r);
-            scatter_rhs_skin_weighted_u_data(msh, chunk.second, fracture_ind, ur_rhs.first);
+//            // rhs
+//            auto ul_rhs = skin_coupling_rhs_u(msh, cell_l, face_l);
+//            scatter_rhs_skin_weighted_u_data(msh, chunk.first, fracture_ind, ul_rhs.second);
+//
+//            auto ur_rhs = skin_coupling_rhs_u(msh, cell_r, face_r);
+//            scatter_rhs_skin_weighted_u_data(msh, chunk.second, fracture_ind, ur_rhs.second);
             
             map_face_l_frac[chunk.first] = fracture_ind;
             map_face_r_frac[chunk.second] = fracture_ind;
@@ -1251,13 +1246,10 @@ public:
             auto mortar_l = skins_point_mortar_coupling_l_matrix(msh,cell_l,face_l,node,fracture_ind_l);
             auto mortar_r = skins_point_mortar_coupling_r_matrix(msh,cell_r,face_r,node,fracture_ind_r);
             
-            
-
-            
-//            scatter_skins_point_mortar_ul_n_data(msh,chunk.first,fracture_ind,mortar_l.first);
-//            scatter_skins_point_mortar_ul_t_data(msh,chunk.first,fracture_ind,mortar_l.second);
-//            scatter_skins_point_mortar_ur_n_data(msh,chunk.second,fracture_ind,mortar_l.first);
-//            scatter_skins_point_mortar_ur_t_data(msh,chunk.second,fracture_ind,mortar_l.second);
+//            scatter_skins_point_mortar_ul_n_data(msh,chunk.first,fracture_ind_l,mortar_l.first);
+//            scatter_skins_point_mortar_ul_t_data(msh,chunk.first,fracture_ind_l,mortar_l.second);
+//            scatter_skins_point_mortar_ur_n_data(msh,chunk.second,fracture_ind_r,mortar_r.first);
+//            scatter_skins_point_mortar_ur_t_data(msh,chunk.second,fracture_ind_r,mortar_r.second);
             
             point_mortar_ind++;
         }
@@ -1716,7 +1708,7 @@ public:
         size_t n_s_basis = sn_basis.size() + st_basis.size();
         Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, n_s_basis);
 
-        T c_perp = 1.0;
+        T c_perp = 0.0;
         const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
         for (auto& qp : qps_l)
         {
@@ -1726,7 +1718,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 1.0;
+        T c_para = 0.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
