@@ -400,7 +400,7 @@ public:
         {
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j], mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j], +1.0*mortar_mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i], -1.0*mortar_mat(i,j)) );
             }
         }
@@ -429,7 +429,7 @@ public:
         {
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j], mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j], +1.0*mortar_mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], -1.0*mortar_mat(i,j)) );
             }
         }
@@ -458,7 +458,7 @@ public:
         {
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mortar_mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mortar_mat(i,j)) );
             }
         }
@@ -487,7 +487,7 @@ public:
         {
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mortar_mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], -1.0*mortar_mat(i,j)) );
             }
         }
@@ -598,7 +598,7 @@ public:
         {
             for (size_t j = 0; j < mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mat(i,j)) );
             }
         }
@@ -627,7 +627,7 @@ public:
         {
             for (size_t j = 0; j < mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mat(i,j)) );
             }
         }
@@ -656,7 +656,7 @@ public:
         {
             for (size_t j = 0; j < mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mat(i,j)) );
             }
         }
@@ -685,7 +685,7 @@ public:
         {
             for (size_t j = 0; j < mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mat(i,j)) );
             }
         }
@@ -1258,7 +1258,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 10000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -1270,38 +1270,6 @@ public:
 
         return ret;
     }
-    
-    auto sigma_skin_mass_matrix(const Mesh& msh, const typename Mesh::face_type& face_l, const typename Mesh::face_type& face_r, size_t di = 0)
-        {
-            const auto degree     = m_sigma_degree;
-            auto sn_basis = disk::make_scalar_monomial_basis(msh, face_l, m_sigma_degree);
-            auto st_basis = disk::make_scalar_monomial_basis(msh, face_r, m_sigma_degree);
-            
-            Matrix<T, Dynamic, Dynamic> ret_n = Matrix<T, Dynamic, Dynamic>::Zero(sn_basis.size(), sn_basis.size());
-            Matrix<T, Dynamic, Dynamic> ret_t = Matrix<T, Dynamic, Dynamic>::Zero(st_basis.size(), st_basis.size());
-
-            T c_perp = 0.0;
-            const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
-            for (auto& qp : qps_l)
-            {
-                const auto sn_f_phi = sn_basis.eval_functions(qp.point());
-                const auto w_sn_f_phi = disk::priv::inner_product(qp.weight(), sn_f_phi);
-                const auto s_n_opt = disk::priv::outer_product(sn_f_phi, w_sn_f_phi);
-                ret_n += c_perp * s_n_opt;
-            }
-            
-            T c_para =  0.0;
-            const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
-            for (auto& qp : qps_r)
-            {
-                const auto st_f_phi = st_basis.eval_functions(qp.point());
-                const auto w_st_f_phi = disk::priv::inner_product(qp.weight(), st_f_phi);
-                const auto s_t_opt = disk::priv::outer_product(st_f_phi, w_st_f_phi);
-                ret_t += c_para * s_t_opt;
-            }
-
-            return std::make_pair(ret_n,ret_t);
-        }
     
     auto skin_weighted_mass_matrix(const Mesh& msh, const typename Mesh::face_type& face_l, const typename Mesh::face_type& face_r, const size_t & fracture_ind, size_t di = 0)
         {
@@ -2152,12 +2120,25 @@ public:
         return m_compress_indexes;
     }
     
+
+    std::vector<size_t> & dof_dest_l(){
+        return m_dof_dest_l;
+    }
+    
+    std::vector<size_t> & dof_dest_r(){
+        return m_dof_dest_r;
+    }
+    
     std::vector<bool> & flip_dest_l(){
         return m_flip_dest_l;
     }
     
     std::vector<bool> & flip_dest_r(){
         return m_flip_dest_r;
+    }
+    
+    std::vector<std::pair<size_t,size_t>> & elements_with_fractures_eges(){
+        return m_elements_with_fractures_eges;
     }
     
 };

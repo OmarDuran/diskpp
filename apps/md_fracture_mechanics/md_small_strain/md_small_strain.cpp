@@ -338,8 +338,12 @@ int main(int argc, char **argv)
         mesh_type::point_type p0;
         for (auto chunk : fracture_pairs) {
             
+            size_t cell_ind_l = assembler.elements_with_fractures_eges()[fracture_ind].first;
+            size_t cell_ind_r = assembler.elements_with_fractures_eges()[fracture_ind].second;
             auto& face_l = storage->edges[chunk.first];
             auto& face_r = storage->edges[chunk.second];
+            auto& cell_l = storage->surfaces[cell_ind_l];
+            auto& cell_r = storage->surfaces[cell_ind_r];
             
             auto points = face_l.point_ids();
             
@@ -396,13 +400,24 @@ int main(int argc, char **argv)
                     auto ur = disk::eval(u_r_x_dof, t_phi_r);
 
                     RealType dv = (bar-p0).to_vector().norm();
-                    data_u_l(2*fracture_ind+ip,0) = dv;
-                    data_u_l(2*fracture_ind+ip,1) = ul(0,0);
-                    data_u_l(2*fracture_ind+ip,2) = ul(1,0);
-                    
-                    data_u_r(2*fracture_ind+ip,0) = dv;
-                    data_u_r(2*fracture_ind+ip,1) = ur(0,0);
-                    data_u_r(2*fracture_ind+ip,2) = ur(1,0);
+                    {
+                        const auto n = disk::normal(msh, cell_l, face_l);
+                        const auto t = disk::tanget(msh, cell_l, face_l);
+                        auto unl = ul.dot(n);
+                        auto utl = ul.dot(t);
+                        data_u_l(2*fracture_ind+ip,0) = dv;
+                        data_u_l(2*fracture_ind+ip,1) = unl;
+                        data_u_l(2*fracture_ind+ip,2) = utl;
+                    }
+                    {
+                        const auto n = disk::normal(msh, cell_r, face_r);
+                        const auto t = disk::tanget(msh, cell_r, face_r);
+                        auto unr = ur.dot(n);
+                        auto utr = ur.dot(t);
+                        data_u_r(2*fracture_ind+ip,0) = dv;
+                        data_u_r(2*fracture_ind+ip,1) = unr;
+                        data_u_r(2*fracture_ind+ip,2) = utr;
+                    }
                 }
                 
                 // skins div
@@ -418,12 +433,16 @@ int main(int argc, char **argv)
                     }
                     
                     
-                    size_t  base = n_cells_dof + n_faces_dofs;
                     size_t sig_bs = 3;
-                    Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(base+fracture_ind*sig_bs+0*n_skin_bs, 0, sig_bs, 1);
-                    Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(base+fracture_ind*sig_bs+1*n_skin_bs, 0, sig_bs, 1);
-                    Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(base+fracture_ind*sig_bs+2*n_skin_bs, 0, sig_bs, 1);
-                    Matrix<RealType, Dynamic, 1> st_r_dof = x_dof.block(base+fracture_ind*sig_bs+3*n_skin_bs, 0, sig_bs, 1);
+                    size_t  base = n_cells_dof + n_faces_dofs;
+                    size_t p_sn_l = base+assembler.dof_dest_l().at(fracture_ind)+0*n_skin_bs;
+                    size_t p_st_l = base+assembler.dof_dest_l().at(fracture_ind)+1*n_skin_bs;
+                    size_t p_sn_r = base+assembler.dof_dest_r().at(fracture_ind)+2*n_skin_bs;
+                    size_t p_st_r = base+assembler.dof_dest_r().at(fracture_ind)+3*n_skin_bs;
+                    Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(p_sn_l, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(p_st_l, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(p_sn_r, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_r_dof = x_dof.block(p_st_r, 0, sig_bs, 1);
                     
                     auto t_div_phi_l = face_basis_l.eval_div_flux_functions( bar );
                     auto t_div_phi_r = face_basis_r.eval_div_flux_functions( bar );
@@ -457,12 +476,16 @@ int main(int argc, char **argv)
                     }
                     
                     
-                    size_t  base = n_cells_dof + n_faces_dofs;
                     size_t sig_bs = 3;
-                    Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(base+fracture_ind*sig_bs+0*n_skin_bs, 0, sig_bs, 1);
-                    Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(base+fracture_ind*sig_bs+1*n_skin_bs, 0, sig_bs, 1);
-                    Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(base+fracture_ind*sig_bs+2*n_skin_bs, 0, sig_bs, 1);
-                    Matrix<RealType, Dynamic, 1> st_r_dof = x_dof.block(base+fracture_ind*sig_bs+3*n_skin_bs, 0, sig_bs, 1);
+                    size_t  base = n_cells_dof + n_faces_dofs;
+                    size_t p_sn_l = base+assembler.dof_dest_l().at(fracture_ind)+0*n_skin_bs;
+                    size_t p_st_l = base+assembler.dof_dest_l().at(fracture_ind)+1*n_skin_bs;
+                    size_t p_sn_r = base+assembler.dof_dest_r().at(fracture_ind)+2*n_skin_bs;
+                    size_t p_st_r = base+assembler.dof_dest_r().at(fracture_ind)+3*n_skin_bs;
+                    Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(p_sn_l, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(p_st_l, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(p_sn_r, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_r_dof = x_dof.block(p_st_r, 0, sig_bs, 1);
                     
                     auto t_phi_l = face_basis_l.eval_flux_functions( bar );
                     auto t_phi_r = face_basis_r.eval_flux_functions( bar );
