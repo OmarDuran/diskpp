@@ -328,6 +328,9 @@ int main(int argc, char **argv)
         
         Matrix<RealType, Dynamic, 3> data_div_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         Matrix<RealType, Dynamic, 3> data_div_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+
+        Matrix<RealType, Dynamic, 3> data_sig_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        Matrix<RealType, Dynamic, 3> data_sig_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         
         Matrix<RealType, Dynamic, 3> data_s_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         Matrix<RealType, Dynamic, 3> data_s_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
@@ -350,7 +353,6 @@ int main(int argc, char **argv)
                 }
 
                 // hybrid sigma evaluation
-                // evaluate_hybrid_sigma()
                 {
                     size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
                     auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
@@ -402,6 +404,84 @@ int main(int argc, char **argv)
                     data_u_r(2*fracture_ind+ip,1) = ur(0,0);
                     data_u_r(2*fracture_ind+ip,2) = ur(1,0);
                 }
+                
+                // skins div
+                {
+                    size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
+                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
+                    if (assembler.flip_dest_l().at(fracture_ind)) {
+                        face_basis_l.swap_nodes();
+                    }
+                    if (assembler.flip_dest_r().at(fracture_ind)) {
+                        face_basis_r.swap_nodes();
+                    }
+                    
+                    
+                    size_t  base = n_cells_dof + n_faces_dofs;
+                    size_t sig_bs = 3;
+                    Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(base+fracture_ind*sig_bs+0*n_skin_bs, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(base+fracture_ind*sig_bs+1*n_skin_bs, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(base+fracture_ind*sig_bs+2*n_skin_bs, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_r_dof = x_dof.block(base+fracture_ind*sig_bs+3*n_skin_bs, 0, sig_bs, 1);
+                    
+                    auto t_div_phi_l = face_basis_l.eval_div_flux_functions( bar );
+                    auto t_div_phi_r = face_basis_r.eval_div_flux_functions( bar );
+                    
+                    auto div_sn_l = disk::eval(sn_l_dof, t_div_phi_l);
+                    auto div_st_l = disk::eval(st_l_dof, t_div_phi_l);
+                    
+                    auto div_sn_r = disk::eval(sn_r_dof, t_div_phi_r);
+                    auto div_st_r = disk::eval(st_r_dof, t_div_phi_r);
+                    
+                    RealType dv = (bar-p0).to_vector().norm();
+                    data_div_l(2*fracture_ind+ip,0) = dv;
+                    data_div_l(2*fracture_ind+ip,1) = div_sn_l;
+                    data_div_l(2*fracture_ind+ip,2) = div_st_l;
+                    
+                    data_div_r(2*fracture_ind+ip,0) = dv;
+                    data_div_r(2*fracture_ind+ip,1) = div_sn_r;
+                    data_div_r(2*fracture_ind+ip,2) = div_st_r;
+                }
+                
+                // skins sigma
+                {
+                    size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+                    auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
+                    auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
+                    if (assembler.flip_dest_l().at(fracture_ind)) {
+                        face_basis_l.swap_nodes();
+                    }
+                    if (assembler.flip_dest_r().at(fracture_ind)) {
+                        face_basis_r.swap_nodes();
+                    }
+                    
+                    
+                    size_t  base = n_cells_dof + n_faces_dofs;
+                    size_t sig_bs = 3;
+                    Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(base+fracture_ind*sig_bs+0*n_skin_bs, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(base+fracture_ind*sig_bs+1*n_skin_bs, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(base+fracture_ind*sig_bs+2*n_skin_bs, 0, sig_bs, 1);
+                    Matrix<RealType, Dynamic, 1> st_r_dof = x_dof.block(base+fracture_ind*sig_bs+3*n_skin_bs, 0, sig_bs, 1);
+                    
+                    auto t_phi_l = face_basis_l.eval_flux_functions( bar );
+                    auto t_phi_r = face_basis_r.eval_flux_functions( bar );
+                    
+                    auto sn_l = disk::eval(sn_l_dof, t_phi_l);
+                    auto st_l = disk::eval(st_l_dof, t_phi_l);
+                    
+                    auto sn_r = disk::eval(sn_r_dof, t_phi_r);
+                    auto st_r = disk::eval(st_r_dof, t_phi_r);
+                    
+                    RealType dv = (bar-p0).to_vector().norm();
+                    data_sig_l(2*fracture_ind+ip,0) = dv;
+                    data_sig_l(2*fracture_ind+ip,1) = sn_l;
+                    data_sig_l(2*fracture_ind+ip,2) = st_l;
+                    
+                    data_sig_r(2*fracture_ind+ip,0) = dv;
+                    data_sig_r(2*fracture_ind+ip,1) = sn_r;
+                    data_sig_r(2*fracture_ind+ip,2) = st_r;
+                }
                                 
              }
             
@@ -437,6 +517,29 @@ int main(int argc, char **argv)
             ur_file.open ("u_r.txt");
             ur_file << data_u_r <<  std::endl;
             ur_file.close();
+            
+        }
+        
+        {
+            std::ofstream divs_l_file;
+            divs_l_file.open("divs_l.txt");
+            divs_l_file << data_div_l <<  std::endl;
+            divs_l_file.close();
+            
+            std::ofstream divs_r_file;
+            divs_r_file.open("divs_r.txt");
+            divs_r_file << data_div_r <<  std::endl;
+            divs_r_file.close();
+            
+            std::ofstream s_l_file;
+            s_l_file.open ("s_l.txt");
+            s_l_file << data_sig_l <<  std::endl;
+            s_l_file.close();
+            
+            std::ofstream s_r_file;
+            s_r_file.open ("s_r.txt");
+            s_r_file << data_sig_r <<  std::endl;
+            s_r_file.close();
             
         }
         

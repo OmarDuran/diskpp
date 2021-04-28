@@ -2152,6 +2152,14 @@ public:
         return m_compress_indexes;
     }
     
+    std::vector<bool> & flip_dest_l(){
+        return m_flip_dest_l;
+    }
+    
+    std::vector<bool> & flip_dest_r(){
+        return m_flip_dest_r;
+    }
+    
 };
 
 #endif /* elastic_two_fields_assembler_hpp */
