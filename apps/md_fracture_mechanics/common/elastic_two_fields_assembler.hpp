@@ -401,7 +401,7 @@ public:
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j], +1.0*mortar_mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i], -1.0*mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i], -0.0*mortar_mat(i,j)) );
             }
         }
     
@@ -430,7 +430,7 @@ public:
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j], +1.0*mortar_mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], -1.0*mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], -0.0*mortar_mat(i,j)) );
             }
         }
     
@@ -459,7 +459,7 @@ public:
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mortar_mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-0.0*mortar_mat(i,j)) );
             }
         }
     
@@ -488,7 +488,7 @@ public:
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mortar_mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], -1.0*mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], -0.0*mortar_mat(i,j)) );
             }
         }
     
