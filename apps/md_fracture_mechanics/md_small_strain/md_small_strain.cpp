@@ -360,7 +360,7 @@ int main(int argc, char **argv)
 
                 // hybrid sigma evaluation
                 {
-                    size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+                    size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
                     auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
                     Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(fracture_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + 4 * n_skin_bs, 0, n_f_sigma_bs, 1);
                     
@@ -424,7 +424,7 @@ int main(int argc, char **argv)
                 
                 // skins div
                 {
-                    size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+                    size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
                     auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
                     auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
                     if (assembler.flip_dest_l().at(fracture_ind)) {
@@ -437,10 +437,10 @@ int main(int argc, char **argv)
                     
                     size_t sig_bs = 3;
                     size_t  base = n_cells_dof + n_faces_dofs;
-                    size_t p_sn_l = base+assembler.dof_dest_l().at(fracture_ind)+0*n_skin_bs;
-                    size_t p_st_l = base+assembler.dof_dest_l().at(fracture_ind)+1*n_skin_bs;
-                    size_t p_sn_r = base+assembler.dof_dest_r().at(fracture_ind)+2*n_skin_bs;
-                    size_t p_st_r = base+assembler.dof_dest_r().at(fracture_ind)+3*n_skin_bs;
+                    size_t p_sn_l = base+fracture_ind*sig_bs+0*n_skin_bs;
+                    size_t p_st_l = base+fracture_ind*sig_bs+1*n_skin_bs;
+                    size_t p_sn_r = base+fracture_ind*sig_bs+2*n_skin_bs;
+                    size_t p_st_r = base+fracture_ind*sig_bs+3*n_skin_bs;
                     Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(p_sn_l, 0, sig_bs, 1);
                     Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(p_st_l, 0, sig_bs, 1);
                     Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(p_sn_r, 0, sig_bs, 1);
@@ -467,7 +467,7 @@ int main(int argc, char **argv)
                 
                 // skins sigma
                 {
-                    size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+                    size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
                     auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
                     auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
                     if (assembler.flip_dest_l().at(fracture_ind)) {
@@ -480,10 +480,10 @@ int main(int argc, char **argv)
                     
                     size_t sig_bs = 3;
                     size_t  base = n_cells_dof + n_faces_dofs;
-                    size_t p_sn_l = base+assembler.dof_dest_l().at(fracture_ind)+0*n_skin_bs;
-                    size_t p_st_l = base+assembler.dof_dest_l().at(fracture_ind)+1*n_skin_bs;
-                    size_t p_sn_r = base+assembler.dof_dest_r().at(fracture_ind)+2*n_skin_bs;
-                    size_t p_st_r = base+assembler.dof_dest_r().at(fracture_ind)+3*n_skin_bs;
+                    size_t p_sn_l = base+fracture_ind*sig_bs+0*n_skin_bs;
+                    size_t p_st_l = base+fracture_ind*sig_bs+1*n_skin_bs;
+                    size_t p_sn_r = base+fracture_ind*sig_bs+2*n_skin_bs;
+                    size_t p_st_r = base+fracture_ind*sig_bs+3*n_skin_bs;
                     Matrix<RealType, Dynamic, 1> sn_l_dof = x_dof.block(p_sn_l, 0, sig_bs, 1);
                     Matrix<RealType, Dynamic, 1> st_l_dof = x_dof.block(p_st_l, 0, sig_bs, 1);
                     Matrix<RealType, Dynamic, 1> sn_r_dof = x_dof.block(p_sn_r, 0, sig_bs, 1);
@@ -516,7 +516,7 @@ int main(int argc, char **argv)
         // sigma normal evaluation
         if(1){
             size_t n_mortar_displacements = 2*end_point_mortars.size();
-            size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+            size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
             size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
             std::cout << "sigma =  " << sigma_dof << std::endl;

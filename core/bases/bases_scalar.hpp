@@ -489,6 +489,14 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
 
         return ret;
     }
+    
+    function_type
+    eval_lambda_functions(const point_type& pt) const
+    {
+        function_type ret = function_type::Zero(1);
+        ret(0) = 1;
+        return ret;
+    }
 
     size_t
     size() const
@@ -506,6 +514,12 @@ class scaled_monomial_scalar_basis<Mesh<T, 2, Storage>, typename Mesh<T, 2, Stor
     swap_nodes()
     {
         std::swap(fpoints[0],fpoints[1]);
+    }
+    
+    std::vector<point_type>
+    nodes()
+    {
+        return fpoints;
     }
 };
 
