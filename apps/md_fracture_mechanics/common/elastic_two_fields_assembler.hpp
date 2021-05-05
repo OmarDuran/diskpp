@@ -817,8 +817,8 @@ public:
             auto& cell_r = storage->surfaces[cell_ind_r];
 
 
-            Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*point_mortar_coupling_matrix(msh,cell_l,face_l,node);
-            Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*point_mortar_coupling_matrix(msh,cell_r,face_r,node);
+            Matrix<T, Dynamic, Dynamic> mortar_l = +1.0*point_mortar_coupling_matrix(msh,cell_l,face_l,node);
+            Matrix<T, Dynamic, Dynamic> mortar_r = +1.0*point_mortar_coupling_matrix(msh,cell_r,face_r,node);
 
             scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
             scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);

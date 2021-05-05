@@ -81,6 +81,8 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
+//      std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_581.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1533.txt";
     std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
@@ -512,10 +514,10 @@ int main(int argc, char **argv)
         }
         
         // sigma normal evaluation
-        if(0){
+        if(1){
             size_t n_mortar_displacements = 2*end_point_mortars.size();
-            size_t n_skin_bs = 0;//skin_operator.rows();
-            size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs + n_mortar_displacements;
+            size_t n_skin_bs = 2 * fracture_pairs.size() + 1;
+            size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
             std::cout << "sigma =  " << sigma_dof << std::endl;
         }
