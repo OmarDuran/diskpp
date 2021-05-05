@@ -1475,7 +1475,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 10000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -1509,7 +1509,7 @@ public:
             Matrix<T, Dynamic, Dynamic> ret_l = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
             Matrix<T, Dynamic, Dynamic> ret_r = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
 
-            T c_l = 1.0*(1.0/(lambda+2.0*mu));
+            T c_l = 0.01*(1.0/(lambda+2.0*mu));
             const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
             for (auto& qp : qps_l)
             {
@@ -1520,7 +1520,7 @@ public:
                 ret_l += c_l * s_opt_l;
             }
             
-            T c_r = 1.0*(1.0/(lambda+2.0*mu));
+            T c_r = 0.01*(1.0/(lambda+2.0*mu));
             const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
             for (auto& qp : qps_r)
             {
