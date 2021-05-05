@@ -323,11 +323,11 @@ public:
     {
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         size_t n_f_sigma_bs = 2.0*disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
-        size_t n_sking_bs = 4.0 * m_fracture_pairs.size() + 1;
+        size_t n_skin_bs = 4.0 * m_fracture_pairs.size() + 1;
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
-        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + 4.0 * n_sking_bs + fracture_ind*n_f_sigma_bs;
+        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + 4.0 * n_skin_bs + fracture_ind*n_f_sigma_bs;
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map_i.push_back( assembly_index(frac_LHS_offset+i, true));
@@ -552,7 +552,7 @@ public:
         size_t n_0d_bc_bs = 1;
         
         std::vector<assembly_index> asm_map_i, asm_map_l_j, asm_map_r_j;
-        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_skin_bs + 2 * n_f_sigma_bs * n_fractures + 2;
+        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_skin_bs + 2 * n_f_sigma_bs * n_fractures + 2*n_0d_bc_bs;
         auto base_j = m_n_cells_dof + m_n_faces_dof + n_skin_bs;
         auto s_point_l_LHS_offset = base_i;
         auto skin_l_LHS_offset = base_j + n_skin_sigma_bs * n_fractures;
@@ -989,6 +989,7 @@ public:
             fracture_ind++;
         }
         
+        return;
         size_t point_mortar_ind = 0;
         for (auto p_chunk : m_end_point_mortars) {
 
@@ -1044,7 +1045,7 @@ public:
             auto hybrid_matrix = skin_hybrid_matrix(msh, face_l, face_r, fracture_ind);
             scatter_skin_hybrid_l_data(msh, fracture_ind, hybrid_matrix.first);
             scatter_skin_hybrid_r_data(msh, fracture_ind, hybrid_matrix.second);
-//            scatter_skin_hybrid_l_data();
+
             
 //            // rhs
 //            auto ul_rhs = skin_coupling_rhs_u(msh, cell_l, face_l);
@@ -1075,9 +1076,9 @@ public:
                 
 
                 size_t fracture_ind_l = map_face_l_frac[chunk.first];
-//                size_t fracture_ind_r = map_face_r_frac[chunk.second];
+                size_t fracture_ind_r = map_face_r_frac[chunk.second];
                 scatter_skins_point_mortar_u_n_data(msh,fracture_ind_l,mortar);
-                scatter_skins_point_mortar_u_t_data(msh,fracture_ind_l,mortar);
+                scatter_skins_point_mortar_u_t_data(msh,fracture_ind_r,mortar);
                 
                 point_mortar_ind++;
             }
