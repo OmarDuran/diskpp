@@ -578,16 +578,16 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], +1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], +1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_fractures, +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_fractures, asm_map_i[i]+1, -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_fractures, asm_map_i[i]+1, +1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_fractures, +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_fractures, asm_map_i[i]+1, -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_fractures, asm_map_i[i]+1, +1.0*mat(i,j)) );
             }
         }
     
