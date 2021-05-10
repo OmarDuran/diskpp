@@ -299,7 +299,7 @@ public:
             m_n_hybrid_dof += (n_f_sigma_n_bs + n_f_sigma_t_bs) * f.m_pairs.size();
             m_n_hybrid_dof += 2 * 2;
             m_compress_fracture_indexes.at(frac_c) = n_skin_bs;
-            n_skin_bs += f.m_skin_bs;
+            n_skin_bs += 4*f.m_skin_bs;
             frac_c++;
         }
         
@@ -529,16 +529,18 @@ public:
 
     }
     
-    void scatter_mortar_data(const Mesh& msh, const size_t & face_id, const size_t & fcell_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
+    void scatter_mortar_data(const Mesh& msh, const size_t & face_id, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
     {
         size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
         size_t n_f_sigma_bs = 2.0*disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
         size_t n_skin_bs = 4 * f.m_skin_bs;
         size_t n_fractures = m_fractures.size();
+        size_t shift_hybrid_dof = n_f_sigma_bs * f.m_pairs.size();
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
-        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + n_fractures * n_skin_bs + fcell_ind*n_f_sigma_bs;
+        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + n_fractures * n_skin_bs + cell_ind*n_f_sigma_bs;
+        frac_LHS_offset += fracture_ind * shift_hybrid_dof;
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map_i.push_back( assembly_index(frac_LHS_offset+i, true));
@@ -712,11 +714,14 @@ public:
         size_t n_skin_sigma_bs = 3.0;
         size_t n_skin_bs = f.m_skin_bs;
         size_t n_cells = f.m_pairs.size();
+        size_t n_fractures = m_fractures.size();
+        size_t shift_hybrid_dof = 2.0 * n_f_sigma_bs * n_cells;
         size_t n_0d_bc_bs = 1;
         
         std::vector<assembly_index> asm_map_i, asm_map_l_j, asm_map_r_j;
-        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_skin_bs + 2 * n_f_sigma_bs * n_cells;
-        base_i += m_compress_fracture_indexes.at(fracture_ind);
+        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_fractures * n_skin_bs;
+        base_i += fracture_ind * 4 * n_0d_bc_bs;
+        base_i += n_fractures * shift_hybrid_dof;
         auto base_j = m_n_cells_dof + m_n_faces_dof;
         base_j += m_compress_fracture_indexes.at(fracture_ind);
         
@@ -763,11 +768,14 @@ public:
         size_t n_skin_sigma_bs = 3.0;
         size_t n_skin_bs = f.m_skin_bs;
         size_t n_cells = f.m_pairs.size();
+        size_t n_fractures = m_fractures.size();
+        size_t shift_hybrid_dof = 2.0 * n_f_sigma_bs * n_cells;
         size_t n_0d_bc_bs = 1;
         
         std::vector<assembly_index> asm_map_i, asm_map_l_j, asm_map_r_j;
-        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_skin_bs + 2 * n_f_sigma_bs * n_cells + 2*n_0d_bc_bs;
-        base_i += m_compress_fracture_indexes.at(fracture_ind);
+        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_fractures * n_skin_bs + 2*n_0d_bc_bs;
+        base_i += fracture_ind * 4 * n_0d_bc_bs;
+        base_i += n_fractures * shift_hybrid_dof;
         auto base_j = m_n_cells_dof + m_n_faces_dof + n_skin_bs;
         base_j += m_compress_fracture_indexes.at(fracture_ind);
         
@@ -883,14 +891,16 @@ public:
         }
     }
     
-    void scatter_mortar_mass_data(const Mesh& msh, const size_t & fcell_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
+    void scatter_mortar_mass_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, Dynamic>& mortar_mat)
     {
         size_t n_f_sigma_bs = 2.0*disk::scalar_basis_size(m_sigma_degree, Mesh::dimension-1);
         size_t n_skin_bs = 4 * f.m_skin_bs;
         size_t n_fractures = m_fractures.size();
+        size_t shift_hybrid_dof = n_f_sigma_bs * f.m_pairs.size();
         
         std::vector<assembly_index> asm_map;
-        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + n_fractures * n_skin_bs +  fcell_ind*n_f_sigma_bs;
+        auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + n_fractures * n_skin_bs +  cell_ind*n_f_sigma_bs;
+        frac_LHS_offset += fracture_ind * shift_hybrid_dof;
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map.push_back( assembly_index(frac_LHS_offset+i, true));
@@ -1284,11 +1294,11 @@ public:
                 Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_coupling_matrix(msh,cell_l,face_l);
                 Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,cell_r,face_r);
                             
-                scatter_mortar_data(msh,chunk.first,cell_ind,f,mortar_l);
-                scatter_mortar_data(msh,chunk.second,cell_ind,f,mortar_r);
+                scatter_mortar_data(msh,chunk.first,f_ind,f,cell_ind,mortar_l);
+                scatter_mortar_data(msh,chunk.second,f_ind,f,cell_ind,mortar_r);
                 
                 Matrix<T, Dynamic, Dynamic> mass_matrix = sigma_mass_matrix(msh, face_l, face_r);
-                scatter_mortar_mass_data(msh,cell_ind,f,mass_matrix);
+                scatter_mortar_mass_data(msh,f_ind,f,cell_ind,mass_matrix);
                 
                 cell_ind++;
             }
@@ -1333,7 +1343,19 @@ public:
                 cell_ind++;
             }
             
-            if(1){ // apply restrictions
+            bool point_mortars_Q = true;
+            if(point_mortars_Q){ // apply mortar
+                
+                Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
+                mortar(0,0) = 1.0;
+                
+                size_t cell_ind = 0;
+                scatter_skins_point_mortar_u_n_data(msh,f_ind,f,cell_ind,mortar);
+                scatter_skins_point_mortar_u_t_data(msh,f_ind,f,cell_ind,mortar);
+                    
+            }
+            
+            if(0){ // apply restrictions
                 size_t point_mortar_ind = 0;
                 Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
                 up_restriction(0,0) = 1.0;

@@ -166,6 +166,8 @@ int main(int argc, char **argv)
         f.build(msh);
         
         fractures.push_back(f);
+//        fractures.push_back(f);
+//        fractures.push_back(f);
     }
     
     // Constant elastic properties
