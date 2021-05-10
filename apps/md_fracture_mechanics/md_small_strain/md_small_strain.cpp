@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
     
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
 //      std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_581.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1533.txt";
-//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
@@ -281,12 +281,12 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    std::ofstream mat_file;
-    mat_file.open ("matrix.txt");
-    size_t n_cells_dof = assembler.get_n_cells_dofs();
-    size_t n_dof = assembler.LHS.rows();
-    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
-    mat_file.close();
+//    std::ofstream mat_file;
+//    mat_file.open ("matrix.txt");
+//    size_t n_cells_dof = assembler.get_n_cells_dofs();
+//    size_t n_dof = assembler.LHS.rows();
+//    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
+//    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
@@ -319,6 +319,7 @@ int main(int argc, char **argv)
         size_t n_faces_dofs = assembler.get_n_faces_dofs();
         size_t n_hybrid_dofs = assembler.get_n_hybrid_dofs();
         size_t fracture_ind = 0;
+        size_t n_fractures = fracture_pairs.size();
         size_t sigma_degree = hho_di.face_degree()-1;
         size_t n_f_sigma_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
         size_t n_data = 2*fracture_pairs.size();
@@ -339,7 +340,7 @@ int main(int argc, char **argv)
         Matrix<RealType, Dynamic, 3> data_s_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         
         mesh_type::point_type p0;
-        for (auto chunk : fracture_pairs) {
+        for (auto chunk : assembler.fracture_pairs()) {
             
             size_t cell_ind_l = assembler.elements_with_fractures_eges()[fracture_ind].first;
             size_t cell_ind_r = assembler.elements_with_fractures_eges()[fracture_ind].second;
@@ -508,10 +509,33 @@ int main(int argc, char **argv)
                     data_sig_r(2*fracture_ind+ip,1) = sn_r;
                     data_sig_r(2*fracture_ind+ip,2) = st_r;
                 }
-                                
+                
+                                                
              }
             
             fracture_ind++;
+        }
+        
+        // skins Lagrange multiplier
+        if(1){
+            size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
+            
+            size_t sig_bs = 3;
+            size_t uL_bs = n_fractures+1;
+            size_t  base = n_cells_dof + n_faces_dofs;
+            size_t p_sn_l = base+n_fractures*sig_bs+0*n_skin_bs;
+            size_t p_st_l = base+n_fractures*sig_bs+1*n_skin_bs;
+            size_t p_sn_r = base+n_fractures*sig_bs+2*n_skin_bs;
+            size_t p_st_r = base+n_fractures*sig_bs+3*n_skin_bs;
+            Matrix<RealType, Dynamic, 1> un_l_dof = x_dof.block(p_sn_l, 0, uL_bs, 1);
+            Matrix<RealType, Dynamic, 1> ut_l_dof = x_dof.block(p_st_l, 0, uL_bs, 1);
+            Matrix<RealType, Dynamic, 1> un_r_dof = x_dof.block(p_sn_r, 0, uL_bs, 1);
+            Matrix<RealType, Dynamic, 1> ut_r_dof = x_dof.block(p_st_r, 0, uL_bs, 1);
+            
+            std::cout << "unL_l =  " << un_l_dof << std::endl;
+            std::cout << "unL_r =  " << un_r_dof << std::endl;
+            std::cout << "utL_l =  " << ut_l_dof << std::endl;
+            std::cout << "utL_r =  " << ut_r_dof << std::endl;
         }
         
         // sigma normal evaluation

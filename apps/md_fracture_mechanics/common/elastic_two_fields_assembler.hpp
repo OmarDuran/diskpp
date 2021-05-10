@@ -53,6 +53,7 @@ class elastic_two_fields_assembler
     size_t      m_sigma_degree;
     bool        m_hho_stabilization_Q;
     bool        m_scaled_stabilization_Q;
+    T           m_l_f = 0.001;
     
 public:
 
@@ -343,7 +344,7 @@ public:
         {
             for (size_t j = 0; j < mortar_mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],mortar_mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j], mortar_mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_j[j],asm_map_i[i], mortar_mat(i,j)) );
             }
         }
@@ -577,16 +578,16 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_fractures, +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_fractures, asm_map_i[i]+1, +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_fractures, asm_map_i[i]+1, -1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_fractures, +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_fractures, asm_map_i[i]+1, +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_fractures, asm_map_i[i]+1, -1.0*mat(i,j)) );
             }
         }
     
@@ -897,7 +898,7 @@ public:
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j],+1.0*mat_l(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i],+1.0*mat_l(i,j)) );
-                
+
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j],+1.0*mat_r(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i],+1.0*mat_r(i,j)) );
                 
@@ -942,7 +943,7 @@ public:
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j],+1.0*mat_l(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i],+1.0*mat_l(i,j)) );
-                
+
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j],+1.0*mat_r(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i],+1.0*mat_r(i,j)) );
                 
@@ -1056,7 +1057,7 @@ public:
             
             Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_coupling_matrix(msh,cell_l,face_l);
             Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,cell_r,face_r);
-            
+                        
             scatter_mortar_data(msh,chunk.first,fracture_ind,mortar_l);
             scatter_mortar_data(msh,chunk.second,fracture_ind,mortar_r);
             
@@ -1067,29 +1068,6 @@ public:
             fracture_ind++;
         }
         
-        return;
-//        size_t point_mortar_ind = 0;
-//        for (auto p_chunk : m_end_point_mortars) {
-//
-//            auto chunk = m_fracture_pairs[p_chunk.first];
-//            auto& node = storage->nodes[p_chunk.second];
-//
-//            size_t cell_ind_l = m_elements_with_fractures_eges[p_chunk.first].first;
-//            size_t cell_ind_r = m_elements_with_fractures_eges[p_chunk.first].second;
-//            auto& face_l = storage->edges[chunk.first];
-//            auto& face_r = storage->edges[chunk.second];
-//            auto& cell_l = storage->surfaces[cell_ind_l];
-//            auto& cell_r = storage->surfaces[cell_ind_r];
-//
-//
-//            Matrix<T, Dynamic, Dynamic> mortar_l = +1.0*point_mortar_coupling_matrix(msh,cell_l,face_l,node);
-//            Matrix<T, Dynamic, Dynamic> mortar_r = +1.0*point_mortar_coupling_matrix(msh,cell_r,face_r,node);
-//
-////            scatter_point_mortar_data(msh,chunk.first,point_mortar_ind,mortar_l);
-////            scatter_point_mortar_data(msh,chunk.second,point_mortar_ind,mortar_r);
-//
-//            point_mortar_ind++;
-//        }
     }
     
     void assemble_skins(const Mesh& msh){
@@ -1115,9 +1093,9 @@ public:
             auto ul_div_phi = skin_coupling_matrix_ul(msh, cell_l, face_l, fracture_ind);
             auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, fracture_ind);
             
-            scatter_skin_weighted_ul_n_data(msh, chunk.first, fracture_ind, ul_div_phi.first);
+//            scatter_skin_weighted_ul_n_data(msh, chunk.first, fracture_ind, ul_div_phi.first);
             scatter_skin_weighted_ul_t_data(msh, chunk.first, fracture_ind, ul_div_phi.second);
-            scatter_skin_weighted_ur_n_data(msh, chunk.second, fracture_ind, ur_div_phi.first);
+//            scatter_skin_weighted_ur_n_data(msh, chunk.second, fracture_ind, ur_div_phi.first);
             scatter_skin_weighted_ur_t_data(msh, chunk.second, fracture_ind, ur_div_phi.second);
             
             auto hybrid_matrix = skin_hybrid_matrix(msh, face_l, face_r, fracture_ind);
@@ -1142,8 +1120,8 @@ public:
             Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
             up_restriction(0,0) = 1.0;
             up_restriction(1,1) = 1.0;
-            up_restriction(0,1) = -1.0;
-            up_restriction(1,0) = -1.0;
+            up_restriction(0,1) = +1.0;
+            up_restriction(1,0) = +1.0;
             
             Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
             mortar(0,0) = 1.0;
@@ -1158,15 +1136,17 @@ public:
 //                auto& cell_l = storage->surfaces[cell_ind_l];
 //                auto& cell_r = storage->surfaces[cell_ind_r];
                 
-
                 size_t fracture_ind_l = map_face_l_frac[chunk.first];
                 size_t fracture_ind_r = map_face_r_frac[chunk.second];
                 scatter_skins_point_mortar_u_n_data(msh,fracture_ind_l,mortar);
                 scatter_skins_point_mortar_u_t_data(msh,fracture_ind_r,mortar);
                 
-//                scatter_skins_point_restriction_u_n_data(msh,fracture_ind_l,up_restriction);
-//                scatter_skins_point_restriction_u_t_data(msh,fracture_ind_r,up_restriction);
+                scatter_skins_point_restriction_u_n_data(msh,fracture_ind_l,up_restriction);
+                scatter_skins_point_restriction_u_t_data(msh,fracture_ind_r,up_restriction);
                 
+                if (point_mortar_ind ==0) {
+                    break;
+                }
                 point_mortar_ind++;
             }
         }
@@ -1596,7 +1576,7 @@ public:
             Matrix<T, Dynamic, Dynamic> ret_l = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
             Matrix<T, Dynamic, Dynamic> ret_r = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
 
-            T c_l = 1*(1.0/(lambda+2.0*mu));
+            T c_l = 1.0*(1.0/(lambda+2.0*mu));
             const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
             for (auto& qp : qps_l)
             {
@@ -1607,7 +1587,7 @@ public:
                 ret_l += c_l * s_opt_l;
             }
             
-            T c_r = 1*(1.0/(lambda+2.0*mu));
+            T c_r = 1.0*(1.0/(lambda+2.0*mu));
             const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
             for (auto& qp : qps_r)
             {
@@ -1949,11 +1929,7 @@ public:
     }
     
     void skin_connected_cells(const Mesh& msh){
-
-//        m_flip_dest_l.resize(m_fracture_pairs.size(),false);
-//        m_flip_dest_r.resize(m_fracture_pairs.size(),false);
-//        return;
-        
+       
         auto storage = msh.backend_storage();
                 
         std::set<size_t> set_l, set_r;
@@ -1964,6 +1940,8 @@ public:
         
 
         std::map<size_t,size_t> node_map_l;
+        std::vector<size_t> frac_indexes_l;
+        frac_indexes_l.reserve(set_l.size());
         {   // build connectivity map on left side
             size_t index = m_end_point_mortars[0].first;
             size_t node_index_b = m_end_point_mortars[0].second;
@@ -1979,6 +1957,7 @@ public:
                     auto points = face.point_ids();
                     bool check_Q = points[0] == node_index || points[1] == node_index;
                     if (check_Q) {
+                        frac_indexes_l.push_back(id);
                         set_l.erase(id);
                         if (points[0] == node_index) {
                             node_index = points[1];
@@ -1994,6 +1973,8 @@ public:
         }
         
         std::map<size_t,size_t> node_map_r;
+        std::vector<size_t> frac_indexes_r;
+        frac_indexes_r.reserve(set_r.size());
         {   // build connectivity map on right side
             size_t index = m_end_point_mortars[0].first;
             size_t node_index_b = m_end_point_mortars[0].second;
@@ -2009,6 +1990,7 @@ public:
                     auto points = face.point_ids();
                     bool check_Q = points[0] == node_index || points[1] == node_index;
                     if (check_Q) {
+                        frac_indexes_r.push_back(id);
                         set_r.erase(id);
                         if (points[0] == node_index) {
                             node_index = points[1];
@@ -2033,6 +2015,13 @@ public:
             return dest;
         };
         
+        // renumbering fracture pairs
+        m_fracture_pairs.clear();
+        assert(frac_indexes_l.size()==frac_indexes_r.size());
+        for (size_t i = 0; i < frac_indexes_l.size(); i++) {
+            m_fracture_pairs.push_back(std::make_pair(frac_indexes_l[i], frac_indexes_r[i]));
+        }
+        
         for (auto chunk : m_fracture_pairs) {
             
             auto& face_l = storage->edges[chunk.first];
@@ -2040,6 +2029,13 @@ public:
             
             auto points_l = face_l.point_ids();
             auto points_r = face_r.point_ids();
+            
+            auto& point0 = storage->points[points_l[0]];
+            auto& point1 = storage->points[points_l[1]];
+            
+//            std::cout << "point0 = " << point0 << std::endl;
+//            std::cout << "point1 = " << point1 << std::endl;
+//            std::cout << std::endl;
             
             if (node_map_l[points_l[0]] < node_map_l[points_l[1]]) {
                 size_t id = node_map_l[points_l[0]];
@@ -2530,6 +2526,10 @@ public:
     
     std::vector<std::pair<size_t,size_t>> & elements_with_fractures_eges(){
         return m_elements_with_fractures_eges;
+    }
+    
+    std::vector<std::pair<size_t,size_t>> & fracture_pairs(){
+        return m_fracture_pairs;
     }
     
 };
