@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
     
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
-//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
+    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_801.txt";
     
     mesh_builder.set_poly_mesh_file(mesh_file);
@@ -98,6 +98,7 @@ int main(int argc, char **argv)
     
     tc.tic();
     std::vector<std::pair<size_t,size_t>> fracture_pairs;
+    std::vector<std::pair<size_t,size_t>> f0_pairs,f1_pairs,f2_pairs;
     std::vector<mesh_type::point_type> fracture_bars;
     fracture_bars.reserve(msh.faces_size());
     auto storage = msh.backend_storage();
@@ -112,6 +113,16 @@ int main(int argc, char **argv)
         bool check_Q = fabs(a.x() - b.x()) <= 1.0e-4 && fabs(a.y() - b.y()) <= 1.0e-4;
         return check_Q;
     };
+    
+    auto is_diag_Q = [](const mesh_type::point_type& a)-> bool {
+        bool check_Q = fabs(a.x() - a.y()) <= 1.0e-3;
+        return check_Q;
+    };
+    
+    auto is_horizontal_Q = [](const mesh_type::point_type& a)-> bool {
+        bool check_Q = fabs(1.0 - a.y()) <= 1.0e-3;
+        return check_Q;
+    };
 
     for (size_t i = 0; i < fracture_bars.size(); i++) {
         mesh_type::point_type bar_i = fracture_bars.at(i);
@@ -119,6 +130,13 @@ int main(int argc, char **argv)
             mesh_type::point_type bar_j = fracture_bars.at(j);
              if (are_equal_Q(bar_i,bar_j)) {
                  fracture_pairs.push_back(std::make_pair(i, j));
+                 if (is_diag_Q(bar_i)) {
+                     f0_pairs.push_back(std::make_pair(i, j));
+                 } else if (is_horizontal_Q(bar_i)) {
+                     f1_pairs.push_back(std::make_pair(i, j));
+                 } else{
+                     f2_pairs.push_back(std::make_pair(i, j));
+                 }
              }
         }
     }
@@ -153,21 +171,83 @@ int main(int argc, char **argv)
     
 //    end_point_mortars.clear();
     
+    {// find points
+        mesh_type::point_type p;
+        p.x() = 10.0;
+        p.y() = 1.0;
+        auto storage = msh.backend_storage();
+        for (size_t i = 0; i < msh.points_size(); i++)
+        {
+            auto point = storage->points.at(i);
+            if (are_equal_Q(point,p)){
+                int aka = 0;
+            }
+        }
+        
+        // print points
+        for(auto chunk : f1_pairs){
+            auto &face_l = storage->edges.at(chunk.first);
+            auto &face_r = storage->edges.at(chunk.second);
+
+            auto ptids_l = face_l.point_ids();
+            auto ptids_r = face_r.point_ids();
+
+            std::cout << "left " << std::endl;
+            std::cout << ptids_l[0] << ", " << ptids_l[1] << std::endl;
+            std::cout << "right " << std::endl;
+            std::cout << ptids_r[0] << ", " << ptids_r[1] << std::endl;
+            int aka = 0;
+        }
+        
+    }
+    
     tc.toc();
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
     
     // filling up fractures
     std::vector<fracture<mesh_type> > fractures;
-    {
-        fracture<mesh_type> f;
-        f.m_pairs = fracture_pairs;
-        f.m_b_index = end_point_mortars[0].second;
-        f.m_e_index = end_point_mortars[1].second;
-        f.build(msh);
+//    if(1){
+//        fracture<mesh_type> f;
+//        f.m_pairs = fracture_pairs;
+//        f.m_bl_index = end_point_mortars[0].second;
+//        f.m_el_index = end_point_mortars[0].second;
+//        f.m_br_index = end_point_mortars[0].second;
+//        f.m_er_index = end_point_mortars[0].second;
+//        f.build(msh);
+//
+//        fractures.push_back(f);
+//    }
+    
+    if(1){
+        fracture<mesh_type> f0;
+        f0.m_pairs = f0_pairs;
+        f0.m_bl_index = 6;
+        f0.m_el_index = 7;
+        f0.m_br_index = 6;
+        f0.m_er_index = 449;
+        f0.build(msh);
         
-        fractures.push_back(f);
-//        fractures.push_back(f);
-//        fractures.push_back(f);
+        fractures.push_back(f0);
+        
+        fracture<mesh_type> f1;
+        f1.m_pairs = f1_pairs;
+        f1.m_bl_index = 4;
+        f1.m_el_index = 7;
+        f1.m_br_index = 472;
+        f1.m_er_index = 475;
+        f1.build(msh);
+
+        fractures.push_back(f1);
+        
+        fracture<mesh_type> f2;
+        f2.m_pairs = f2_pairs;
+        f2.m_bl_index = 5;
+        f2.m_el_index = 475;
+        f2.m_br_index = 455;
+        f2.m_er_index = 449;
+        f2.build(msh);
+        
+        fractures.push_back(f2);
     }
     
     // Constant elastic properties
@@ -355,7 +435,7 @@ int main(int argc, char **argv)
         Matrix<RealType, Dynamic, 3> data_s_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         
         mesh_type::point_type p0;
-        for (auto chunk : assembler.fracture_pairs()) {
+        for (auto chunk : f.m_pairs) {
             
             size_t cell_ind_l = f.m_elements[cell_ind].first;
             size_t cell_ind_r = f.m_elements[cell_ind].second;

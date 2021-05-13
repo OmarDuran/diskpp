@@ -21,9 +21,11 @@
 template<typename Mesh>
 struct fracture {
     
-    size_t m_b_index;
+    size_t m_bl_index;
+    size_t m_el_index;
     
-    size_t m_e_index;
+    size_t m_br_index;
+    size_t m_er_index;
     
     size_t m_skin_bs;
 
@@ -38,8 +40,10 @@ struct fracture {
     }
     
     fracture(const fracture &other){
-        m_b_index       = other.m_b_index;
-        m_e_index       = other.m_e_index;
+        m_bl_index       = other.m_bl_index;
+        m_el_index       = other.m_el_index;
+        m_br_index       = other.m_br_index;
+        m_er_index       = other.m_er_index;
         m_pairs         = other.m_pairs;
         m_flips_l       = other.m_flips_l;
         m_flips_r       = other.m_flips_r;
@@ -49,8 +53,10 @@ struct fracture {
          
     fracture& operator = (const fracture &other){
     
-        m_b_index       = other.m_b_index;
-        m_e_index       = other.m_e_index;
+        m_bl_index       = other.m_bl_index;
+        m_el_index       = other.m_el_index;
+        m_br_index       = other.m_br_index;
+        m_er_index       = other.m_er_index;
         m_pairs         = other.m_pairs;
         m_flips_l       = other.m_flips_l;
         m_flips_r       = other.m_flips_r;
@@ -62,7 +68,7 @@ struct fracture {
     void build(const Mesh& msh){
         build_mesh(msh);
         build_elements(msh);
-        m_skin_bs = 4.0 * m_pairs.size() + 1;
+        m_skin_bs = 0*(4 * m_pairs.size() + 1);
     }
     
     void build_elements(const Mesh& msh){
@@ -115,8 +121,8 @@ struct fracture {
         std::vector<size_t> frac_indexes_l;
         frac_indexes_l.reserve(set_l.size());
         {   // build connectivity map on left side
-            size_t node_index_b = m_b_index;
-            size_t node_index_e = m_e_index;
+            size_t node_index_b = m_bl_index;
+            size_t node_index_e = m_el_index;
             size_t node_index = node_index_b;
             
             size_t node_c = 1;
@@ -147,8 +153,8 @@ struct fracture {
         std::vector<size_t> frac_indexes_r;
         frac_indexes_r.reserve(set_r.size());
         {   // build connectivity map on right side
-            size_t node_index_b = m_b_index;
-            size_t node_index_e = m_e_index;
+            size_t node_index_b = m_br_index;
+            size_t node_index_e = m_er_index;
             size_t node_index = node_index_b;
             
             size_t node_c = 1;
@@ -174,10 +180,7 @@ struct fracture {
                 }
             }
         }
-        
-        m_flips_l.reserve(m_pairs.size());
-        m_flips_r.reserve(m_pairs.size());
-        
+                
         // renumbering fracture pairs
         m_pairs.clear();
         assert(frac_indexes_l.size()==frac_indexes_r.size());
@@ -185,6 +188,8 @@ struct fracture {
             m_pairs.push_back(std::make_pair(frac_indexes_l[i], frac_indexes_r[i]));
         }
         
+        m_flips_l.reserve(m_pairs.size());
+        m_flips_r.reserve(m_pairs.size());
         for (auto chunk : m_pairs) {
             
             auto& face_l = storage->edges[chunk.first];
@@ -238,6 +243,7 @@ class elastic_two_fields_assembler
     std::vector< size_t >               m_elements_with_bc_eges;
     std::vector<fracture<Mesh> >        m_fractures;
     std::vector<size_t>                 m_compress_fracture_indexes;
+    std::vector<size_t>                 m_compress_hybrid_indexes;
     
     std::vector<std::pair<size_t,size_t>> m_fracture_pairs;
     std::vector<std::pair<size_t,size_t>> m_elements_with_fractures_eges;
@@ -295,10 +301,13 @@ public:
         size_t frac_c = 0;
         size_t n_skin_bs = 0;
         m_compress_fracture_indexes.resize(m_fractures.size());
+        m_compress_hybrid_indexes.resize(m_fractures.size());
         for (auto f : m_fractures) {
-            m_n_hybrid_dof += (n_f_sigma_n_bs + n_f_sigma_t_bs) * f.m_pairs.size();
-            m_n_hybrid_dof += 2 * 2;
+            m_compress_hybrid_indexes.at(frac_c) = m_n_hybrid_dof;
             m_compress_fracture_indexes.at(frac_c) = n_skin_bs;
+            
+            m_n_hybrid_dof += (n_f_sigma_n_bs + n_f_sigma_t_bs) * f.m_pairs.size();
+//            m_n_hybrid_dof += 2 * 2;
             n_skin_bs += 4*f.m_skin_bs;
             frac_c++;
         }
@@ -312,7 +321,7 @@ public:
         
         // skin data
         for (auto f : m_fractures) {
-            system_size += 4.0 * f.m_skin_bs;
+            system_size += 4 * f.m_skin_bs;
         }
         
         LHS = SparseMatrix<T>( system_size, system_size );
@@ -535,12 +544,12 @@ public:
         size_t n_f_sigma_bs = 2.0*disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
         size_t n_skin_bs = 4 * f.m_skin_bs;
         size_t n_fractures = m_fractures.size();
-        size_t shift_hybrid_dof = n_f_sigma_bs * f.m_pairs.size();
+
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
         auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + n_fractures * n_skin_bs + cell_ind*n_f_sigma_bs;
-        frac_LHS_offset += fracture_ind * shift_hybrid_dof;
+        frac_LHS_offset += m_compress_hybrid_indexes.at(fracture_ind);
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map_i.push_back( assembly_index(frac_LHS_offset+i, true));
@@ -896,11 +905,10 @@ public:
         size_t n_f_sigma_bs = 2.0*disk::scalar_basis_size(m_sigma_degree, Mesh::dimension-1);
         size_t n_skin_bs = 4 * f.m_skin_bs;
         size_t n_fractures = m_fractures.size();
-        size_t shift_hybrid_dof = n_f_sigma_bs * f.m_pairs.size();
         
         std::vector<assembly_index> asm_map;
         auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + n_fractures * n_skin_bs +  cell_ind*n_f_sigma_bs;
-        frac_LHS_offset += fracture_ind * shift_hybrid_dof;
+        frac_LHS_offset += m_compress_hybrid_indexes.at(fracture_ind);
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map.push_back( assembly_index(frac_LHS_offset+i, true));
@@ -1257,7 +1265,7 @@ public:
         assemble_mortars(msh);
         
         // skins assemble
-        assemble_skins(msh);
+//        assemble_skins(msh);
     
         finalize();
 
@@ -1343,7 +1351,7 @@ public:
                 cell_ind++;
             }
             
-            bool point_mortars_Q = true;
+            bool point_mortars_Q = false;
             if(point_mortars_Q){ // apply mortar
                 
                 Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
@@ -1736,7 +1744,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 10000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
