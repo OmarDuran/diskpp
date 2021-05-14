@@ -206,17 +206,17 @@ int main(int argc, char **argv)
     
     // filling up fractures
     std::vector<fracture<mesh_type> > fractures;
-//    if(1){
-//        fracture<mesh_type> f;
-//        f.m_pairs = fracture_pairs;
-//        f.m_bl_index = end_point_mortars[0].second;
-//        f.m_el_index = end_point_mortars[0].second;
-//        f.m_br_index = end_point_mortars[0].second;
-//        f.m_er_index = end_point_mortars[0].second;
-//        f.build(msh);
-//
-//        fractures.push_back(f);
-//    }
+    if(0){
+        fracture<mesh_type> f;
+        f.m_pairs = fracture_pairs;
+        f.m_bl_index = end_point_mortars[0].second;
+        f.m_el_index = end_point_mortars[1].second;
+        f.m_br_index = end_point_mortars[0].second;
+        f.m_er_index = end_point_mortars[1].second;
+        f.build(msh);
+
+        fractures.push_back(f);
+    }
     
     if(1){
         fracture<mesh_type> f0;
@@ -277,6 +277,15 @@ int main(int argc, char **argv)
         y = pt.y();
         RealType ux = -0.0;
         RealType uy = -0.1;
+        return static_vector<RealType, 2>{ux, uy};
+    };
+    
+    auto u_right_fun = [](const mesh_type::point_type& pt) -> static_vector<RealType, 2> {
+        RealType x,y;
+        x = pt.x();
+        y = pt.y();
+        RealType ux = -0.1;
+        RealType uy = -0.0;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -351,10 +360,16 @@ int main(int argc, char **argv)
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
         
-        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
+//        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        
+        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_right_id, u_right_fun);
         bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
+        
     }
 
     tc.tic();
@@ -403,7 +418,7 @@ int main(int argc, char **argv)
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
     
     // sigma n and t
-    size_t f_ind = 1;
+    size_t f_ind = 0;
     {
         fracture<mesh_type> f = fractures[f_ind];
         auto storage = msh.backend_storage();

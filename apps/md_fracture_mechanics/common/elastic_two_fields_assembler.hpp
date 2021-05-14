@@ -824,7 +824,7 @@ public:
     
     }
     
-    void scatter_skins_point_restriction_u_n_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    void scatter_skins_point_restriction_u_n_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mat)
     {
  
         size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
@@ -862,7 +862,7 @@ public:
         }
     }
     
-    void scatter_skins_point_restriction_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    void scatter_skins_point_restriction_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mat)
     {
  
         size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
@@ -1364,9 +1364,9 @@ public:
                     
             }
             
-            bool point_restrictions_Q = false;
+            bool point_restrictions_Q = true;
             if(point_restrictions_Q){ // apply restrictions
-                size_t point_mortar_ind = 0;
+
                 Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
                 up_restriction(0,0) = 1.0;
                 up_restriction(1,1) = 1.0;
@@ -1378,8 +1378,8 @@ public:
                 
                 auto chunk = f.m_pairs[cell_ind];
 
-                scatter_skins_point_restriction_u_n_data(msh,f_ind,f,cell_ind,up_restriction);
-                scatter_skins_point_restriction_u_t_data(msh,f_ind,f,cell_ind,up_restriction);
+                scatter_skins_point_restriction_u_n_data(msh,f_ind,f,up_restriction);
+                scatter_skins_point_restriction_u_t_data(msh,f_ind,f,up_restriction);
                     
             }
             
@@ -1743,7 +1743,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 10000.0;
+        T c_para = 0.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
