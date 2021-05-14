@@ -28,6 +28,9 @@ struct fracture {
     size_t m_er_index;
     
     size_t m_skin_bs;
+    
+    std::pair<size_t,size_t> m_bc_type = {0,0}; // (0 -> none, 1 -> D, 2 -> N)
+    std::pair<size_t,size_t> m_bc_data = {0,0}; // (left and right val)
 
     std::vector<std::pair<size_t,size_t>> m_pairs;
     
@@ -254,6 +257,7 @@ class elastic_two_fields_assembler
     size_t      m_n_cells_dof;
     size_t      m_n_faces_dof;
     size_t      m_n_hybrid_dof;
+    size_t      m_n_f_hybrid_dof;
     size_t      m_n_skin_dof;
     size_t      m_sigma_degree;
     bool        m_hho_stabilization_Q;
@@ -299,18 +303,20 @@ public:
         }
         
         m_n_hybrid_dof = 0;
+        m_n_f_hybrid_dof = 0;
         m_n_skin_dof = 0;
         m_compress_fracture_indexes.resize(m_fractures.size());
         m_compress_hybrid_indexes.resize(m_fractures.size());
         
         size_t frac_c = 0;
         for (auto f : m_fractures) {
-            m_compress_hybrid_indexes.at(frac_c) = m_n_hybrid_dof;
+            m_compress_hybrid_indexes.at(frac_c) = m_n_f_hybrid_dof;
             m_compress_fracture_indexes.at(frac_c) = m_n_skin_dof;
             
+            m_n_f_hybrid_dof += (n_f_sigma_n_bs + n_f_sigma_t_bs) * f.m_pairs.size();
             m_n_hybrid_dof += (n_f_sigma_n_bs + n_f_sigma_t_bs) * f.m_pairs.size();
-//            m_n_hybrid_dof += 2 * 2;
-            m_n_skin_dof += 4*f.m_skin_bs;
+            m_n_hybrid_dof += 2 * 2;
+            m_n_skin_dof += 4 * f.m_skin_bs;
             frac_c++;
         }
         
@@ -329,9 +335,7 @@ public:
         LHS = SparseMatrix<T>( system_size, system_size );
         RHS = Matrix<T, Dynamic, 1>::Zero( system_size );
         classify_cells(msh);
-        
-//        classify_fracture_cells(msh);//ok
-//        skin_connected_cells(msh); // ok
+
     }
 
     void scatter_data(const Mesh& msh, const typename Mesh::cell_type& cl,
@@ -716,7 +720,7 @@ public:
     
     }
     
-    void scatter_skins_point_mortar_u_n_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    void scatter_skins_point_mortar_u_n_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mat)
     {
  
         size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
@@ -724,13 +728,11 @@ public:
         size_t n_skin_bs = f.m_skin_bs;
         size_t n_cells = f.m_pairs.size();
         size_t n_fractures = m_fractures.size();
-        size_t shift_hybrid_dof = 2.0 * n_f_sigma_bs * n_cells;
         size_t n_0d_bc_bs = 1;
         
         std::vector<assembly_index> asm_map_i, asm_map_l_j, asm_map_r_j;
-        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_fractures * n_skin_bs;
+        auto base_i = m_n_cells_dof + m_n_faces_dof + m_n_skin_dof + m_n_f_hybrid_dof;
         base_i += fracture_ind * 4 * n_0d_bc_bs;
-        base_i += n_fractures * shift_hybrid_dof;
         auto base_j = m_n_cells_dof + m_n_faces_dof;
         base_j += m_compress_fracture_indexes.at(fracture_ind);
         
@@ -770,7 +772,7 @@ public:
     
     }
     
-    void scatter_skins_point_mortar_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    void scatter_skins_point_mortar_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mat)
     {
  
         size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
@@ -778,13 +780,11 @@ public:
         size_t n_skin_bs = f.m_skin_bs;
         size_t n_cells = f.m_pairs.size();
         size_t n_fractures = m_fractures.size();
-        size_t shift_hybrid_dof = 2.0 * n_f_sigma_bs * n_cells;
         size_t n_0d_bc_bs = 1;
         
         std::vector<assembly_index> asm_map_i, asm_map_l_j, asm_map_r_j;
-        auto base_i = m_n_cells_dof + m_n_faces_dof + 4 * n_fractures * n_skin_bs + 2*n_0d_bc_bs;
+        auto base_i = m_n_cells_dof + m_n_faces_dof + m_n_skin_dof + m_n_f_hybrid_dof +  2*n_0d_bc_bs;
         base_i += fracture_ind * 4 * n_0d_bc_bs;
-        base_i += n_fractures * shift_hybrid_dof;
         auto base_j = m_n_cells_dof + m_n_faces_dof + n_skin_bs;
         base_j += m_compress_fracture_indexes.at(fracture_ind);
         
@@ -1353,15 +1353,14 @@ public:
                 cell_ind++;
             }
             
-            bool point_mortars_Q = false;
+            bool point_mortars_Q = true;
             if(point_mortars_Q){ // apply mortar
                 
                 Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
                 mortar(0,0) = 1.0;
                 
-                size_t cell_ind = 0;
-                scatter_skins_point_mortar_u_n_data(msh,f_ind,f,cell_ind,mortar);
-                scatter_skins_point_mortar_u_t_data(msh,f_ind,f,cell_ind,mortar);
+                scatter_skins_point_mortar_u_n_data(msh,f_ind,f,mortar);
+                scatter_skins_point_mortar_u_t_data(msh,f_ind,f,mortar);
                     
             }
             
@@ -1377,10 +1376,7 @@ public:
                 Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
                 mortar(0,0) = 1.0;
                 
-                size_t cell_ind = 0;
                 auto chunk = f.m_pairs[cell_ind];
-                scatter_skins_point_mortar_u_n_data(msh,f_ind,f,cell_ind,mortar);
-                scatter_skins_point_mortar_u_t_data(msh,f_ind,f,cell_ind,mortar);
 
                 scatter_skins_point_restriction_u_n_data(msh,f_ind,f,cell_ind,up_restriction);
                 scatter_skins_point_restriction_u_t_data(msh,f_ind,f,cell_ind,up_restriction);
@@ -2703,11 +2699,26 @@ public:
     size_t get_n_hybrid_dofs(){
         return m_n_hybrid_dof;
     }
+    
+    size_t get_n_f_hybrid_dofs(){
+        return m_n_f_hybrid_dof;
+    }
+    
+    size_t get_n_skin_dof(){
+        return m_n_skin_dof;
+    }
 
     std::vector<size_t> & compress_indexes(){
         return m_compress_indexes;
     }
     
+    std::vector<size_t> & compress_fracture_indexes(){
+        return m_compress_fracture_indexes;
+    }
+    
+    std::vector<size_t> & compress_hybrid_indexes(){
+        return m_compress_hybrid_indexes;
+    }
 
     std::vector<size_t> & dof_dest_l(){
         return m_dof_dest_l;

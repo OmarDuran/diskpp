@@ -226,7 +226,6 @@ int main(int argc, char **argv)
         f0.m_br_index = 6;
         f0.m_er_index = 449;
         f0.build(msh);
-        
         fractures.push_back(f0);
         
         fracture<mesh_type> f1;
@@ -236,7 +235,6 @@ int main(int argc, char **argv)
         f1.m_br_index = 472;
         f1.m_er_index = 475;
         f1.build(msh);
-
         fractures.push_back(f1);
         
         fracture<mesh_type> f2;
@@ -246,7 +244,6 @@ int main(int argc, char **argv)
         f2.m_br_index = 455;
         f2.m_er_index = 449;
         f2.build(msh);
-        
         fractures.push_back(f2);
     }
     
@@ -374,12 +371,12 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    std::ofstream mat_file;
-    mat_file.open ("matrix.txt");
-    size_t n_cells_dof = assembler.get_n_cells_dofs();
-    size_t n_dof = assembler.LHS.rows();
-    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
-    mat_file.close();
+//    std::ofstream mat_file;
+//    mat_file.open ("matrix.txt");
+//    size_t n_cells_dof = assembler.get_n_cells_dofs();
+//    size_t n_dof = assembler.LHS.rows();
+//    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
+//    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
@@ -406,21 +403,22 @@ int main(int argc, char **argv)
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
     
     // sigma n and t
-    size_t f_ind = 0;
+    size_t f_ind = 1;
     {
         fracture<mesh_type> f = fractures[f_ind];
         auto storage = msh.backend_storage();
         size_t n_cells_dof = assembler.get_n_cells_dofs();
         size_t n_faces_dofs = assembler.get_n_faces_dofs();
         size_t n_hybrid_dofs = assembler.get_n_hybrid_dofs();
+        size_t n_skins_dofs = assembler.get_n_skin_dof();
         size_t cell_ind = 0;
         size_t n_cells = f.m_pairs.size();
         size_t sigma_degree = hho_di.face_degree()-1;
         size_t n_f_sigma_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
         size_t n_data = 2*n_cells;
         
-        Matrix<RealType, Dynamic, 2> data_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 2);
-        Matrix<RealType, Dynamic, 2> data_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 2);
+        Matrix<RealType, Dynamic, 2> data_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 2);
+        Matrix<RealType, Dynamic, 2> data_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 2);
         
         Matrix<RealType, Dynamic, 3> data_u_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         Matrix<RealType, Dynamic, 3> data_u_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
@@ -457,11 +455,13 @@ int main(int argc, char **argv)
 
                 // hybrid sigma evaluation
                 {
-                    size_t n_skin_bs = f.m_skin_bs;
+
                     auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
-                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(cell_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + 4 * n_skin_bs, 0, n_f_sigma_bs, 1);
+                    size_t offset_n = cell_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_skins_dofs + assembler.compress_hybrid_indexes().at(f_ind);
+                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(offset_n, 0, n_f_sigma_bs, 1);
                     
-                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(cell_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs + 4 * n_skin_bs, 0, n_f_sigma_bs, 1);
+                    size_t offset_t = cell_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs + n_skins_dofs + assembler.compress_hybrid_indexes().at(f_ind);
+                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(offset_t, 0, n_f_sigma_bs, 1);
                     
                     auto t_phi = face_basis.eval_functions( bar );
                     assert(t_phi.rows() == face_basis.size());
@@ -470,11 +470,11 @@ int main(int argc, char **argv)
                     auto sth = disk::eval(sigma_t_x_dof, t_phi);
 
                     RealType dv = (bar-p0).to_vector().norm();
-                    data_n(2*cell_ind+ip,0) = dv;
-                    data_n(2*cell_ind+ip,1) = snh;
+                    data_n(cell_ind,0) += 0.5*dv;
+                    data_n(cell_ind,1) += 0.5*snh;
                     
-                    data_t(2*cell_ind+ip,0) = dv;
-                    data_t(2*cell_ind+ip,1) = sth;
+                    data_t(cell_ind,0) += 0.5*dv;
+                    data_t(cell_ind,1) += 0.5*sth;
                 }
                 
                 // u evaluation
@@ -521,7 +521,7 @@ int main(int argc, char **argv)
                 
                 // skins div
                 {
-                    size_t n_skin_bs = f.m_skin_bs;
+
                     auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
                     auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
                     if (f.m_flips_l.at(cell_ind)) {
@@ -533,7 +533,9 @@ int main(int argc, char **argv)
                     
                     
                     size_t sig_bs = 3;
-                    size_t  base = n_cells_dof + n_faces_dofs;
+                    size_t n_skin_bs = f.m_skin_bs;
+                    size_t f_offset = assembler.compress_fracture_indexes().at(f_ind);
+                    size_t base = n_cells_dof + n_faces_dofs + f_offset;
                     size_t p_sn_l = base+cell_ind*sig_bs+0*n_skin_bs;
                     size_t p_st_l = base+cell_ind*sig_bs+1*n_skin_bs;
                     size_t p_sn_r = base+cell_ind*sig_bs+2*n_skin_bs;
@@ -564,7 +566,6 @@ int main(int argc, char **argv)
                 
                 // skins sigma
                 {
-                    size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
                     auto face_basis_l = make_scalar_monomial_basis(msh, face_l, hho_di.face_degree());
                     auto face_basis_r = make_scalar_monomial_basis(msh, face_r, hho_di.face_degree());
                     if (f.m_flips_l.at(cell_ind)) {
@@ -576,7 +577,9 @@ int main(int argc, char **argv)
                     
                     
                     size_t sig_bs = 3;
-                    size_t  base = n_cells_dof + n_faces_dofs;
+                    size_t n_skin_bs = f.m_skin_bs;
+                    size_t f_offset = assembler.compress_fracture_indexes().at(f_ind);
+                    size_t base = n_cells_dof + n_faces_dofs + f_offset;
                     size_t p_sn_l = base+cell_ind*sig_bs+0*n_skin_bs;
                     size_t p_st_l = base+cell_ind*sig_bs+1*n_skin_bs;
                     size_t p_sn_r = base+cell_ind*sig_bs+2*n_skin_bs;
@@ -613,15 +616,17 @@ int main(int argc, char **argv)
         
         // skins Lagrange multiplier
         if(0){
-            size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
             
             size_t sig_bs = 3;
+            size_t n_skin_bs = f.m_skin_bs;
             size_t uL_bs = cell_ind+1;
-            size_t  base = n_cells_dof + n_faces_dofs;
+            size_t f_offset = assembler.compress_fracture_indexes().at(f_ind);
+            size_t base = n_cells_dof + n_faces_dofs + f_offset;
             size_t p_sn_l = base+n_cells*sig_bs+0*n_skin_bs;
             size_t p_st_l = base+n_cells*sig_bs+1*n_skin_bs;
             size_t p_sn_r = base+n_cells*sig_bs+2*n_skin_bs;
             size_t p_st_r = base+n_cells*sig_bs+3*n_skin_bs;
+            
             Matrix<RealType, Dynamic, 1> un_l_dof = x_dof.block(p_sn_l, 0, uL_bs, 1);
             Matrix<RealType, Dynamic, 1> ut_l_dof = x_dof.block(p_st_l, 0, uL_bs, 1);
             Matrix<RealType, Dynamic, 1> un_r_dof = x_dof.block(p_sn_r, 0, uL_bs, 1);
