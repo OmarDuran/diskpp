@@ -1364,7 +1364,7 @@ public:
                     
             }
             
-            bool point_restrictions_Q = true;
+            bool point_restrictions_Q = false;
             if(point_restrictions_Q){ // apply restrictions
 
                 Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);

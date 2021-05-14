@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
-//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
-    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
+//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_801.txt";
     
     mesh_builder.set_poly_mesh_file(mesh_file);
@@ -206,7 +206,7 @@ int main(int argc, char **argv)
     
     // filling up fractures
     std::vector<fracture<mesh_type> > fractures;
-    if(0){
+    if(1){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
         f.m_bl_index = end_point_mortars[0].second;
@@ -218,7 +218,7 @@ int main(int argc, char **argv)
         fractures.push_back(f);
     }
     
-    if(1){
+    if(0){
         fracture<mesh_type> f0;
         f0.m_pairs = f0_pairs;
         f0.m_bl_index = 6;
@@ -630,7 +630,7 @@ int main(int argc, char **argv)
         }
         
         // skins Lagrange multiplier
-        if(0){
+        if(1){
             
             size_t sig_bs = 3;
             size_t n_skin_bs = f.m_skin_bs;
@@ -654,7 +654,7 @@ int main(int argc, char **argv)
         }
         
         // sigma normal evaluation
-        if(0){
+        if(1){
             size_t n_mortar_displacements = 2*end_point_mortars.size();
             size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
             size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
