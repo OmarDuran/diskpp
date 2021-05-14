@@ -386,12 +386,12 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-//    std::ofstream mat_file;
-//    mat_file.open ("matrix.txt");
-//    size_t n_cells_dof = assembler.get_n_cells_dofs();
-//    size_t n_dof = assembler.LHS.rows();
-//    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
-//    mat_file.close();
+    std::ofstream mat_file;
+    mat_file.open ("matrix.txt");
+    size_t n_cells_dof = assembler.get_n_cells_dofs();
+    size_t n_dof = assembler.LHS.rows();
+    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
+    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
@@ -653,7 +653,7 @@ int main(int argc, char **argv)
             std::cout << "utL_r =  " << ut_r_dof << std::endl;
         }
         
-        // sigma normal evaluation
+        // sigma normal and mortar u0 evaluation
         if(1){
             size_t n_mortar_displacements = 2*end_point_mortars.size();
             size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
