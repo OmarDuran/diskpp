@@ -1488,9 +1488,9 @@ public:
                 auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, f, cell_ind);
                 
 //                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
-//                scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
+                scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
 //                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
-//                scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
+                scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
                 
                 auto hybrid_matrix = skin_hybrid_matrix(msh, face_l, face_r, f, cell_ind);
                 scatter_skin_hybrid_l_data(msh, f_ind, f, cell_ind, hybrid_matrix.first);
@@ -1503,13 +1503,12 @@ public:
             if(point_mortars_Q){ // apply mortar
                 
                 Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
-                
                 mortar(0,0) = 1.0;
+                
                 scatter_skins_point_mortar_u_n_data(msh,f_ind,f,mortar);
-                mortar(0,0) = -1.0;
                 scatter_skins_point_mortar_u_t_data(msh,f_ind,f,mortar);
                 
-                mortar(0,0) = 1.0;
+                mortar(0,0) = 0.0;
                 scatter_skins_point_mortar_mass_n_data(msh,f_ind,f,mortar);
                 scatter_skins_point_mortar_mass_t_data(msh,f_ind,f,mortar);
                 
@@ -1525,10 +1524,10 @@ public:
 
                 Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
                 T beta = 1.0e+10;
-                up_restriction(0,0) = +0.0*beta;
+                up_restriction(0,0) = +1.0*beta;
                 up_restriction(1,1) = +1.0*beta;
-                up_restriction(0,1) = -0.0*beta;
-                up_restriction(1,0) = -0.0*beta;
+                up_restriction(0,1) = -1.0*beta;
+                up_restriction(1,0) = -1.0*beta;
                 
                 for (size_t up_ind = 0; up_ind < m_n_mortar_points; up_ind++) {
                     scatter_skins_point_restriction_u_n_data(msh,f_ind,f,up_ind,up_restriction);
@@ -1963,8 +1962,8 @@ public:
             Matrix<T, Dynamic, Dynamic> ret_l = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
             Matrix<T, Dynamic, Dynamic> ret_r = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
 
-            T c_l = 1.0*(1.0/(lambda+2.0*mu));
-            const auto qps_l = integrate(msh, face_l, 2 * (degree + 1 + di));
+            T c_l = 100000000.0*(1.0/(lambda+2.0*mu));
+            const auto qps_l = integrate(msh, face_l, 2 * (degree + 2 + di));
             for (auto& qp : qps_l)
             {
                 
@@ -1974,8 +1973,8 @@ public:
                 ret_l += c_l * s_opt_l;
             }
             
-            T c_r = 1.0*(1.0/(lambda+2.0*mu));
-            const auto qps_r = integrate(msh, face_r, 2 * (degree + 1 + di));
+            T c_r = 100000000.0*(1.0/(lambda+2.0*mu));
+            const auto qps_r = integrate(msh, face_r, 2 * (degree + 2 + di));
             for (auto& qp : qps_r)
             {
                 
@@ -2155,7 +2154,7 @@ public:
             
             Matrix<T, Dynamic, Dynamic> ret_t = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, vec_u_basis.size());
             
-            const auto qps = integrate(msh, face, 2 * (degree + 1 + di));
+            const auto qps = integrate(msh, face, 2 * (degree + 2 + di));
             const auto n = disk::normal(msh, cell, face);
             const auto t = disk::tanget(msh, cell, face);
 
@@ -2192,7 +2191,7 @@ public:
             
             Matrix<T, Dynamic, Dynamic> ret_t = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, vec_u_basis.size());
             
-            const auto qps = integrate(msh, face, 2 * (degree + 1 + di));
+            const auto qps = integrate(msh, face, 2 * (degree + 2 + di));
             const auto n = disk::normal(msh, cell, face);
             const auto t = disk::tanget(msh, cell, face);
 
