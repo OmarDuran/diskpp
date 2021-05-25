@@ -821,16 +821,16 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_cells, -1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_cells, asm_map_i[i]+1, -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_cells, -1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_cells, asm_map_i[i]+1, -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
             }
         }
     
@@ -1157,7 +1157,7 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],+1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mat(i,j)) );
             }
         }
     
@@ -1248,7 +1248,7 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_j[j],+1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],+1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_j[j], asm_map_i[i],-1.0*mat(i,j)) );
             }
         }
     
@@ -1488,9 +1488,9 @@ public:
                 auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, f, cell_ind);
                 
 //                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
-                scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
+//                scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
 //                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
-                scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
+//                scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
                 
                 auto hybrid_matrix = skin_hybrid_matrix(msh, face_l, face_r, f, cell_ind);
                 scatter_skin_hybrid_l_data(msh, f_ind, f, cell_ind, hybrid_matrix.first);
@@ -1503,9 +1503,10 @@ public:
             if(point_mortars_Q){ // apply mortar
                 
                 Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
-                mortar(0,0) = 1.0;
                 
+                mortar(0,0) = 1.0;
                 scatter_skins_point_mortar_u_n_data(msh,f_ind,f,mortar);
+                mortar(0,0) = -1.0;
                 scatter_skins_point_mortar_u_t_data(msh,f_ind,f,mortar);
                 
                 mortar(0,0) = 1.0;
@@ -1513,7 +1514,7 @@ public:
                 scatter_skins_point_mortar_mass_t_data(msh,f_ind,f,mortar);
                 
                 Matrix<T, Dynamic, Dynamic> rhs = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
-                T beta = 1.0;
+                T beta = 0.0;
                 rhs(0,0) = (-1.0/600.0)*beta;
                 scatter_skins_point_mortar_rhs_t_data(msh,f_ind,f,rhs);
                     
