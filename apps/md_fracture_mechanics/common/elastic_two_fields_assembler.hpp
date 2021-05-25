@@ -836,6 +836,71 @@ public:
     
     }
     
+    void scatter_skins_point_mortar_mass_n_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mat)
+    {
+ 
+        size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
+        size_t n_skin_sigma_bs = 3.0;
+        size_t n_skin_bs = f.m_skin_bs;
+        size_t n_cells = f.m_pairs.size();
+        size_t n_fractures = m_fractures.size();
+        size_t n_0d_bc_bs = 1;
+        
+        std::vector<assembly_index> asm_map;
+        auto base = m_n_cells_dof + m_n_faces_dof + m_n_skin_dof + m_n_f_hybrid_dof;
+        base += fracture_ind * 4 * n_0d_bc_bs;
+        auto s_point_l_LHS_offset = base;
+
+        
+        for (size_t i = 0; i < n_0d_bc_bs; i++)
+        asm_map.push_back( assembly_index(s_point_l_LHS_offset+i, true));
+        
+        assert( asm_map.size() == mat.rows() && asm_map.size() == mat.cols() );
+
+        for (size_t i = 0; i < mat.rows(); i++)
+        {
+            for (size_t j = 0; j < mat.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map[i]+1, asm_map[j]+1, +1.0*mat(i,j)) );
+            }
+        }
+    
+    }
+    
+    void scatter_skins_point_mortar_mass_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const Matrix<T, Dynamic, Dynamic>& mat)
+    {
+ 
+        size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
+        size_t n_skin_sigma_bs = 3.0;
+        size_t n_skin_bs = f.m_skin_bs;
+        size_t n_cells = f.m_pairs.size();
+        size_t n_fractures = m_fractures.size();
+        size_t n_0d_bc_bs = 1;
+        
+        std::vector<assembly_index> asm_map;
+        auto base = m_n_cells_dof + m_n_faces_dof + m_n_skin_dof + m_n_f_hybrid_dof + 2*n_0d_bc_bs;
+        base += fracture_ind * 4 * n_0d_bc_bs;
+        auto s_point_l_LHS_offset = base;
+
+        
+        for (size_t i = 0; i < n_0d_bc_bs; i++)
+        asm_map.push_back( assembly_index(s_point_l_LHS_offset+i, true));
+        
+        assert( asm_map.size() == mat.rows() && asm_map.size() == mat.cols() );
+
+        for (size_t i = 0; i < mat.rows(); i++)
+        {
+            for (size_t j = 0; j < mat.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map[i]+1, asm_map[j]+1, +1.0*mat(i,j)) );
+            }
+        }
+    
+    }
+
+    
     void scatter_skins_point_restriction_u_n_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, size_t & up_ind, const Matrix<T, Dynamic, Dynamic>& mat)
     {
  
@@ -1390,6 +1455,10 @@ public:
                 
                 scatter_skins_point_mortar_u_n_data(msh,f_ind,f,mortar);
                 scatter_skins_point_mortar_u_t_data(msh,f_ind,f,mortar);
+                
+                mortar(0,0) = 1.0;
+                scatter_skins_point_mortar_mass_n_data(msh,f_ind,f,mortar);
+                scatter_skins_point_mortar_mass_t_data(msh,f_ind,f,mortar);
                     
             }
             
@@ -1397,7 +1466,7 @@ public:
             if(point_restrictions_Q){ // apply restrictions
 
                 Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
-                T beta = 1.0e+3;
+                T beta = 1.0e+12;
                 up_restriction(0,0) = +1.0*beta;
                 up_restriction(1,1) = +1.0*beta;
                 up_restriction(0,1) = -1.0*beta;
@@ -1770,7 +1839,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 10000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -1804,7 +1873,7 @@ public:
             Matrix<T, Dynamic, Dynamic> ret_l = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
             Matrix<T, Dynamic, Dynamic> ret_r = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
 
-            T c_l = 1000000.0*(1.0/(lambda+2.0*mu));
+            T c_l = 1.0*(1.0/(lambda+2.0*mu));
             const auto qps_l = integrate(msh, face_l, 2 * (degree + 1 + di));
             for (auto& qp : qps_l)
             {
@@ -1815,7 +1884,7 @@ public:
                 ret_l += c_l * s_opt_l;
             }
             
-            T c_r = 1000000.0*(1.0/(lambda+2.0*mu));
+            T c_r = 1.0*(1.0/(lambda+2.0*mu));
             const auto qps_r = integrate(msh, face_r, 2 * (degree + 1 + di));
             for (auto& qp : qps_r)
             {
