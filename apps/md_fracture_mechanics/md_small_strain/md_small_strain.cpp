@@ -412,6 +412,10 @@ int main(int argc, char **argv)
     std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
     std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
     
+    assembler.project_over_skin_cells(msh,x_dof);
+    std::cout << "x = " << x_dof.tail(4) << std::endl;
+//    std::cout << "r = " << assembler.LHS * x_dof - assembler.RHS << std::endl;
+    
     // render silo
     size_t it = 0;
     std::string silo_file_name = "single_fracture";
@@ -562,6 +566,9 @@ int main(int argc, char **argv)
                     
                     auto t_div_phi_l = face_basis_l.eval_div_flux_functions( bar );
                     auto t_div_phi_r = face_basis_r.eval_div_flux_functions( bar );
+                    
+//                    std::cout << st_l_dof << std::endl;
+//                    std::cout << st_r_dof << std::endl;
                     
                     auto div_sn_l = disk::eval(sn_l_dof, t_div_phi_l);
                     auto div_st_l = disk::eval(st_l_dof, t_div_phi_l);
