@@ -769,15 +769,15 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
-                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_cells, +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_cells, -1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
                 
-                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_cells, +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_cells, -1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
             }
         }
@@ -821,15 +821,15 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], -1.0*mat(i,j)) );
                 
-                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_cells, +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_cells, -1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
                 
-                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_cells, +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_cells, -1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
             }
         }
@@ -873,7 +873,12 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_l[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_l[j], +1.0*mat(i,j)) );
+                if (i!=j) {
+                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], -1.0*mat(i,j)) );
+                }else{
+                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
+                }
             }
         }
     }
@@ -1365,9 +1370,9 @@ public:
                 auto ul_div_phi = skin_coupling_matrix_ul(msh, cell_l, face_l, f, cell_ind);
                 auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, f, cell_ind);
                 
-//                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
+                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
                 scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
-//                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
+                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
                 scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
                 
                 auto hybrid_matrix = skin_hybrid_matrix(msh, face_l, face_r, f, cell_ind);
@@ -1392,14 +1397,14 @@ public:
             if(point_restrictions_Q){ // apply restrictions
 
                 Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
-                T beta = 1.0;
+                T beta = 1.0e+3;
                 up_restriction(0,0) = +1.0*beta;
                 up_restriction(1,1) = +1.0*beta;
                 up_restriction(0,1) = -1.0*beta;
                 up_restriction(1,0) = -1.0*beta;
                 
                 for (size_t up_ind = 0; up_ind < m_n_mortar_points; up_ind++) {
-//                    scatter_skins_point_restriction_u_n_data(msh,f_ind,f,up_ind,up_restriction);
+                    scatter_skins_point_restriction_u_n_data(msh,f_ind,f,up_ind,up_restriction);
                     scatter_skins_point_restriction_u_t_data(msh,f_ind,f,up_ind,up_restriction);
                 }
                 
