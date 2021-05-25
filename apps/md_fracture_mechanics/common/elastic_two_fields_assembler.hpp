@@ -1370,9 +1370,9 @@ public:
                 auto ul_div_phi = skin_coupling_matrix_ul(msh, cell_l, face_l, f, cell_ind);
                 auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, f, cell_ind);
                 
-                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
+//                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
                 scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
-                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
+//                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
                 scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
                 
                 auto hybrid_matrix = skin_hybrid_matrix(msh, face_l, face_r, f, cell_ind);
@@ -1509,7 +1509,7 @@ public:
         auto ten_bs = disk::sym_matrix_basis_size(gradeg, dim, dim);
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(ten_bs, ten_bs);
         
-        auto qps = integrate(msh, cell, 2 * gradeg);
+        auto qps = integrate(msh, cell, 2 * gradeg + 1);
 
         // number of tensor components
         size_t dec = 0;
@@ -1761,7 +1761,7 @@ public:
         Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, n_s_basis);
 
         T c_perp = 0.0;
-        const auto qps_l = integrate(msh, face_l, 2 * (degree+di));
+        const auto qps_l = integrate(msh, face_l, 2 * (degree+di+1));
         for (auto& qp : qps_l)
         {
             const auto sn_f_phi = sn_basis.eval_functions(qp.point());
@@ -1804,7 +1804,7 @@ public:
             Matrix<T, Dynamic, Dynamic> ret_l = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
             Matrix<T, Dynamic, Dynamic> ret_r = Matrix<T, Dynamic, Dynamic>::Zero(3, 3);
 
-            T c_l = 1.0*(1.0/(lambda+2.0*mu));
+            T c_l = 1000000.0*(1.0/(lambda+2.0*mu));
             const auto qps_l = integrate(msh, face_l, 2 * (degree + 1 + di));
             for (auto& qp : qps_l)
             {
@@ -1815,7 +1815,7 @@ public:
                 ret_l += c_l * s_opt_l;
             }
             
-            T c_r = 1.0*(1.0/(lambda+2.0*mu));
+            T c_r = 1000000.0*(1.0/(lambda+2.0*mu));
             const auto qps_r = integrate(msh, face_r, 2 * (degree + 1 + di));
             for (auto& qp : qps_r)
             {
@@ -2033,7 +2033,7 @@ public:
             
             Matrix<T, Dynamic, Dynamic> ret_t = Matrix<T, Dynamic, Dynamic>::Zero(n_s_basis, vec_u_basis.size());
             
-            const auto qps = integrate(msh, face, 2 * (degree+di));
+            const auto qps = integrate(msh, face, 2 * (degree + 1 + di));
             const auto n = disk::normal(msh, cell, face);
             const auto t = disk::tanget(msh, cell, face);
 
@@ -2638,7 +2638,7 @@ public:
         matrix_type gr_lhs = matrix_type::Zero(ten_bs, ten_bs);
         matrix_type gr_rhs = matrix_type::Zero(ten_bs, vec_bs + num_faces * fbs);
         
-        const auto qps = integrate(msh, cell, 2 * graddeg);
+        const auto qps = integrate(msh, cell, 2 * graddeg + 1);
 
         size_t dec = 0;
          if (N == 3)

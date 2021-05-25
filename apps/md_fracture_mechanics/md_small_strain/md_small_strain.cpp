@@ -636,6 +636,7 @@ int main(int argc, char **argv)
             cell_ind++;
         }
         
+        size_t pre = 10;
         // skins Lagrange multiplier
         if(1){
             
@@ -654,10 +655,10 @@ int main(int argc, char **argv)
             Matrix<RealType, Dynamic, 1> un_r_dof = x_dof.block(p_sn_r, 0, uL_bs, 1);
             Matrix<RealType, Dynamic, 1> ut_r_dof = x_dof.block(p_st_r, 0, uL_bs, 1);
             
-            std::cout << "unL_l =  " << un_l_dof << std::endl;
-            std::cout << "unL_r =  " << un_r_dof << std::endl;
-            std::cout << "utL_l =  " << ut_l_dof << std::endl;
-            std::cout << "utL_r =  " << ut_r_dof << std::endl;
+            std::cout << std::setprecision(pre) << "unL_l =  " << un_l_dof << std::endl;
+            std::cout << std::setprecision(pre) << "unL_r =  " << un_r_dof << std::endl;
+            std::cout << std::setprecision(pre) << "utL_l =  " << ut_l_dof << std::endl;
+            std::cout << std::setprecision(pre) << "utL_r =  " << ut_r_dof << std::endl;
         }
         
         // sigma normal and mortar u0 evaluation
@@ -666,28 +667,28 @@ int main(int argc, char **argv)
             size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
             size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
-            std::cout << "sigma =  " << sigma_dof << std::endl;
+            std::cout << std::setprecision(pre) << "sigma =  " << sigma_dof << std::endl;
         }
         
         {
             std::ofstream sn_file;
             sn_file.open ("sigma_n.txt");
-            sn_file << data_n <<  std::endl;
+            sn_file << std::setprecision(pre) << data_n <<  std::endl;
             sn_file.close();
             
             std::ofstream st_file;
             st_file.open ("sigma_t.txt");
-            st_file << data_t <<  std::endl;
+            st_file << std::setprecision(pre) << data_t <<  std::endl;
             st_file.close();
             
             std::ofstream ul_file;
             ul_file.open ("u_l.txt");
-            ul_file << data_u_l <<  std::endl;
+            ul_file << std::setprecision(pre) << data_u_l <<  std::endl;
             ul_file.close();
             
             std::ofstream ur_file;
             ur_file.open ("u_r.txt");
-            ur_file << data_u_r <<  std::endl;
+            ur_file << std::setprecision(pre) << data_u_r <<  std::endl;
             ur_file.close();
             
         }
@@ -695,22 +696,22 @@ int main(int argc, char **argv)
         {
             std::ofstream divs_l_file;
             divs_l_file.open("divs_l.txt");
-            divs_l_file << data_div_l <<  std::endl;
+            divs_l_file << std::setprecision(pre) << data_div_l <<  std::endl;
             divs_l_file.close();
             
             std::ofstream divs_r_file;
             divs_r_file.open("divs_r.txt");
-            divs_r_file << data_div_r <<  std::endl;
+            divs_r_file << std::setprecision(pre) << data_div_r <<  std::endl;
             divs_r_file.close();
             
             std::ofstream s_l_file;
             s_l_file.open ("s_l.txt");
-            s_l_file << data_sig_l <<  std::endl;
+            s_l_file << std::setprecision(pre) << data_sig_l <<  std::endl;
             s_l_file.close();
             
             std::ofstream s_r_file;
             s_r_file.open ("s_r.txt");
-            s_r_file << data_sig_r <<  std::endl;
+            s_r_file << std::setprecision(pre) << data_sig_r <<  std::endl;
             s_r_file.close();
             
         }

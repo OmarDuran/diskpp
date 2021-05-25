@@ -421,7 +421,7 @@ public:
         auto ten_bs = disk::sym_matrix_basis_size(gradeg, dim, dim);
         Matrix<T, Dynamic, Dynamic> mass_matrix = Matrix<T, Dynamic, Dynamic>::Zero(ten_bs, ten_bs);
         
-        auto qps = integrate(msh, cell, 2 * gradeg);
+        auto qps = integrate(msh, cell, 2 * gradeg + 1);
 
         // number of tensor components
         size_t dec = 0;
