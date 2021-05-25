@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
-//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
 //      std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_581.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1533.txt";
-    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
@@ -386,12 +386,12 @@ int main(int argc, char **argv)
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-//    std::ofstream mat_file;
-//    mat_file.open ("matrix.txt");
-//    size_t n_cells_dof = assembler.get_n_cells_dofs();
-//    size_t n_dof = assembler.LHS.rows();
-//    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
-//    mat_file.close();
+    std::ofstream mat_file;
+    mat_file.open ("matrix.txt");
+    size_t n_cells_dof = assembler.get_n_cells_dofs();
+    size_t n_dof = assembler.LHS.rows();
+    mat_file << assembler.LHS.block(n_cells_dof, n_cells_dof, n_dof-n_cells_dof, n_dof-n_cells_dof).toDense() <<  std::endl;
+    mat_file.close();
     
     // Solving LS
     Matrix<RealType, Dynamic, 1> x_dof;
@@ -413,7 +413,7 @@ int main(int argc, char **argv)
     std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
     
     assembler.project_over_skin_cells(msh,x_dof);
-//    std::cout << "x = " << x_dof.tail(4) << std::endl;
+    std::cout << "x = " << x_dof.tail(4) << std::endl;
 //    std::cout << "r = " << assembler.LHS * x_dof - assembler.RHS << std::endl;
     
     // render silo
