@@ -413,7 +413,7 @@ int main(int argc, char **argv)
     std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
     
     assembler.project_over_skin_cells(msh,x_dof);
-    std::cout << "x = " << x_dof.tail(4) << std::endl;
+//    std::cout << "x = " << x_dof.tail(4) << std::endl;
 //    std::cout << "r = " << assembler.LHS * x_dof - assembler.RHS << std::endl;
     
     // render silo
@@ -636,7 +636,7 @@ int main(int argc, char **argv)
             cell_ind++;
         }
         
-        size_t pre = 10;
+        size_t pre = 15;
         // skins Lagrange multiplier
         if(1){
             
@@ -667,6 +667,7 @@ int main(int argc, char **argv)
             size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
             size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
+            std::cout << std::setprecision(pre) << "u0 =  " << x_dof.tail(4) << std::endl;
             std::cout << std::setprecision(pre) << "sigma =  " << sigma_dof << std::endl;
         }
         
