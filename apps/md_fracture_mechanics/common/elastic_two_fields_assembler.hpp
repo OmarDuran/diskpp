@@ -337,7 +337,7 @@ public:
         m_n_cells_dof = n_cbs * msh.cells_size();
             
         size_t system_size = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof;
-        system_size += m_n_up_mortar_dof;
+//        system_size += m_n_up_mortar_dof;
         
         // skin data
         for (auto f : m_fractures) {
@@ -951,8 +951,11 @@ public:
         for (size_t i = 0; i < n_0d_bc_bs; i++)
         asm_map_l.push_back( assembly_index(skin_l_LHS_offset+i, true));
 
-        for (size_t i = 0; i < n_0d_up_bs; i++)
-        asm_map_l.push_back( assembly_index(up_mortar_LHS_offset+i, true));
+        for (size_t i = 0; i < n_0d_bc_bs; i++)
+        asm_map_l.push_back( assembly_index(skin_r_LHS_offset+i, true));
+        
+//        for (size_t i = 0; i < n_0d_up_bs; i++)
+//        asm_map_l.push_back( assembly_index(up_mortar_LHS_offset+i, true));
         
         for (size_t i = 0; i < n_0d_bc_bs; i++)
         asm_map_r.push_back( assembly_index(skin_r_LHS_offset+i, true));
@@ -967,12 +970,12 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_l[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_l[j], +1.0*mat(i,j)) );
-                if (i!=j) {
-                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], -1.0*mat(i,j)) );
-                }else{
-                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
-                }
+//                m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
+//                if (i!=j) {
+//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], -1.0*mat(i,j)) );
+//                }else{
+//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
+//                }
             }
         }
     }
@@ -998,8 +1001,11 @@ public:
         for (size_t i = 0; i < n_0d_bc_bs; i++)
         asm_map_l.push_back( assembly_index(skin_l_LHS_offset+i, true));
 
-        for (size_t i = 0; i < n_0d_up_bs; i++)
-        asm_map_l.push_back( assembly_index(up_mortar_LHS_offset+i, true));
+        for (size_t i = 0; i < n_0d_bc_bs; i++)
+        asm_map_l.push_back( assembly_index(skin_r_LHS_offset+i, true));
+        
+//        for (size_t i = 0; i < n_0d_up_bs; i++)
+//        asm_map_l.push_back( assembly_index(up_mortar_LHS_offset+i, true));
         
         for (size_t i = 0; i < n_0d_bc_bs; i++)
         asm_map_r.push_back( assembly_index(skin_r_LHS_offset+i, true));
@@ -1014,11 +1020,12 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_l[j], +1.0*mat(i,j)) );
-                if (i!=j) {
-                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], -1.0*mat(i,j)) );
-                }else{
-                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
-                }
+//                m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
+//                if (i!=j) {
+//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], -1.0*mat(i,j)) );
+//                }else{
+//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
+//                }
             }
         }
     }
@@ -1508,8 +1515,9 @@ public:
                 scatter_skins_point_mortar_u_n_data(msh,f_ind,f,mortar);
                 scatter_skins_point_mortar_u_t_data(msh,f_ind,f,mortar);
                 
-                mortar(0,0) = 0.0;
+                mortar(0,0) = 1.0;
                 scatter_skins_point_mortar_mass_n_data(msh,f_ind,f,mortar);
+                mortar(0,0) = 1.0;
                 scatter_skins_point_mortar_mass_t_data(msh,f_ind,f,mortar);
                 
                 Matrix<T, Dynamic, Dynamic> rhs = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
@@ -1523,11 +1531,12 @@ public:
             if(point_restrictions_Q){ // apply restrictions
 
                 Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
-                T beta = 1.0;
-                up_restriction(0,0) = +0.0*beta;
+                T beta = 1.0e9;
+                up_restriction(0,0) = +1.0*beta;
+                up_restriction(0,1) = +1.0*beta;
+                
                 up_restriction(1,1) = +1.0*beta;
-                up_restriction(0,1) = -0.0*beta;
-                up_restriction(1,0) = -1.0*beta;
+                up_restriction(1,0) = +1.0*beta;
                 
                 for (size_t up_ind = 0; up_ind < m_n_mortar_points; up_ind++) {
                     scatter_skins_point_restriction_u_n_data(msh,f_ind,f,up_ind,up_restriction);
@@ -1896,7 +1905,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 1000000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
