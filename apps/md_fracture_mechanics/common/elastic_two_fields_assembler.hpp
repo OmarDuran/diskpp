@@ -21,6 +21,8 @@
 template<typename Mesh>
 struct fracture {
     
+    using T = typename Mesh::coordinate_type;
+    
     size_t m_bl_index;
     size_t m_el_index;
     
@@ -30,7 +32,7 @@ struct fracture {
     size_t m_skin_bs;
     
     std::pair<size_t,size_t> m_bc_type = {0,0}; // (0 -> none, 1 -> D, 2 -> N)
-    std::pair<size_t,size_t> m_bc_data = {0,0}; // (left and right val)
+    std::pair<std::vector<T>,std::vector<T>> m_bc_data = {{0,0},{0,0}}; // (left and right val)
 
     std::vector<std::pair<size_t,size_t>> m_pairs;
     
@@ -52,6 +54,8 @@ struct fracture {
         m_flips_r       = other.m_flips_r;
         m_elements      = other.m_elements;
         m_skin_bs       = other.m_skin_bs;
+        m_bc_type       = other.m_bc_type;
+        m_bc_data       = other.m_bc_data;
     }
          
     fracture& operator = (const fracture &other){
@@ -65,6 +69,8 @@ struct fracture {
         m_flips_r       = other.m_flips_r;
         m_elements      = other.m_elements;
         m_skin_bs       = other.m_skin_bs;
+        m_bc_type       = other.m_bc_type;
+        m_bc_data       = other.m_bc_data;
         return *this;
     }
     
@@ -201,9 +207,6 @@ struct fracture {
             auto points_l = face_l.point_ids();
             auto points_r = face_r.point_ids();
             
-//            auto& point0 = storage->points[points_l[0]];
-//            auto& point1 = storage->points[points_l[1]];
-            
             if (node_map_l[points_l[0]] < node_map_l[points_l[1]]) {
                 m_flips_l.push_back(false);
             }else{
@@ -218,6 +221,31 @@ struct fracture {
             
         }
 
+    }
+};
+
+struct restriction {
+    
+    std::pair<size_t,size_t> m_f_index;
+    std::pair<size_t,size_t> m_p_index;
+    std::pair<size_t,size_t> m_s_index;
+    
+    restriction(){
+        
+    }
+    
+    restriction(const restriction &other){
+        m_f_index       = other.m_f_index;
+        m_p_index       = other.m_p_index;
+        m_s_index       = other.m_s_index;
+    }
+         
+    restriction& operator = (const restriction &other){
+    
+        m_f_index       = other.m_f_index;
+        m_p_index       = other.m_p_index;
+        m_s_index       = other.m_s_index;
+        return *this;
     }
 };
 
@@ -244,6 +272,8 @@ class elastic_two_fields_assembler
     std::vector< elastic_material_data<T> > m_material;
     std::vector< size_t >               m_elements_with_bc_eges;
     std::vector<fracture<Mesh> >        m_fractures;
+    std::vector<restriction >           m_restrictions;
+    
     std::vector<size_t>                 m_compress_sigma_indexes;
     std::vector<size_t>                 m_compress_fracture_indexes;
     std::vector<size_t>                 m_compress_hybrid_indexes;
@@ -272,8 +302,8 @@ public:
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
 
-    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs, std::vector<std::pair<size_t,size_t>> & end_point_mortars, std::vector<fracture<Mesh> > & fractures)
-        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_end_point_mortars(end_point_mortars), m_fractures(fractures), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
+    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs, std::vector<std::pair<size_t,size_t>> & end_point_mortars, std::vector<fracture<Mesh> > & fractures, std::vector<restriction > & restrictions)
+        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_end_point_mortars(end_point_mortars), m_fractures(fractures), m_restrictions(restrictions), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
@@ -821,15 +851,15 @@ public:
             for (size_t j = 0; j < mat.cols(); j++)
             {
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i], +1.0*mat(i,j)) );
                 
                 m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j], +1.0*mat(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i], +1.0*mat(i,j)) );
                 
-                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_cells, -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_l_j[j]+n_cells, +1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
                 
-                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_cells, -1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+1, asm_map_r_j[j]+n_cells, +1.0*mat(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_cells, asm_map_i[i]+1, +1.0*mat(i,j)) );
             }
         }
@@ -929,103 +959,199 @@ public:
     
     }
 
-    
-    void scatter_skins_point_restriction_u_n_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, size_t & up_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    void scatter_skins_bc_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, size_t s_ind)
     {
  
+        auto storage = msh.backend_storage();
+        
+        Matrix<T, Dynamic, Dynamic> mat = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
+        T beta = 1.0e+10;
+        mat(0,0) = +1.0*beta;
+        
+        size_t cell_ind = 0;
+        if(f.m_bc_type.first == 1){
+            cell_ind = 0;
+        }else{
+            cell_ind = f.m_pairs.size() - 1;
+        }
+        
+
+        
+        auto chunk = f.m_pairs[cell_ind];
+        size_t cell_ind_l = f.m_elements[cell_ind].first;
+        size_t cell_ind_r = f.m_elements[cell_ind].second;
+        auto& face_l = storage->edges[chunk.first];
+        auto& face_r = storage->edges[chunk.second];
+        auto& cell_l = storage->surfaces[cell_ind_l];
+        auto& cell_r = storage->surfaces[cell_ind_r];
+        
+        const auto n_l = disk::normal(msh, cell_l, face_l);
+        const auto t_l = disk::tanget(msh, cell_l, face_l);
+        
+        const auto n_r = disk::normal(msh, cell_r, face_r);
+        const auto t_r = disk::tanget(msh, cell_r, face_r);
+        
+        // scattering data
+        
         size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
         size_t n_skin_sigma_bs = 3.0;
         size_t n_skin_bs = f.m_skin_bs;
         size_t n_cells = f.m_pairs.size();
+        size_t n_fractures = m_fractures.size();
         size_t n_0d_bc_bs = 1;
-        size_t n_0d_up_bs = 1;
         
-        std::vector<assembly_index> asm_map_l, asm_map_r;
-        auto base_i = m_n_cells_dof + m_n_faces_dof + m_compress_fracture_indexes.at(fracture_ind);
-        auto skin_l_LHS_offset = base_i + n_skin_sigma_bs * n_cells + up_ind * n_cells;
-        auto skin_r_LHS_offset = base_i + n_skin_sigma_bs * n_cells + 2 * n_skin_bs + up_ind * n_cells;
+        // rhs value
+        T uD_val;
+        size_t shift = 0;
+        static_vector<T, 2> uD;
+        if(s_ind==0){
+            uD = {f.m_bc_data.first[0],f.m_bc_data.first[1]};
+            uD_val = uD.dot(t_l);
+        }else{
+            uD = {f.m_bc_data.second[0],f.m_bc_data.second[1]};
+            uD_val = uD.dot(t_r);
+            shift += 2 * n_skin_bs;
+        }
         
-        auto base_j = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof + m_n_skin_dof;
-        auto up_mortar_LHS_offset = base_j + m_compress_up_mortar_indexes.at(up_ind) + 0*n_0d_up_bs;
         
-        for (size_t i = 0; i < n_0d_bc_bs; i++)
-        asm_map_l.push_back( assembly_index(skin_l_LHS_offset+i, true));
 
+        
+        std::vector<assembly_index> asm_map;
+        auto base = m_n_cells_dof + m_n_faces_dof + n_skin_bs;
+        base += m_compress_fracture_indexes.at(fracture_ind) + shift;
+        
+        auto u_LHS_offset = base + n_skin_sigma_bs * n_cells + cell_ind * n_cells;
+        
         for (size_t i = 0; i < n_0d_bc_bs; i++)
-        asm_map_l.push_back( assembly_index(skin_r_LHS_offset+i, true));
+        asm_map.push_back( assembly_index(u_LHS_offset+i, true));
         
-//        for (size_t i = 0; i < n_0d_up_bs; i++)
-//        asm_map_l.push_back( assembly_index(up_mortar_LHS_offset+i, true));
-        
-        for (size_t i = 0; i < n_0d_bc_bs; i++)
-        asm_map_r.push_back( assembly_index(skin_r_LHS_offset+i, true));
-        
-        for (size_t i = 0; i < n_0d_up_bs; i++)
-        asm_map_r.push_back( assembly_index(up_mortar_LHS_offset+i, true));
-        
-        assert( asm_map_l.size() == mat.rows() && asm_map_r.size() == mat.cols() );
+        assert( asm_map.size() == mat.rows() && asm_map.size() == mat.cols() );
 
         for (size_t i = 0; i < mat.rows(); i++)
         {
             for (size_t j = 0; j < mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_l[j], +1.0*mat(i,j)) );
-//                m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
-//                if (i!=j) {
-//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], -1.0*mat(i,j)) );
-//                }else{
-//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
-//                }
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], +1.0*mat(i,j)) );
+            }
+            RHS(asm_map[i]) += uD_val * beta;
+        }
+        
+    }
+    
+    void scatter_skins_point_restriction_u_n_data(const Mesh& msh, restriction & r, const Matrix<T, Dynamic, Dynamic>& mat)
+    {
+ 
+        size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
+        size_t n_skin_sigma_bs = 3.0;
+        
+        auto f_ind_f = r.m_f_index.first;
+        auto p_ind_f = r.m_p_index.first;
+        auto s_ind_f = r.m_s_index.first;
+        
+        auto f_ind_s = r.m_f_index.second;
+        auto p_ind_s = r.m_p_index.second;
+        auto s_ind_s = r.m_s_index.second;
+        
+        
+        auto f_f = m_fractures[f_ind_f];
+        auto f_s = m_fractures[f_ind_s];
+        
+
+        size_t shift_f = 0;
+        size_t n_skin_bs_f = f_f.m_skin_bs;
+        size_t n_cells_f = f_f.m_pairs.size();
+        if(s_ind_f){
+            shift_f += 2 * n_skin_bs_f;
+        }
+        
+        size_t shift_s = 0;
+        size_t n_skin_bs_s = f_s.m_skin_bs;
+        size_t n_cells_s = f_s.m_pairs.size();
+        if(s_ind_s){
+            shift_s += 2 * n_skin_bs_s;
+        }
+        
+        size_t n_0d_bc_bs = 1;
+        size_t n_0d_up_bs = 1;
+        
+        std::vector<assembly_index> asm_map;
+        auto base_f = m_n_cells_dof + m_n_faces_dof + m_compress_fracture_indexes.at(f_ind_f);
+        auto base_s = m_n_cells_dof + m_n_faces_dof + m_compress_fracture_indexes.at(f_ind_s);
+        auto skin_f_LHS_offset = base_f + n_skin_sigma_bs * n_cells_f + p_ind_f * n_cells_f + shift_f;
+        auto skin_s_LHS_offset = base_s + n_skin_sigma_bs * n_cells_s + p_ind_s * n_cells_s + shift_s;
+        
+        for (size_t i = 0; i < n_0d_bc_bs; i++)
+        asm_map.push_back( assembly_index(skin_f_LHS_offset+i, true));
+
+        for (size_t i = 0; i < n_0d_bc_bs; i++)
+        asm_map.push_back( assembly_index(skin_s_LHS_offset+i, true));
+                
+        assert( asm_map.size() == mat.rows() && asm_map.size() == mat.cols() );
+
+        for (size_t i = 0; i < mat.rows(); i++)
+        {
+            for (size_t j = 0; j < mat.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], +1.0*mat(i,j)) );
             }
         }
     }
     
-    void scatter_skins_point_restriction_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, size_t & up_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    void scatter_skins_point_restriction_u_t_data(const Mesh& msh, restriction & r, const Matrix<T, Dynamic, Dynamic>& mat)
     {
  
         size_t n_f_sigma_bs = disk::scalar_basis_size(m_sigma_degree, Mesh::dimension - 1);
         size_t n_skin_sigma_bs = 3.0;
-        size_t n_skin_bs = f.m_skin_bs;
-        size_t n_cells = f.m_pairs.size();
+        
+        auto f_ind_f = r.m_f_index.first;
+        auto p_ind_f = r.m_p_index.first;
+        auto s_ind_f = r.m_s_index.first;
+        
+        auto f_ind_s = r.m_f_index.second;
+        auto p_ind_s = r.m_p_index.second;
+        auto s_ind_s = r.m_s_index.second;
+        
+        
+        auto f_f = m_fractures[f_ind_f];
+        auto f_s = m_fractures[f_ind_s];
+        
+
+        size_t shift_f = 0;
+        size_t n_skin_bs_f = f_f.m_skin_bs;
+        size_t n_cells_f = f_f.m_pairs.size();
+        if(s_ind_f){
+            shift_f += 2 * n_skin_bs_f;
+        }
+        
+        size_t shift_s = 0;
+        size_t n_skin_bs_s = f_s.m_skin_bs;
+        size_t n_cells_s = f_s.m_pairs.size();
+        if(s_ind_s){
+            shift_s += 2 * n_skin_bs_s;
+        }
+        
         size_t n_0d_bc_bs = 1;
         size_t n_0d_up_bs = 1;
         
-        std::vector<assembly_index> asm_map_l, asm_map_r;
-        auto base = m_n_cells_dof + m_n_faces_dof + n_skin_bs + m_compress_fracture_indexes.at(fracture_ind);
-        auto skin_l_LHS_offset = base + n_skin_sigma_bs * n_cells + up_ind * n_cells;
-        auto skin_r_LHS_offset = base + n_skin_sigma_bs * n_cells + 2 * n_skin_bs + up_ind * n_cells;
-        
-        auto base_j = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof + m_n_skin_dof;
-        auto up_mortar_LHS_offset = base_j + m_compress_up_mortar_indexes.at(up_ind) + 1*n_0d_up_bs;
+        std::vector<assembly_index> asm_map;
+        auto base_f = m_n_cells_dof + m_n_faces_dof + n_skin_bs_f + m_compress_fracture_indexes.at(f_ind_f);
+        auto base_s = m_n_cells_dof + m_n_faces_dof + n_skin_bs_s + m_compress_fracture_indexes.at(f_ind_s);
+        auto skin_f_LHS_offset = base_f + n_skin_sigma_bs * n_cells_f + p_ind_f * n_cells_f + shift_f;
+        auto skin_s_LHS_offset = base_s + n_skin_sigma_bs * n_cells_s + p_ind_s * n_cells_s + shift_s;
         
         for (size_t i = 0; i < n_0d_bc_bs; i++)
-        asm_map_l.push_back( assembly_index(skin_l_LHS_offset+i, true));
+        asm_map.push_back( assembly_index(skin_f_LHS_offset+i, true));
 
         for (size_t i = 0; i < n_0d_bc_bs; i++)
-        asm_map_l.push_back( assembly_index(skin_r_LHS_offset+i, true));
-        
-//        for (size_t i = 0; i < n_0d_up_bs; i++)
-//        asm_map_l.push_back( assembly_index(up_mortar_LHS_offset+i, true));
-        
-        for (size_t i = 0; i < n_0d_bc_bs; i++)
-        asm_map_r.push_back( assembly_index(skin_r_LHS_offset+i, true));
-        
-        for (size_t i = 0; i < n_0d_up_bs; i++)
-        asm_map_r.push_back( assembly_index(up_mortar_LHS_offset+i, true));
-        
-        assert( asm_map_l.size() == mat.rows() && asm_map_r.size() == mat.cols() );
+        asm_map.push_back( assembly_index(skin_s_LHS_offset+i, true));
+                
+        assert( asm_map.size() == mat.rows() && asm_map.size() == mat.cols() );
 
         for (size_t i = 0; i < mat.rows(); i++)
         {
             for (size_t j = 0; j < mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_l[j], +1.0*mat(i,j)) );
-//                m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
-//                if (i!=j) {
-//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], -1.0*mat(i,j)) );
-//                }else{
-//                    m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_r[j], +1.0*mat(i,j)) );
-//                }
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], +1.0*mat(i,j)) );
             }
         }
     }
@@ -1515,37 +1641,119 @@ public:
                 scatter_skins_point_mortar_u_n_data(msh,f_ind,f,mortar);
                 scatter_skins_point_mortar_u_t_data(msh,f_ind,f,mortar);
                 
-                mortar(0,0) = 1.0;
+                T alpha = 0.0e+0;
+                if (f_ind == 0) {
+                    alpha = 1.0;
+                }
+                mortar(0,0) = alpha;
                 scatter_skins_point_mortar_mass_n_data(msh,f_ind,f,mortar);
-                mortar(0,0) = 1.0;
+                mortar(0,0) = alpha;
                 scatter_skins_point_mortar_mass_t_data(msh,f_ind,f,mortar);
                 
-                Matrix<T, Dynamic, Dynamic> rhs = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
-                T beta = 0.0;
-                rhs(0,0) = (+3.0/200.0)*beta;
-                scatter_skins_point_mortar_rhs_t_data(msh,f_ind,f,rhs);
+//                Matrix<T, Dynamic, Dynamic> rhs = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
+//                T beta = 0.0;
+//                rhs(0,0) = (+3.0/200.0)*beta;
+//                scatter_skins_point_mortar_rhs_t_data(msh,f_ind,f,rhs);
                     
             }
             
-            bool point_restrictions_Q = true;
-            if(point_restrictions_Q){ // apply restrictions
-
-                Matrix<T, Dynamic, Dynamic> up_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
-                T beta = 1.0e9;
-                up_restriction(0,0) = +1.0*beta;
-                up_restriction(0,1) = +1.0*beta;
-                
-                up_restriction(1,1) = +1.0*beta;
-                up_restriction(1,0) = +1.0*beta;
-                
-                for (size_t up_ind = 0; up_ind < m_n_mortar_points; up_ind++) {
-                    scatter_skins_point_restriction_u_n_data(msh,f_ind,f,up_ind,up_restriction);
-                    scatter_skins_point_restriction_u_t_data(msh,f_ind,f,up_ind,up_restriction);
+            if(f.m_bc_type.first == 1 || f.m_bc_type.second == 1){
+                if (cell_ind == 0 || cell_ind == f.m_pairs.size()) {
+                    scatter_skins_bc_u_t_data(msh, f_ind, f , 0);
+                    scatter_skins_bc_u_t_data(msh, f_ind, f , 1);
                 }
-                
+
             }
             
             f_ind++;
+        }
+        
+        // apply mortar restrictions
+        
+        bool point_restrictions_Q = true;
+        if(point_restrictions_Q){ // apply restrictions
+
+            Matrix<T, Dynamic, Dynamic> un_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
+            Matrix<T, Dynamic, Dynamic> ut_restriction = Matrix<T, Dynamic, Dynamic>::Zero(2,2);
+            T beta = 1.0e+10;
+            for (auto r : m_restrictions) {
+                
+                un_restriction(0,0) = +1.0*beta;
+                un_restriction(1,1) = +1.0*beta;
+                ut_restriction(0,0) = +1.0*beta;
+                ut_restriction(1,1) = +1.0*beta;
+                
+                auto f_ind_f = r.m_f_index.first;
+                auto f_ind_s = r.m_f_index.second;
+                auto f_f = m_fractures[f_ind_f];
+                auto f_s = m_fractures[f_ind_s];
+                size_t n_cells_f = f_f.m_pairs.size();
+                size_t n_cells_s = f_s.m_pairs.size();
+                
+                size_t face_ind_f,cell_ind_f;
+                if (r.m_p_index.first == 0) {
+                    if(r.m_s_index.first == 0){
+                        cell_ind_f = f_f.m_elements[0].first;
+                        face_ind_f = f_f.m_pairs[0].first;
+                    }else{
+                        cell_ind_f = f_f.m_elements[0].second;
+                        face_ind_f = f_f.m_pairs[0].second;
+                    }
+                }else{
+                    if(r.m_s_index.first == 0){
+                        cell_ind_f = f_f.m_elements[n_cells_f-1].first;
+                        face_ind_f = f_f.m_pairs[n_cells_f-1].first;
+                    }else{
+                        cell_ind_f = f_f.m_elements[n_cells_f-1].second;
+                        face_ind_f = f_f.m_pairs[n_cells_f-1].second;
+                    }
+                }
+                
+                size_t face_ind_s,cell_ind_s;
+                if (r.m_p_index.second == 0) {
+                    if(r.m_s_index.second == 0){
+                        cell_ind_s = f_s.m_elements[0].first;
+                        face_ind_s = f_s.m_pairs[0].first;
+                    }else{
+                        cell_ind_s = f_s.m_elements[0].second;
+                        face_ind_s = f_s.m_pairs[0].second;
+                    }
+                }else{
+                    if(r.m_s_index.second == 0){
+                        cell_ind_s = f_s.m_elements[n_cells_s-1].first;
+                        face_ind_s = f_s.m_pairs[n_cells_s-1].first;
+                    }else{
+                        cell_ind_s = f_s.m_elements[n_cells_s-1].second;
+                        face_ind_s = f_s.m_pairs[n_cells_s-1].second;
+                    }
+                }
+                
+                auto& face_f = storage->edges[face_ind_f];
+                auto& cell_f = storage->surfaces[cell_ind_f];
+                auto& face_s = storage->edges[face_ind_s];
+                auto& cell_s = storage->surfaces[cell_ind_s];
+                
+                const auto n_f = disk::normal(msh, cell_f, face_f);
+                const auto t_f = disk::tanget(msh, cell_f, face_f);
+                
+                const auto n_s = disk::normal(msh, cell_s, face_s);
+                const auto t_s = disk::tanget(msh, cell_s, face_s);
+                
+                // simple because normal data is being neglected
+                auto p_f_s = t_f.dot(t_s);
+                auto p_s_f = t_s.dot(t_f);
+                if(f_ind_f == f_ind_s){
+                    ut_restriction(0,1) = -1.0*beta * (p_f_s);
+                    ut_restriction(1,0) = -1.0*beta * (p_s_f);
+                }else{
+                    ut_restriction(0,1) = +1.0*beta * (p_f_s);
+                    ut_restriction(1,0) = +1.0*beta * (p_s_f);
+                }
+                
+                scatter_skins_point_restriction_u_n_data(msh,r,ut_restriction);
+                scatter_skins_point_restriction_u_t_data(msh,r,ut_restriction);
+            }
+            
         }
         
     }
@@ -1905,7 +2113,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 1000000.0;
+        T c_para = 10000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {

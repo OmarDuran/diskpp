@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
-//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
     
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_444.txt";
 //      std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_581.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1533.txt";
-    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
+//    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
     
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
     
 //    end_point_mortars.clear();
     
-    {// find points
+    if(0){// find points
         mesh_type::point_type p;
         p.x() = 10.0;
         p.y() = 1.0;
@@ -206,7 +206,8 @@ int main(int argc, char **argv)
     
     // filling up fractures
     std::vector<fracture<mesh_type> > fractures;
-    if(1){
+    std::vector<restriction > restrictions;
+    if(0){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
         f.m_bl_index = end_point_mortars[0].second;
@@ -216,9 +217,21 @@ int main(int argc, char **argv)
         f.build(msh);
 
         fractures.push_back(f);
+        
+        restriction r0;
+        r0.m_f_index = {0,0};
+        r0.m_p_index = {0,0};
+        r0.m_s_index = {0,1};
+        restrictions.push_back(r0);
+        
+        restriction r1;
+        r1.m_f_index = {0,0};
+        r1.m_p_index = {1,1};
+        r1.m_s_index = {0,1};
+        restrictions.push_back(r1);
     }
     
-    if(0){
+    if(1){
         fracture<mesh_type> f0;
         f0.m_pairs = f0_pairs;
         f0.m_bl_index = 6;
@@ -235,6 +248,8 @@ int main(int argc, char **argv)
         f1.m_br_index = 472;
         f1.m_er_index = 475;
         f1.build(msh);
+        f1.m_bc_type = {1,1};
+        f1.m_bc_data = {{-0.05,0},{-0.05,0}};
         fractures.push_back(f1);
         
         fracture<mesh_type> f2;
@@ -244,7 +259,48 @@ int main(int argc, char **argv)
         f2.m_br_index = 455;
         f2.m_er_index = 449;
         f2.build(msh);
+        f2.m_bc_type = {1,1};
+        f2.m_bc_data = {{0,-0.2},{0,-0.2}};
         fractures.push_back(f2);
+        
+
+        
+        
+        restriction r0;
+        r0.m_f_index = {0,0};
+        r0.m_p_index = {0,0};
+        r0.m_s_index = {0,1};
+        restrictions.push_back(r0);
+        
+//        restriction r1;
+//        r1.m_f_index = {0,2};
+//        r1.m_p_index = {1,1};
+//        r1.m_s_index = {1,1};
+//        restrictions.push_back(r1);
+//
+//        restriction r2;
+//        r2.m_f_index = {2,1};
+//        r2.m_p_index = {1,1};
+//        r2.m_s_index = {0,1};
+//        restrictions.push_back(r2);
+//
+//        restriction r3;
+//        r3.m_f_index = {0,1};
+//        r3.m_p_index = {1,1};
+//        r3.m_s_index = {0,0};
+//        restrictions.push_back(r3);
+        
+//        restriction r4;
+//        r4.m_f_index = {1,1};
+//        r4.m_p_index = {0,0};
+//        r4.m_s_index = {0,1};
+//        restrictions.push_back(r4);
+        
+//        restriction r5;
+//        r5.m_f_index = {2,2};
+//        r5.m_p_index = {0,0};
+//        r5.m_s_index = {0,1};
+//        restrictions.push_back(r5);
     }
     
     // Constant elastic properties
@@ -276,7 +332,7 @@ int main(int argc, char **argv)
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -0.2;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -284,7 +340,7 @@ int main(int argc, char **argv)
         RealType x,y;
         x = pt.x();
         y = pt.y();
-        RealType ux = -0.1;
+        RealType ux = -0.05;
         RealType uy = -0.0;
         return static_vector<RealType, 2>{ux, uy};
     };
@@ -360,20 +416,20 @@ int main(int argc, char **argv)
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
 //        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
         
-        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
-        
-//        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
-//        bnd.addDirichletBC(disk::DX, bc_N_right_id, u_right_fun);
+//        bnd.addDirichletBC(disk::DIRICHLET, bc_D_bot_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_right_id, null_v_fun);
 //        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
-//        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
+//        bnd.addNeumannBC(disk::NEUMANN, bc_N_left_id, null_v_fun);
+        
+        bnd.addDirichletBC(disk::DY, bc_D_bot_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_right_id, u_right_fun);
+        bnd.addDirichletBC(disk::DY, bc_D_top_id, u_top_fun);
+        bnd.addDirichletBC(disk::DX, bc_N_left_id, null_v_fun);
         
     }
 
     tc.tic();
-    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs, end_point_mortars, fractures);
+    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs, end_point_mortars, fractures,restrictions);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
@@ -425,7 +481,7 @@ int main(int argc, char **argv)
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
     
     // sigma n and t
-    size_t f_ind = 0;
+    size_t f_ind = 2;
     {
         fracture<mesh_type> f = fractures[f_ind];
         auto storage = msh.backend_storage();
@@ -666,11 +722,12 @@ int main(int argc, char **argv)
         
         // sigma normal and mortar u0 evaluation
         if(1){
-            size_t n_mortar_displacements = 2*end_point_mortars.size();
-            size_t n_skin_bs = 4 * fracture_pairs.size() + 1;
-            size_t points_offset = n_cells_dof + n_faces_dofs + 4 * n_skin_bs + n_hybrid_dofs - n_mortar_displacements;
+            size_t n_mortar_displacements = 2*2;
+            size_t n_skin_bs = assembler.get_n_skin_dof();
+            size_t n_f_hybrid_dofs = assembler.get_n_f_hybrid_dofs();
+            size_t f_offset = assembler.compress_fracture_indexes().at(f_ind);
+            size_t points_offset = n_cells_dof + n_faces_dofs + n_skin_bs + n_f_hybrid_dofs + f_ind * n_mortar_displacements;
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
-//            std::cout << std::setprecision(pre) << "u0 =  " << x_dof.tail(4) << std::endl;
             std::cout << std::setprecision(pre) << "sigma =  " << sigma_dof << std::endl;
         }
         
