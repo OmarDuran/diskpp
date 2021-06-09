@@ -23,6 +23,24 @@ class postprocessor {
 public:
     
     // Write a silo file for cell displacements
+    static void write_silo_mesh(std::string silo_file_name, Mesh & msh){
+        
+        timecounter tc;
+        tc.tic();
+
+        disk::silo_database silo;
+        silo_file_name += ".silo";
+        silo.create(silo_file_name.c_str());
+        silo.add_mesh(msh, "mesh");
+
+        silo.close();
+        tc.toc();
+        std::cout << std::endl;
+        std::cout << bold << cyan << "Silo file rendered in : " << tc << " seconds" << reset << std::endl;
+        
+    }
+    
+    // Write a silo file for cell displacements
     static void write_silo_u_field(std::string silo_file_name, size_t it, Mesh & msh, disk::hho_degree_info & hho_di, Matrix<double, Dynamic, 1> & x_dof){
         
         timecounter tc;
