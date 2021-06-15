@@ -2481,12 +2481,16 @@ public:
             for (auto face_it = storage->surfaces.begin(); face_it != storage->surfaces.end(); face_it++)
             {
                 auto face = *face_it;
-                auto face_p_ids = face.point_ids();
-                auto p_ids = surface.point_ids();
+                
+                std::vector<size_t> face_p_ids,p_ids;
+                for (auto & id: face.point_ids()) {
+                    face_p_ids.push_back(id);
+                }
+                for (auto & id: surface.point_ids()) {
+                    p_ids.push_back(id);
+                }
                 std::sort(face_p_ids.begin(), face_p_ids.end());
                 std::sort(p_ids.begin(), p_ids.end());
-                std::cout << "i = " << face_p_ids[0] << "  " << face_p_ids[1] << "  " << face_p_ids[2] << std::endl;
-                std::cout << "t = " << p_ids[0] << "  " << p_ids[1] << "  " << p_ids[2] << std::endl;
                 check_Q = std::equal(face_p_ids.begin(), face_p_ids.end(), p_ids.begin());
                 if (check_Q) {
                     break;
@@ -2501,7 +2505,7 @@ public:
             
         };
         
-        storage->boundary_info.resize(surfaces.size());
+        storage->boundary_info.resize(storage->surfaces.size());
         for (auto& p : boundary_polygons)
         {
             std::vector<typename edge_type::id_type> surface_edges = facet_edges(p);
