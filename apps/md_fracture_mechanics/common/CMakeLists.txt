@@ -11,6 +11,7 @@ set(md_headers ${md_headers}
 	${CMAKE_CURRENT_SOURCE_DIR}/elastic_material_data.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/fitted_geometry_builders.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/elastic_two_fields_assembler.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/elastic_two_fields_assembler_3d.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/elastic_1d_two_fields_assembler.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/fitted_geometry_builders.hpp	
 	${CMAKE_CURRENT_SOURCE_DIR}/linear_solver.hpp

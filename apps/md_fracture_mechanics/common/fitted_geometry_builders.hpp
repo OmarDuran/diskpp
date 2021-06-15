@@ -1043,11 +1043,11 @@ class gmsh_2d_reader : public fitted_geometry_builder<disk::generic_mesh<T, 2>>
         
     };
     
-    struct polygon_2d
+    struct polygon
     {
         std::vector<size_t>                 m_member_nodes;
         std::set<std::array<size_t, 2>>     m_member_edges;
-        bool operator<(const polygon_2d & other) {
+        bool operator<(const polygon & other) {
             return m_member_nodes < other.m_member_nodes;
         }
     };
@@ -1057,7 +1057,7 @@ class gmsh_2d_reader : public fitted_geometry_builder<disk::generic_mesh<T, 2>>
     std::vector<std::array<size_t, 2>>              facets;
     std::vector<std::array<size_t, 2>>              skeleton_edges;
     std::vector<std::array<size_t, 2>>              boundary_edges;
-    std::vector<polygon_2d>                         polygons;
+    std::vector<polygon>                         polygons;
     std::string poly_mesh_file;
     std::set<size_t> bc_points;
     gmsh_data   mesh_data;
@@ -1554,7 +1554,7 @@ public:
                                 }else{ // polygon case
                                     /// Internally the nodes index and element index is converted to zero based indexation
                                     
-                                    polygon_2d polygon;
+                                    polygon polygon;
                                     std::vector<size_t> member_nodes;
                                     for (int i_node = 0; i_node < n_el_nodes; i_node++) {
                                         member_nodes.push_back(node_map[node_identifiers[i_node]]);
@@ -1710,6 +1710,876 @@ public:
         file << "Number of skeleton edges : " << skeleton_edges.size() << std::endl;
         file << "Number of boundary edges : " << boundary_edges.size() << std::endl;
         file << "Number of vertices : " << vertices.size() << std::endl;
+        file.close();
+    }
+    
+};
+
+template<typename T>
+class gmsh_3d_reader : public fitted_geometry_builder<disk::generic_mesh<T, 3>>
+{
+    typedef disk::generic_mesh<T,3>                       mesh_type;
+    typedef typename mesh_type::point_type          point_type;
+    typedef typename mesh_type::node_type           node_type;
+    typedef typename mesh_type::edge_type           edge_type;
+    typedef typename mesh_type::surface_type        surface_type;
+    typedef typename mesh_type::volume_type         volume_type;
+
+    std::vector<point_type>                         m_points;
+    std::vector<node_type>                          m_nodes;
+    std::vector<std::pair<size_t, edge_type>>       m_edges;
+
+    std::vector<std::pair<size_t, std::vector<size_t>>>     vol_to_faces;
+    std::vector<std::vector<size_t>>                        vol_to_vts;
+    std::vector<std::pair<size_t, std::vector<size_t>>>     faces_to_edges;
+    std::vector<std::vector<size_t>>                        faces_to_vts;
+    
+    /// gmsh data
+    struct gmsh_data {
+        
+        int m_n_volumes;
+        int m_n_surfaces;
+        int m_n_curves;
+        int m_n_points;
+        int m_n_physical_volumes;
+        int m_n_physical_surfaces;
+        int m_n_physical_curves;
+        int m_n_physical_points;
+        int m_dimension;
+        std::vector<std::map<int,std::vector<int>>> m_dim_entity_tag_and_physical_tag;
+        std::vector<std::map<int,std::string>> m_dim_physical_tag_and_name;
+        std::vector<std::map<std::string,int>> m_dim_name_and_physical_tag;
+        std::vector<std::map<int,int>> m_dim_physical_tag_and_physical_tag;
+        std::vector<int> m_entity_index;
+        
+        gmsh_data() {
+            m_n_volumes = 0;
+            m_n_surfaces = 0;
+            m_n_curves = 0;
+            m_n_points = 0;
+            m_n_physical_volumes = 0;
+            m_n_physical_surfaces = 0;
+            m_n_physical_curves = 0;
+            m_n_physical_points = 0;
+            m_dimension = 0;
+            m_dim_entity_tag_and_physical_tag.resize(4);
+            m_dim_physical_tag_and_name.resize(4);
+            m_dim_name_and_physical_tag.resize(4);
+            m_dim_physical_tag_and_physical_tag.resize(4);
+        }
+        
+        gmsh_data(const gmsh_data &other) {
+            m_n_volumes = other.m_n_volumes;
+            m_n_surfaces = other.m_n_surfaces;
+            m_n_curves = other.m_n_curves;
+            m_n_points = other.m_n_points;
+            m_n_physical_volumes = other.m_n_physical_volumes;
+            m_n_physical_surfaces = other.m_n_physical_surfaces;
+            m_n_physical_curves = other.m_n_physical_curves;
+            m_n_physical_points = other.m_n_physical_points;
+            m_dimension = other.m_dimension;
+            m_dim_entity_tag_and_physical_tag   = other.m_dim_entity_tag_and_physical_tag;
+            m_dim_physical_tag_and_name         = other.m_dim_physical_tag_and_name;
+            m_dim_name_and_physical_tag         = other.m_dim_name_and_physical_tag;
+            m_dim_physical_tag_and_physical_tag = other.m_dim_physical_tag_and_physical_tag;
+        }
+        
+        gmsh_data &operator=(const gmsh_data &other){
+            m_n_volumes = other.m_n_volumes;
+            m_n_surfaces = other.m_n_surfaces;
+            m_n_curves = other.m_n_curves;
+            m_n_points = other.m_n_points;
+            m_n_physical_volumes = other.m_n_physical_volumes;
+            m_n_physical_surfaces = other.m_n_physical_surfaces;
+            m_n_physical_curves = other.m_n_physical_curves;
+            m_n_physical_points = other.m_n_physical_points;
+            m_dimension = other.m_dimension;
+            m_dim_entity_tag_and_physical_tag   = other.m_dim_entity_tag_and_physical_tag;
+            m_dim_physical_tag_and_name         = other.m_dim_physical_tag_and_name;
+            m_dim_name_and_physical_tag         = other.m_dim_name_and_physical_tag;
+            m_dim_physical_tag_and_physical_tag = other.m_dim_physical_tag_and_physical_tag;
+            return *this;
+        }
+        
+    };
+    
+    struct polygon
+    {
+        std::vector<size_t>                 m_member_nodes;
+        std::vector<std::array<size_t, 2>>  m_member_edges;
+        bool operator<(const polygon & other) {
+            return m_member_nodes < other.m_member_nodes;
+        }
+    };
+
+    struct polyhedron
+    {
+        std::vector<size_t>                 m_member_nodes;
+        std::vector<std::array<size_t, 2>>  m_member_edges;
+        std::vector<polygon>                m_member_facets;
+        bool operator<(const polyhedron & other) {
+            return m_member_nodes < other.m_member_nodes;
+        }
+    };
+    
+    std::vector<point_type>                         points;
+    std::vector<node_type>                          nodes;
+    std::vector<edge_type>                          edges;
+    std::vector<surface_type>                       surfaces, boundary_surfaces;
+    std::vector<volume_type>                        volumes;
+    std::vector<polygon>                            polygons;
+    std::vector<polygon>                            boundary_polygons;
+    std::vector<polyhedron>                         polyhedrons;
+    std::vector<std::array<size_t, 2>>              skeleton_edges;
+    std::string gmsh_file;
+    
+    
+    
+    gmsh_data   mesh_data;
+            
+    void validate_edge(std::array<size_t, 2> & edge){
+        assert(edge[0] != edge[1]);
+        if (edge[0] > edge[1]){
+            std::swap(edge[0], edge[1]);
+        }
+    }
+    
+public:
+
+    gmsh_3d_reader() : fitted_geometry_builder<mesh_type>()
+    {
+        fitted_geometry_builder<mesh_type>::m_dimension = 3;
+    }
+    
+    void set_gmsh_file(std::string mesh_file){
+        gmsh_file = mesh_file;
+    }
+    
+    int GetNumberofNodes(int & cell_type){
+        
+        int n_nodes;
+        switch (cell_type) {
+            case 1:
+            {   // Line
+                n_nodes = 2;
+            }
+                break;
+            case 2:
+            {
+                // Triangle
+                n_nodes = 3;
+            }
+                break;
+            case 3:
+            {
+                // Quadrilateral
+                n_nodes = 4;
+            }
+                break;
+            case 4:
+            {
+                // Tetrahedron
+                n_nodes = 4;
+            }
+                break;
+            case 5:
+            {
+                // Hexahedra
+                n_nodes = 8;
+            }
+                break;
+            case 6:
+            {
+                // Prism
+                n_nodes = 6;
+            }
+                break;
+            case 7:
+            {
+                // Pyramid
+                n_nodes = 5;
+            }
+                break;
+            case 8:
+            {
+                // Quadratic Line
+                n_nodes = 3;
+            }
+                break;
+            case 9:
+            {
+                // Quadratic Triangle
+                n_nodes = 6;
+            }
+                break;
+            case 10:
+            {
+                // Quadratic Quadrilateral
+                n_nodes = 9;
+            }
+                break;
+            case 11:
+            {
+                // Quadratic Tetrahedron
+                n_nodes = 10;
+                
+            }
+                break;
+            case 12:
+            {
+                // Quadratic Hexahedra
+                n_nodes = 20;
+            }
+                break;
+            case 13:
+            {
+                // Quadratic Prism
+                n_nodes = 15;
+            }
+                break;
+            case 15:{
+                // Point
+                n_nodes = 1;
+            }
+                break;
+            default:
+            {
+                std::cout << "Cell not impelemented." << std::endl;
+                n_nodes = 0;
+                assert(false);
+            }
+                break;
+        }
+        
+        return n_nodes;
+    }
+    
+    // build the mesh
+    bool build_mesh(){
+        
+        int max_dimension = 0;
+        {
+            
+            // reading a general mesh information by filter
+            std::ifstream read (gmsh_file.c_str());
+            bool file_check_Q = !read;
+            if(file_check_Q)
+            {
+                std::cout << "Couldn't open the file." << gmsh_file << std::endl;
+                assert(!file_check_Q);
+            }
+            
+            if (file_check_Q) {
+                std::cout << "File path is wrong." << std::endl;
+                assert(!file_check_Q);
+            }
+            
+            std::vector<int64_t> node_map;
+            while(read)
+            {
+                char buf[1024];
+                read.getline(buf, 1024);
+                std::string str(buf);
+                
+                if(str == "$MeshFormat" || str == "$MeshFormat\r")
+                {
+                    read.getline(buf, 1024);
+                    std::string str(buf);
+                    std::cout << "Reading mesh format = " << str << std::endl;
+                    
+                }
+                
+                if(str == "$PhysicalNames" || str == "$PhysicalNames\r" )
+                {
+                    
+                    int64_t n_physical_names;
+                    read >> n_physical_names;
+                    
+                    int dimension, id;
+                    std::string name;
+                    std::pair<int, std::string> chunk;
+                    
+                    for (int64_t i_name = 0; i_name < n_physical_names; i_name++) {
+                        
+                        read.getline(buf, 1024);
+                        read >> dimension;
+                        read >> id;
+                        read >> name;
+                        name.erase(0,1);
+                        name.erase(name.end()-1,name.end());
+                        mesh_data.m_dim_physical_tag_and_name[dimension][id] = name;
+                        
+                        if(mesh_data.m_dim_name_and_physical_tag[dimension].find(name) == mesh_data.m_dim_name_and_physical_tag[dimension].end())
+                        {
+                            std::cout << "Automatically associating " << name << " with material id " << id << std::endl;
+                            mesh_data.m_dim_name_and_physical_tag[dimension][name] = id;
+                        }
+                        else
+                        {
+                            int external_matid = mesh_data.m_dim_name_and_physical_tag[dimension][name];
+                            std::cout << "Associating " << name << " with material id " << id <<
+                            " with external material id " << external_matid << std::endl;
+                        }
+                        
+                        mesh_data.m_dim_physical_tag_and_physical_tag[dimension][id] = mesh_data.m_dim_name_and_physical_tag[dimension][name];
+                        
+                        if (max_dimension < dimension) {
+                            max_dimension = dimension;
+                        }
+                    }
+                    mesh_data.m_dimension = max_dimension;
+                    
+                    char buf_end[1024];
+                    read.getline(buf_end, 1024);
+                    read.getline(buf_end, 1024);
+                    std::string str_end(buf_end);
+                    if(str_end == "$EndPhysicalNames" || str_end == "$EndPhysicalNames\r")
+                    {
+                        std::cout << "Read mesh physical entities = " << n_physical_names << std::endl;
+                    }
+                    continue;
+                }
+                
+                if(str == "$Entities" || str == "$Entities\r")
+                {
+                    read >> mesh_data.m_n_points;
+                    read >> mesh_data.m_n_curves;
+                    read >> mesh_data.m_n_surfaces;
+                    read >> mesh_data.m_n_volumes;
+
+                    if(max_dimension < 3 && mesh_data.m_n_volumes > 0) max_dimension = 3;
+                    else if(max_dimension < 2 && mesh_data.m_n_surfaces > 0) max_dimension = 2;
+                    else if(max_dimension < 1 && mesh_data.m_n_curves > 0) max_dimension = 1;
+                    
+                    int n_physical_tag;
+                    std::pair<int, std::vector<int> > chunk;
+                    /// Entity bounding box data
+                    T x_min, y_min, z_min;
+                    T x_max, y_max, z_max;
+                    std::vector<int> n_entities = {mesh_data.m_n_points,mesh_data.m_n_curves,mesh_data.m_n_surfaces,mesh_data.m_n_volumes};
+                    std::vector<int> n_entities_with_physical_tag = {0,0,0,0};
+                    
+                    
+                    for (int i_dim = 0; i_dim <4; i_dim++) {
+                        for (int64_t i_entity = 0; i_entity < n_entities[i_dim]; i_entity++) {
+                            
+                            read.getline(buf, 1024);
+                            read >> chunk.first;
+                            read >> x_min;
+                            read >> y_min;
+                            read >> z_min;
+                            if(i_dim > 0)
+                            {
+                                read >> x_max;
+                                read >> y_max;
+                                read >> z_max;
+                            }
+                            read >> n_physical_tag;
+                            chunk.second.resize(n_physical_tag);
+                            for (int i_data = 0; i_data < n_physical_tag; i_data++) {
+                                read >> chunk.second[i_data];
+                            }
+                            if(i_dim > 0)
+                            {
+                                size_t n_bounding_points;
+                                read >> n_bounding_points;
+                                for (int i_data = 0; i_data < n_bounding_points; i_data++) {
+                                    int point_tag;
+                                    read >> point_tag;
+                                }
+                            }
+                            n_entities_with_physical_tag[i_dim] += n_physical_tag;
+                            mesh_data.m_dim_entity_tag_and_physical_tag[i_dim].insert(chunk);
+                        }
+                    }
+
+                    mesh_data.m_n_physical_points = n_entities_with_physical_tag[0];
+                    mesh_data.m_n_physical_curves = n_entities_with_physical_tag[1];
+                    mesh_data.m_n_physical_surfaces = n_entities_with_physical_tag[2];
+                    mesh_data.m_n_physical_volumes = n_entities_with_physical_tag[3];
+                    
+                    char buf_end[1024];
+                    read.getline(buf_end, 1024);
+                    read.getline(buf_end, 1024);
+                    std::string str_end(buf_end);
+                    if(str_end == "$EndEntities" || str_end == "$EndEntities\r")
+                    {
+                        std::cout << "Read mesh entities = " <<  mesh_data.m_n_points + mesh_data.m_n_curves + mesh_data.m_n_surfaces + mesh_data.m_n_volumes << std::endl;
+                        std::cout << "Read mesh entities with physical tags = " <<  mesh_data.m_n_physical_points + mesh_data.m_n_physical_curves + mesh_data.m_n_physical_surfaces + mesh_data.m_n_physical_volumes << std::endl;
+                    }
+                    continue;
+                }
+                
+                
+                if(str == "$Nodes" || str == "$Nodes\r")
+                {
+                    
+                    int64_t n_entity_blocks, n_nodes, min_node_tag, max_node_tag;
+                    read >> n_entity_blocks;
+                    read >> n_nodes;
+                    read >> min_node_tag;
+                    read >> max_node_tag;
+                    
+                    int64_t node_id;
+                    T nodecoordX , nodecoordY , nodecoordZ ;
+                    points.reserve(max_node_tag);
+                    nodes.reserve(max_node_tag);
+                    
+                    edges.reserve(max_node_tag);
+                    polygons.reserve(max_node_tag);
+                    boundary_polygons.reserve(max_node_tag);
+                    
+                    node_map.resize(max_node_tag,-1);
+                    int64_t node_c = 0;
+                    const int64_t Tnodes = max_node_tag;
+            
+                    int entity_tag, entity_dim, entity_parametric, entity_nodes;
+                    for (int64_t i_block = 0; i_block < n_entity_blocks; i_block++)
+                    {
+                        read.getline(buf, 1024);
+                        read >> entity_dim;
+                        read >> entity_tag;
+                        read >> entity_parametric;
+                        read >> entity_nodes;
+                        
+                        if (entity_parametric != 0) {
+                            std::cout << "Characteristic not implemented." << std::endl;
+                            assert(false);
+                        }
+                        
+                        std::vector<int64_t> nodeids(entity_nodes,-1);
+                        for (int64_t inode = 0; inode < entity_nodes; inode++) {
+                            read >> nodeids[inode];
+                            nodeids[inode] --;
+                            node_map[nodeids[inode]] = node_c;
+                            node_c++;
+                        }
+                        for (int64_t inode = 0; inode < entity_nodes; inode++) {
+                            read >> nodecoordX;
+                            read >> nodecoordY;
+                            read >> nodecoordZ;
+
+                            int64_t node_id = node_map[nodeids[inode]];
+                            points.push_back( point_type({nodecoordX, nodecoordY, nodecoordZ}) );
+                            nodes.push_back( node_type( point_identifier<3>(node_id) ) );
+                        }
+                    }
+                    
+                    char buf_end[1024];
+                    read.getline(buf_end, 1024);
+                    read.getline(buf_end, 1024);
+                    std::string str_end(buf_end);
+                    if(str_end == "$EndNodes" || str_end == "$EndNodes\r")
+                    {
+                        std::cout << "Read mesh nodes = " <<  points.size() << std::endl;
+                    }
+                    continue;
+                }
+                
+                if(str == "$Elements" || str == "$Elements\r")
+                {
+                    
+                    int64_t n_entity_blocks, n_elements, min_element_tag, max_element_tag;
+                    read >> n_entity_blocks;
+                    read >> n_elements;
+                    read >> min_element_tag;
+                    read >> max_element_tag;
+                    volumes.reserve(n_elements-1);
+
+                    
+                    int entity_tag, entity_dim, entity_el_type, entity_elements;
+                    for (int64_t i_block = 0; i_block < n_entity_blocks; i_block++)
+                    {
+                        read.getline(buf, 1024);
+                        read >> entity_dim;
+                        read >> entity_tag;
+                        read >> entity_el_type;
+                        read >> entity_elements;
+                        
+                        if(entity_elements == 0){
+                            std::cout << "The entity with tag " << entity_tag << " does not have elements to insert" << std::endl;
+                        }
+                        
+                        for (int64_t iel = 0; iel < entity_elements; iel++) {
+                            int physical_identifier;
+                            int n_physical_identifier = 0;
+                            if(mesh_data.m_dim_entity_tag_and_physical_tag[entity_dim].find(entity_tag) != mesh_data.m_dim_entity_tag_and_physical_tag[entity_dim].end())
+                            {
+                                n_physical_identifier = mesh_data.m_dim_entity_tag_and_physical_tag[entity_dim][entity_tag].size();
+                            }
+                            bool physical_identifier_Q = n_physical_identifier != 0;
+                            if(physical_identifier_Q)
+                            {
+                                int gmsh_physical_identifier = mesh_data.m_dim_entity_tag_and_physical_tag[entity_dim][entity_tag][0];
+                                physical_identifier = mesh_data.m_dim_physical_tag_and_physical_tag[entity_dim][gmsh_physical_identifier];
+                                if(n_physical_identifier !=1){
+                                    std::cout << "The entity with tag " << entity_tag << std::endl;
+                                    std::cout << "Has associated the following physical tags : " << std::endl;
+                                    for (int i_data = 0; i_data < n_physical_identifier; i_data++) {
+                                        std::cout << mesh_data.m_dim_entity_tag_and_physical_tag[entity_dim][entity_tag][i_data] << std::endl;
+                                    }
+                                    
+                                    std::cout << "Automatically, the assgined external physical tag = " << physical_identifier << " is used.  The other ones are dropped out." << std::endl;
+                                }
+                                
+                                
+                                read.getline(buf, 1024);
+                                int el_identifier, n_el_nodes;
+                                n_el_nodes = GetNumberofNodes(entity_el_type);
+                                read >> el_identifier;
+                                std::vector<int> node_identifiers(n_el_nodes);
+                                for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                    read >> node_identifiers[i_node];
+                                    node_identifiers[i_node]--;
+                                }
+                                
+                                // BC case
+                                
+                                std::string entity_name = mesh_data.m_dim_physical_tag_and_name[entity_dim][physical_identifier];
+                                
+                                std::string bc_string = "Gamma";
+                                std::string fracture_string = "Fracture";
+                                if (entity_name.find(bc_string) != std::string::npos) {
+                                    
+                                    std::vector<size_t> member_nodes;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        member_nodes.push_back(node_map[node_identifiers[i_node]]);
+                                    }
+                                    
+                                    std::vector<std::array<size_t, 2>> member_edges;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        std::array<size_t, 2> edge;
+                                        if (i_node == n_el_nodes - 1) {
+                                            edge = {static_cast<unsigned long>(member_nodes[i_node]),static_cast<unsigned long>(member_nodes[0])};
+                                        }else{
+                                            edge = {static_cast<unsigned long>(member_nodes[i_node]),static_cast<unsigned long>(member_nodes[i_node+1])};
+                                        }
+                                        validate_edge(edge);
+                                        skeleton_edges.push_back( edge );
+                                        member_edges.push_back(edge);
+                                    }
+
+                                    polygon  facet;
+                                    facet.m_member_nodes = member_nodes;
+                                    facet.m_member_edges = member_edges;
+                                    boundary_polygons.push_back(facet);
+                                    
+                                    
+                                }else if(entity_name.find(fracture_string) != std::string::npos){ // fracture case
+                                    
+                                    std::vector<size_t> member_nodes;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        member_nodes.push_back(node_map[node_identifiers[i_node]]);
+                                    }
+                                    
+                                    std::vector<std::array<size_t, 2>> member_edges;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        std::array<size_t, 2> edge;
+                                        if (i_node == n_el_nodes - 1) {
+                                            edge = {static_cast<unsigned long>(member_nodes[i_node]),static_cast<unsigned long>(member_nodes[0])};
+                                        }else{
+                                            edge = {static_cast<unsigned long>(member_nodes[i_node]),static_cast<unsigned long>(member_nodes[i_node+1])};
+                                        }
+                                        validate_edge(edge);
+                                        skeleton_edges.push_back( edge );
+                                        member_edges.push_back(edge);
+                                    }
+
+                                    polygon  facet;
+                                    facet.m_member_nodes = member_nodes;
+                                    facet.m_member_edges = member_edges;
+                                    polygons.push_back(facet);
+                                    
+                                }else{ // polygon case
+                                                                        
+                                    std::vector<size_t> member_nodes;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        member_nodes.push_back(node_map[node_identifiers[i_node]]);
+                                    }
+                                    
+                                    auto simplex_edges = [&](const std::vector<size_t> & nodes)->std::vector<std::array<size_t, 2>> {
+                                        
+                                        std::vector<std::array<size_t, 2>> edges;
+                                        std::array<size_t, 2> edge0 {{nodes[0], nodes[1]}};
+                                        validate_edge(edge0);
+                                        edges.push_back(edge0);
+                                        
+                                        std::array<size_t, 2> edge1 {{nodes[1], nodes[2]}};
+                                        validate_edge(edge1);
+                                        edges.push_back(edge1);
+                                        
+                                        std::array<size_t, 2> edge2 {{nodes[0], nodes[2]}};
+                                        validate_edge(edge2);
+                                        edges.push_back(edge2);
+                                        
+                                        std::array<size_t, 2> edge3 {{nodes[0], nodes[3]}};
+                                        validate_edge(edge3);
+                                        edges.push_back(edge3);
+                                        
+                                        std::array<size_t, 2> edge4 {{nodes[2], nodes[3]}};
+                                        validate_edge(edge4);
+                                        edges.push_back(edge4);
+                                        
+                                        std::array<size_t, 2> edge5 {{nodes[3], nodes[1]}};
+                                        validate_edge(edge5);
+                                        edges.push_back(edge5);
+                                        
+                                        return edges;
+                                    };
+                                    
+                                    auto simplex_facets = [&](const std::vector<size_t> & nodes, const std::vector<std::array<size_t, 2>> & edges)->std::vector<polygon> {
+                                        
+                                        std::vector<polygon> polygons;
+                                        
+                                        polygon facet0;
+                                        facet0.m_member_nodes = {nodes[0],nodes[1],nodes[2]};
+                                        facet0.m_member_edges = {edges[0],edges[1],edges[2]};
+                                        polygons.push_back(facet0);
+                                        
+                                        polygon facet1;
+                                        facet1.m_member_nodes = {nodes[0],nodes[2],nodes[3]};
+                                        facet1.m_member_edges = {edges[2],edges[3],edges[4]};
+                                        polygons.push_back(facet1);
+                                        
+                                        polygon facet2;
+                                        facet2.m_member_nodes = {nodes[1],nodes[2],nodes[3]};
+                                        facet2.m_member_edges = {edges[1],edges[4],edges[5]};
+                                        polygons.push_back(facet2);
+                                        
+                                        polygon facet4;
+                                        facet4.m_member_nodes = {nodes[0],nodes[1],nodes[3]};
+                                        facet4.m_member_edges = {edges[0],edges[3],edges[4]};
+                                        polygons.push_back(facet4);
+                                        
+                                        return polygons;
+                                    };
+                                    
+                                    std::vector<std::array<size_t, 2>> member_edges = simplex_edges(member_nodes);
+                                    for (auto & edge : member_edges) {
+                                        skeleton_edges.push_back( edge );
+                                    }
+                                    
+                                    std::vector<polygon> member_facets = simplex_facets(member_nodes,member_edges);
+                                    for (auto & facet : member_facets) {
+                                        polygons.push_back( facet );
+                                    }
+
+                                    polyhedron vol;
+                                    vol.m_member_nodes  = member_nodes;
+                                    vol.m_member_edges  = member_edges;
+                                    vol.m_member_facets = member_facets;
+                                    polyhedrons.push_back(vol);
+                                    
+                                }
+                                
+                            }else{
+                                read.getline(buf, 1024);
+                                int el_identifier, n_el_nodes;
+                                n_el_nodes = GetNumberofNodes(entity_el_type);
+                                read >> el_identifier;
+                                std::vector<int> node_identifiers(n_el_nodes);
+                                for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                    read >> node_identifiers[i_node];
+                                }
+                                std::cout << "The entity with tag " << entity_tag << " does not have a physical tag, element " << el_identifier << " skipped " << std::endl;
+                            }
+
+                        }
+                    }
+                    
+                    char buf_end[1024];
+                    read.getline(buf_end, 1024);
+                    read.getline(buf_end, 1024);
+                    std::string str_end(buf_end);
+                    if(str_end == "$EndElements" || str_end == "$EndElements\r")
+                    {
+                        std::cout << "Read mesh cells = " << polyhedrons.size() << std::endl;
+                    }
+                    continue;
+                }
+                
+            }
+            
+        }
+        
+        // Duplicated facets are eliminated
+        std::sort( skeleton_edges.begin(), skeleton_edges.end() );
+        skeleton_edges.erase( std::unique( skeleton_edges.begin(), skeleton_edges.end() ), skeleton_edges.end() );
+        
+        std::cout << "Gmsh data is read." << std::endl;
+        std::cout << "Number of edges  " << skeleton_edges.size() << std::endl;
+        std::cout << "Number of facets " << polygons.size() << std::endl;
+        std::cout << "Number of cells  " << polyhedrons.size() << std::endl;
+        
+        return true;
+    }
+    
+    void move_to_mesh_storage(mesh_type& msh){
+        
+        auto storage = msh.backend_storage();
+        storage->points = std::move(points);
+        storage->nodes  = std::move(nodes);
+        
+        edges.reserve(skeleton_edges.size());
+        for (size_t i = 0; i < skeleton_edges.size(); i++)
+        {
+            assert(skeleton_edges[i][0] < skeleton_edges[i][1]);
+            auto node1 = typename node_type::id_type(skeleton_edges[i][0]);
+            auto node2 = typename node_type::id_type(skeleton_edges[i][1]);
+
+            auto e = edge_type{{node1, node2}};
+
+            e.set_point_ids(skeleton_edges[i].begin(), skeleton_edges[i].end());
+            edges.push_back(e);
+        }
+        std::sort(edges.begin(), edges.end());
+        storage->edges = std::move(edges);
+        
+        auto facet_edges = [&](const polygon & p)->std::vector<typename edge_type::id_type> {
+            
+            std::vector<typename edge_type::id_type> surface_edges;
+            for (auto& e : p.m_member_edges)
+            {
+                assert(e[0] < e[1]);
+                auto n1 = typename node_type::id_type(e[0]);
+                auto n2 = typename node_type::id_type(e[1]);
+
+                edge_type edge{{n1, n2}};
+                auto edge_id = find_element_id(storage->edges.begin(),
+                                               storage->edges.end(), edge);
+                if (!edge_id.first)
+                {
+                    std::cout << "Bad bug at " << __FILE__ << "("
+                              << __LINE__ << ")" << std::endl;
+                    assert(false);
+                }
+
+                surface_edges.push_back(edge_id.second);
+            }
+            
+            return surface_edges;
+        };
+        
+        surfaces.reserve( polygons.size() );
+        for (auto& p : polygons)
+        {
+            std::vector<typename edge_type::id_type> surface_edges = facet_edges(p);
+            auto surface = surface_type(surface_edges);
+            surface.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
+            surfaces.push_back( surface );
+        }
+
+        std::sort(surfaces.begin(), surfaces.end());
+        surfaces.erase( std::unique( surfaces.begin(), surfaces.end() ), surfaces.end() );
+        storage->surfaces = std::move(surfaces);
+        
+        
+        auto find_surface = [&](const surface_type & surface)-> typename surface_type::id_type {
+            
+            size_t c = 0;
+            bool check_Q = false;
+            for (auto face_it = storage->surfaces.begin(); face_it != storage->surfaces.end(); face_it++)
+            {
+                auto face = *face_it;
+                auto face_p_ids = face.point_ids();
+                auto p_ids = surface.point_ids();
+                std::sort(face_p_ids.begin(), face_p_ids.end());
+                std::sort(p_ids.begin(), p_ids.end());
+                std::cout << "i = " << face_p_ids[0] << "  " << face_p_ids[1] << "  " << face_p_ids[2] << std::endl;
+                std::cout << "t = " << p_ids[0] << "  " << p_ids[1] << "  " << p_ids[2] << std::endl;
+                check_Q = std::equal(face_p_ids.begin(), face_p_ids.end(), p_ids.begin());
+                if (check_Q) {
+                    break;
+                }
+                c++;
+            }
+            if (check_Q) {
+                return typename surface_type::id_type(c);
+            }else{
+                return typename surface_type::id_type(-1);
+            }
+            
+        };
+        
+        storage->boundary_info.resize(surfaces.size());
+        for (auto& p : boundary_polygons)
+        {
+            std::vector<typename edge_type::id_type> surface_edges = facet_edges(p);
+            auto surface = surface_type(surface_edges);
+            surface.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
+ 
+            auto position = find_surface(surface);
+            if (position == -1)
+            {
+                std::cout << "Bad bug at " << __FILE__ << "("
+                          << __LINE__ << ")" << std::endl;
+                assert(false);
+            }
+
+            disk::bnd_info bi{0, true};
+            storage->boundary_info.at(position) = bi;
+
+        }
+        
+        auto volume_facets = [&](const polyhedron & p)->std::vector<typename surface_type::id_type> {
+            
+            std::vector<typename surface_type::id_type> volume_surfaces;
+            for (auto& p : p.m_member_facets)
+            {
+
+                std::vector<typename edge_type::id_type> surface_edges = facet_edges(p);
+                auto surface = surface_type(surface_edges);
+                surface.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
+                
+                auto surface_id = find_element_id(storage->surfaces.begin(),
+                                               storage->surfaces.end(), surface);
+                if (!surface_id.first)
+                {
+                    std::cout << "Bad bug at " << __FILE__ << "("
+                              << __LINE__ << ")" << std::endl;
+                    assert(false);
+                }
+
+                volume_surfaces.push_back(surface_id.second);
+            }
+            
+            return volume_surfaces;
+        };
+        
+        volumes.reserve( polyhedrons.size() );
+        for (auto& p : polyhedrons)
+        {
+            std::vector<typename surface_type::id_type> volume_surfaces = volume_facets(p);
+            auto volume = volume_type(volume_surfaces);
+            volume.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
+            volumes.push_back( volume );
+        }
+        
+        std::sort(volumes.begin(), volumes.end());
+        volumes.erase( std::unique( volumes.begin(), volumes.end() ), volumes.end() );
+        storage->volumes = std::move(volumes);
+        
+        std::cout << "Nodes: " << storage->nodes.size() << std::endl;
+        std::cout << "Edges: " << storage->edges.size() << std::endl;
+        std::cout << "Faces: " << storage->surfaces.size() << std::endl;
+        std::cout << "Volumes: " << storage->volumes.size() << std::endl;
+
+        boundary_surfaces.clear();
+
+        return true;
+        
+    }
+            
+    // Print in log file relevant mesh information
+    void print_log_file(){
+        fitted_geometry_builder<mesh_type>::m_n_elements = volumes.size();
+        std::ofstream file;
+        file.open (fitted_geometry_builder<mesh_type>::m_log_file.c_str());
+        file << "Number of volumes : " << volumes.size() << std::endl;
+        file << "Number of surfaces : " << surfaces.size() << std::endl;
+        file << "Number of skeleton edges : " << edges.size() << std::endl;
+        file << "Number of boundary edges : " << boundary_surfaces.size() << std::endl;
+        file << "Number of nodes : " << nodes.size() << std::endl;
         file.close();
     }
     

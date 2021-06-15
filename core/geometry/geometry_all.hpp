@@ -312,6 +312,23 @@ tanget(const Mesh<T,2,Storage>& msh,
     return t/t.norm();
 }
 
+template<template<typename, size_t, typename> class Mesh,
+         typename T, typename Storage>
+std::pair<static_vector<T, 3>,static_vector<T, 3>>
+tanget(const Mesh<T, 3, Storage>& msh,
+       const typename Mesh<T, 3, Storage>::cell& cl,
+       const typename Mesh<T, 3, Storage>::face& fc)
+{
+    auto n = normal(msh,cl,fc);
+    auto pts = points(msh, fc);
+    assert(pts.size() == 3);
+    auto t = (pts[1] - pts[0]).to_vector();
+    auto t1_unit = t/t.norm();
+    auto t2_unit = n.cross(t1_unit);
+
+    return std::make_pair(t1_unit, t2_unit);
+}
+
 } // namespace disk
 
 #endif /* _GEOMETRY_ALL_HPP_ */

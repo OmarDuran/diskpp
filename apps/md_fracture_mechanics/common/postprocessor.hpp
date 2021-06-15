@@ -10,6 +10,7 @@
 #define postprocessor_hpp
 
 #include <iomanip>
+#include "../common/elastic_two_fields_assembler_3d.hpp"
 #include "../common/elastic_two_fields_assembler.hpp"
 #include "../common/elastic_1d_two_fields_assembler.hpp"
 
