@@ -97,17 +97,7 @@ void Fratures3D(simulation_data & sim_data){
     }
 
     auto are_equal_Q = [](const mesh_type_3d::point_type& a, const mesh_type_3d::point_type& b)-> bool {
-        bool check_Q = fabs(a.x() - b.x()) <= 1.0e-4 && fabs(a.y() - b.y()) <= 1.0e-4 && fabs(a.z() - b.z()) <= 1.0e-4;
-        return check_Q;
-    };
-
-    auto is_diag_Q = [](const mesh_type_3d::point_type& a)-> bool {
-        bool check_Q = fabs(a.x() - a.y()) <= 1.0e-4;
-        return check_Q;
-    };
-
-    auto is_horizontal_Q = [](const mesh_type_3d::point_type& a)-> bool {
-        bool check_Q = fabs(1.0 - a.y()) <= 1.0e-4;
+        bool check_Q = fabs(a.x() - b.x()) <= 1.0e-3 && fabs(a.y() - b.y()) <= 1.0e-3 && fabs(a.z() - b.z()) <= 1.0e-3;
         return check_Q;
     };
 
@@ -117,13 +107,6 @@ void Fratures3D(simulation_data & sim_data){
             mesh_type_3d::point_type bar_j = fracture_bars.at(j);
              if (are_equal_Q(bar_i,bar_j)) {
                  fracture_pairs.push_back(std::make_pair(i, j));
-                 if (is_diag_Q(bar_i)) {
-                     f0_pairs.push_back(std::make_pair(i, j));
-                 } else if (is_horizontal_Q(bar_i)) {
-                     f1_pairs.push_back(std::make_pair(i, j));
-                 } else{
-                     f2_pairs.push_back(std::make_pair(i, j));
-                 }
              }
         }
     }
@@ -194,103 +177,32 @@ void Fratures3D(simulation_data & sim_data){
     std::cout << bold << cyan << "Fracture mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
 
     // filling up fractures
-    std::vector<fracture<mesh_type_3d> > fractures;
-    std::vector<restriction > restrictions;
+    std::vector<fracture_3d<mesh_type_3d> > fractures;
+    std::vector<restriction_3d > restrictions;
     if(1){
-        fracture<mesh_type_3d> f;
+        fracture_3d<mesh_type_3d> f;
         f.m_pairs = fracture_pairs;
-//        f.m_bl_index = end_point_mortars[0].second;
-//        f.m_el_index = end_point_mortars[1].second;
-//        f.m_br_index = end_point_mortars[0].second;
-//        f.m_er_index = end_point_mortars[1].second;
-//        f.build(msh);
+        f.m_bl_index = end_point_mortars[0].second;
+        f.m_el_index = end_point_mortars[1].second;
+        f.m_br_index = end_point_mortars[0].second;
+        f.m_er_index = end_point_mortars[1].second;
+        f.build(msh);
 
         fractures.push_back(f);
 
-        restriction r0;
+        restriction_3d r0;
         r0.m_f_index = {0,0};
         r0.m_p_index = {0,0};
         r0.m_s_index = {0,1};
         restrictions.push_back(r0);
 
-        restriction r1;
+        restriction_3d r1;
         r1.m_f_index = {0,0};
         r1.m_p_index = {1,1};
         r1.m_s_index = {0,1};
         restrictions.push_back(r1);
     }
 
-    if(0){
-        fracture<mesh_type_3d> f0;
-        f0.m_pairs = f0_pairs;
-        f0.m_bl_index = 6;
-        f0.m_el_index = 7;
-        f0.m_br_index = 6;
-        f0.m_er_index = 449;
-        f0.build(msh);
-        fractures.push_back(f0);
-
-        fracture<mesh_type_3d> f1;
-        f1.m_pairs = f1_pairs;
-        f1.m_bl_index = 4;
-        f1.m_el_index = 7;
-        f1.m_br_index = 472;
-        f1.m_er_index = 475;
-        f1.build(msh);
-        f1.m_bc_type = {1,1};
-        f1.m_bc_data = {{-0.05,0},{-0.05,0}};
-        fractures.push_back(f1);
-
-        fracture<mesh_type_3d> f2;
-        f2.m_pairs = f2_pairs;
-        f2.m_bl_index = 5;
-        f2.m_el_index = 475;
-        f2.m_br_index = 455;
-        f2.m_er_index = 449;
-        f2.build(msh);
-        f2.m_bc_type = {1,1};
-        f2.m_bc_data = {{0,-0.2},{0,-0.2}};
-        fractures.push_back(f2);
-
-
-
-
-        restriction r0;
-        r0.m_f_index = {0,0};
-        r0.m_p_index = {0,0};
-        r0.m_s_index = {0,1};
-        restrictions.push_back(r0);
-
-//        restriction r1;
-//        r1.m_f_index = {0,2};
-//        r1.m_p_index = {1,1};
-//        r1.m_s_index = {1,1};
-//        restrictions.push_back(r1);
-//
-//        restriction r2;
-//        r2.m_f_index = {2,1};
-//        r2.m_p_index = {1,1};
-//        r2.m_s_index = {0,1};
-//        restrictions.push_back(r2);
-//
-//        restriction r3;
-//        r3.m_f_index = {0,1};
-//        r3.m_p_index = {1,1};
-//        r3.m_s_index = {0,0};
-//        restrictions.push_back(r3);
-
-//        restriction r4;
-//        r4.m_f_index = {1,1};
-//        r4.m_p_index = {0,0};
-//        r4.m_s_index = {0,1};
-//        restrictions.push_back(r4);
-
-//        restriction r5;
-//        r5.m_f_index = {2,2};
-//        r5.m_p_index = {0,0};
-//        r5.m_s_index = {0,1};
-//        restrictions.push_back(r5);
-    }
 
     // Constant elastic properties
     RealType rho,l,mu;
@@ -436,7 +348,7 @@ void Fratures3D(simulation_data & sim_data){
 
     tc.tic();
 //    auto assembler = elastic_two_fields_assembler_3d<mesh_type_3d>(msh, hho_di, bnd, fracture_pairs, end_point_mortars, fractures,restrictions);
-    auto assembler = elastic_two_fields_assembler_3d<mesh_type_3d>(msh, hho_di, bnd);
+    auto assembler = elastic_two_fields_assembler_3d<mesh_type_3d>(msh, hho_di, bnd, fractures);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
