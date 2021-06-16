@@ -479,7 +479,33 @@ void Fratures3D(simulation_data & sim_data){
     std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
     std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
 
-//    assembler.project_over_skin_cells(msh,x_dof);
+    
+    auto ue_fun = [](const mesh_type_3d::point_type& pt) -> static_vector<RealType, 3> {
+        RealType x,y,z;
+        x = pt.x();
+        y = pt.y();
+        z = pt.z();
+        RealType ux = -(x+10.0)/200.0;
+        RealType uy = -(y+10.0)/200.0;
+        RealType uz = -(z+10.0)/200.0;
+        return static_vector<RealType, 3>{ux, uy, uz};
+    };
+    
+    auto flux_fun = [](const mesh_type_3d::point_type& pt) -> static_matrix<RealType, 3,3> {
+        
+        static_matrix<RealType, 3,3> sigma = static_matrix<RealType, 3,3>::Zero(3,3);
+        RealType x,y,z;
+        x = pt.x();
+        y = pt.y();
+        z = pt.z();
+        sigma(0,0) = -0.025;
+        sigma(1,1) = -0.025;
+        sigma(2,2) = -0.025;
+        return sigma;
+    };
+    
+//    assembler.project_over_cells(msh,x_dof,ue_fun,flux_fun);
+    assembler.cells_residuals(msh,ue_fun,flux_fun);
 
     // render silo
     size_t it = 0;
