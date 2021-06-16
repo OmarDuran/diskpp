@@ -450,7 +450,7 @@ void Fratures3D(simulation_data & sim_data){
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     std::cout << bold << cyan << "ndof : " << assembler.LHS.rows() << reset << std::endl;
 
-    bool write_kg_Q = true;
+    bool write_kg_Q = false;
     if(write_kg_Q){
         std::ofstream mat_file;
         mat_file.open ("matrix.txt");
@@ -505,7 +505,7 @@ void Fratures3D(simulation_data & sim_data){
     };
     
 //    assembler.project_over_cells(msh,x_dof,ue_fun,flux_fun);
-    assembler.cells_residuals(msh,ue_fun,flux_fun);
+//    assembler.cells_residuals(msh,ue_fun,flux_fun);
 
     // render silo
     size_t it = 0;
