@@ -324,7 +324,7 @@ void Fratures3D(simulation_data & sim_data){
         x = pt.x();
         y = pt.y();
         z = pt.z();
-        RealType ux = -0.2;
+        RealType ux = -0.1;
         RealType uy = -0.0;
         RealType uz = -0.0;
         return static_vector<RealType, 3>{ux, uy, uz};
@@ -336,7 +336,7 @@ void Fratures3D(simulation_data & sim_data){
         y = pt.y();
         z = pt.z();
         RealType ux = -0.0;
-        RealType uy = -0.2;
+        RealType uy = -0.1;
         RealType uz = -0.0;
         return static_vector<RealType, 3>{ux, uy, uz};
     };
@@ -348,7 +348,7 @@ void Fratures3D(simulation_data & sim_data){
         z = pt.z();
         RealType ux = -0.0;
         RealType uy = -0.0;
-        RealType uz = -0.2;
+        RealType uz = -0.1;
         return static_vector<RealType, 3>{ux, uy, uz};
     };
     
@@ -427,8 +427,8 @@ void Fratures3D(simulation_data & sim_data){
         }
 
         bnd.addDirichletBC(disk::DY, bc_south_id, null_v_fun);
-        bnd.addDirichletBC(disk::DX, bc_east_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_north_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_east_id, u_east_fun);
+        bnd.addDirichletBC(disk::DY, bc_north_id, u_north_fun);
         bnd.addDirichletBC(disk::DX, bc_west_id, null_v_fun);
         bnd.addDirichletBC(disk::DZ, bc_bottom_id, null_v_fun);
         bnd.addDirichletBC(disk::DZ, bc_top_id, u_top_fun);
@@ -450,7 +450,7 @@ void Fratures3D(simulation_data & sim_data){
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     std::cout << bold << cyan << "ndof : " << assembler.LHS.rows() << reset << std::endl;
 
-    bool write_kg_Q = false;
+    bool write_kg_Q = true;
     if(write_kg_Q){
         std::ofstream mat_file;
         mat_file.open ("matrix.txt");

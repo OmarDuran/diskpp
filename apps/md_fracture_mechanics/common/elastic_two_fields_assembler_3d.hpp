@@ -385,6 +385,7 @@ public:
              const Matrix<T, Dynamic, Dynamic>& lhs,
              const Matrix<T, Dynamic, 1>& rhs)
     {
+        const auto dim = Mesh::dimension;
         auto fcs = faces(msh, cl);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -417,26 +418,26 @@ public:
                         break;
                     }
                     case disk::DX: {
-                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, false) );
+                        for (size_t i = 0; i < (dim-1)*(n_fbs/dim); i += dim-1){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i-0, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
                             asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
                         }
                         break;
                     }
                     case disk::DY: {
-                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                        for (size_t i = 0; i < (dim-1)*(n_fbs/dim); i += dim-1){
                             asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, false) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i-0, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
                         }
                         break;
                     }
                     case disk::DZ: {
-                     for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                     for (size_t i = 0; i < (dim-1)*(n_fbs/dim); i += dim-1){
                          asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
                          asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
-                         asm_map.push_back( assembly_index(face_LHS_offset+i+2, false) );
+                         asm_map.push_back( assembly_index(face_LHS_offset+i-0, false) );
                      }
                      break;
                     }
@@ -490,6 +491,7 @@ public:
     void scatter_bc_data(const Mesh& msh, const typename Mesh::cell_type& cl,
     const Matrix<T, Dynamic, Dynamic>& lhs)
     {
+        const auto dim = Mesh::dimension;
         auto fcs = faces(msh, cl);
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
@@ -522,26 +524,26 @@ public:
                         break;
                     }
                     case disk::DX: {
-                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, false) );
+                        for (size_t i = 0; i < (dim-1)*(n_fbs/dim); i += dim-1){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i-0, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
                             asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
                         }
                         break;
                     }
                     case disk::DY: {
-                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                        for (size_t i = 0; i < (dim-1)*(n_fbs/dim); i += dim-1){
                             asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, false) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i-0, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
                         }
                         break;
                     }
                      case disk::DZ: {
-                         for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                         for (size_t i = 0; i < (dim-1)*(n_fbs/dim); i += dim-1){
                              asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
                              asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i+2, false) );
+                             asm_map.push_back( assembly_index(face_LHS_offset+i-0, false) );
                          }
                          break;
                      }
@@ -2693,7 +2695,6 @@ public:
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         
-        size_t cell_ind = 0;
         for (auto& cell : msh)
         {
             Matrix<T, Dynamic, 1> x_proj_ten_dof = project_ten_function(msh, cell, ten_fun);
@@ -2702,13 +2703,7 @@ public:
             Matrix<T, Dynamic, 1> x_proj_dof = Matrix<T, Dynamic, 1>::Zero(n_cbs);
             x_proj_dof.block(0, 0, n_ten_cbs, 1)                    = x_proj_ten_dof;
             x_proj_dof.block(n_ten_cbs, 0, n_vec_cbs, 1)  = x_proj_vec_dof;
-            
-            Matrix<T, Dynamic, Dynamic> mixed_operator_loc = mixed_operator(cell_ind,msh,cell);
             scatter_cell_dof_data(msh, cell, x_glob, x_proj_dof);
-            cell_ind++;
-            
-            Matrix<T, Dynamic, 1> r_loc = mixed_operator_loc*x_proj_vec_dof;
-            std::cout << "rc = "<< r_loc << std::endl;
         }
     }
             
@@ -2784,13 +2779,10 @@ public:
                 x_proj_dof.block(n_ten_cbs + n_vec_cbs + i * n_fbs, 0, n_fbs, 1)  = x_proj_vec_dof;
             }
             
-            
-            
             Matrix<T, Dynamic, Dynamic> mixed_operator_loc = mixed_operator(cell_ind,msh,cell);
             Matrix<T, Dynamic, 1> r_loc = mixed_operator_loc*x_proj_dof;
-            std::cout << "rtc = "<< r_loc << std::endl;
-            std::cout << "cell sum = "<< r_loc.head(n_ten_cbs+n_vec_cbs).sum() << std::endl;
-            std::cout << "sum = "<< r_loc.sum() << std::endl;
+            std::cout << "cell res norm = "<< r_loc.head(n_ten_cbs+n_vec_cbs).norm() << std::endl;
+            std::cout << "res sum = "<< r_loc.sum() << std::endl;
             
             cell_ind++;
         }
