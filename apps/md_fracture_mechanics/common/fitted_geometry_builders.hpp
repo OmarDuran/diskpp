@@ -2308,7 +2308,7 @@ public:
                                         validate_edge(edge1);
                                         edges.push_back(edge1);
                                         
-                                        std::array<size_t, 2> edge2 {{nodes[0], nodes[2]}};
+                                        std::array<size_t, 2> edge2 {{nodes[2], nodes[0]}};
                                         validate_edge(edge2);
                                         edges.push_back(edge2);
                                         
@@ -2320,7 +2320,7 @@ public:
                                         validate_edge(edge4);
                                         edges.push_back(edge4);
                                         
-                                        std::array<size_t, 2> edge5 {{nodes[3], nodes[1]}};
+                                        std::array<size_t, 2> edge5 {{nodes[1], nodes[3]}};
                                         validate_edge(edge5);
                                         edges.push_back(edge5);
                                         
@@ -2338,7 +2338,7 @@ public:
                                         
                                         polygon facet1;
                                         facet1.m_member_nodes = {nodes[0],nodes[2],nodes[3]};
-                                        facet1.m_member_edges = {edges[2],edges[3],edges[4]};
+                                        facet1.m_member_edges = {edges[2],edges[4],edges[3]};
                                         polygons.push_back(facet1);
                                         
                                         polygon facet2;
@@ -2348,7 +2348,7 @@ public:
                                         
                                         polygon facet4;
                                         facet4.m_member_nodes = {nodes[0],nodes[1],nodes[3]};
-                                        facet4.m_member_edges = {edges[0],edges[3],edges[4]};
+                                        facet4.m_member_edges = {edges[0],edges[5],edges[3]};
                                         polygons.push_back(facet4);
                                         
                                         return polygons;
@@ -2407,9 +2407,10 @@ public:
         skeleton_edges.erase( std::unique( skeleton_edges.begin(), skeleton_edges.end() ), skeleton_edges.end() );
         
         std::cout << "Gmsh data is read." << std::endl;
-        std::cout << "Number of edges  " << skeleton_edges.size() << std::endl;
-        std::cout << "Number of facets " << polygons.size() << std::endl;
-        std::cout << "Number of cells  " << polyhedrons.size() << std::endl;
+        std::cout << "Raw number of nodes  " << nodes.size() << std::endl;
+        std::cout << "Raw number of edges  " << skeleton_edges.size() << std::endl;
+        std::cout << "Raw number of facets " << polygons.size() << std::endl;
+        std::cout << "Raw number of cells  " << polyhedrons.size() << std::endl;
         
         return true;
     }
@@ -2420,6 +2421,7 @@ public:
         storage->points = std::move(points);
         storage->nodes  = std::move(nodes);
         
+        edges.clear();
         edges.reserve(skeleton_edges.size());
         for (size_t i = 0; i < skeleton_edges.size(); i++)
         {
@@ -2433,6 +2435,7 @@ public:
             edges.push_back(e);
         }
         std::sort(edges.begin(), edges.end());
+        edges.erase( std::unique( edges.begin(), edges.end() ), edges.end() );
         storage->edges = std::move(edges);
         
         auto facet_edges = [&](const polygon & p)->std::vector<typename edge_type::id_type> {
@@ -2460,17 +2463,44 @@ public:
             return surface_edges;
         };
         
+        auto should_skip = [&](const surface_type & surface)-> bool {
+        
+            bool check_Q = false;
+            for (auto face_it = surfaces.begin(); face_it != surfaces.end(); face_it++)
+            {
+                auto face = *face_it;
+                
+                std::vector<size_t> face_p_ids,p_ids;
+                for (auto & id: face.point_ids()) {
+                    face_p_ids.push_back(id);
+                }
+                for (auto & id: surface.point_ids()) {
+                    p_ids.push_back(id);
+                }
+                std::sort(face_p_ids.begin(), face_p_ids.end());
+                std::sort(p_ids.begin(), p_ids.end());
+                check_Q = std::equal(face_p_ids.begin(), face_p_ids.end(), p_ids.begin());
+                if (check_Q) {
+                    break;
+                }
+            }
+            return check_Q;
+        };
+        
         surfaces.reserve( polygons.size() );
         for (auto& p : polygons)
         {
             std::vector<typename edge_type::id_type> surface_edges = facet_edges(p);
             auto surface = surface_type(surface_edges);
             surface.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
+            bool should_skip_Q = should_skip(surface);
+            if (should_skip_Q) {
+                continue;
+            }
             surfaces.push_back( surface );
         }
 
         std::sort(surfaces.begin(), surfaces.end());
-        surfaces.erase( std::unique( surfaces.begin(), surfaces.end() ), surfaces.end() );
         storage->surfaces = std::move(surfaces);
         
         
@@ -2512,6 +2542,8 @@ public:
             auto surface = surface_type(surface_edges);
             surface.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
  
+
+
             auto position = find_surface(surface);
             if (position == -1)
             {
@@ -2535,16 +2567,15 @@ public:
                 auto surface = surface_type(surface_edges);
                 surface.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
                 
-                auto surface_id = find_element_id(storage->surfaces.begin(),
-                                               storage->surfaces.end(), surface);
-                if (!surface_id.first)
+                auto surface_id = find_surface(surface);
+                if (surface_id == -1)
                 {
                     std::cout << "Bad bug at " << __FILE__ << "("
                               << __LINE__ << ")" << std::endl;
                     assert(false);
                 }
 
-                volume_surfaces.push_back(surface_id.second);
+                volume_surfaces.push_back(surface_id);
             }
             
             return volume_surfaces;
@@ -2558,9 +2589,8 @@ public:
             volume.set_point_ids(p.m_member_nodes.begin(), p.m_member_nodes.end());
             volumes.push_back( volume );
         }
-        
+
         std::sort(volumes.begin(), volumes.end());
-        volumes.erase( std::unique( volumes.begin(), volumes.end() ), volumes.end() );
         storage->volumes = std::move(volumes);
         
         std::cout << "Nodes: " << storage->nodes.size() << std::endl;
@@ -2568,7 +2598,10 @@ public:
         std::cout << "Faces: " << storage->surfaces.size() << std::endl;
         std::cout << "Volumes: " << storage->volumes.size() << std::endl;
 
-        boundary_surfaces.clear();
+        polygons.clear();
+        boundary_polygons.clear();
+        polyhedrons.clear();
+        skeleton_edges.clear();
 
         return true;
         

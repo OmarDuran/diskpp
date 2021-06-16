@@ -102,12 +102,12 @@ void Fratures3D(simulation_data & sim_data){
     };
 
     auto is_diag_Q = [](const mesh_type_3d::point_type& a)-> bool {
-        bool check_Q = fabs(a.x() - a.y()) <= 1.0e-3;
+        bool check_Q = fabs(a.x() - a.y()) <= 1.0e-4;
         return check_Q;
     };
 
     auto is_horizontal_Q = [](const mesh_type_3d::point_type& a)-> bool {
-        bool check_Q = fabs(1.0 - a.y()) <= 1.0e-3;
+        bool check_Q = fabs(1.0 - a.y()) <= 1.0e-4;
         return check_Q;
     };
 
@@ -199,11 +199,11 @@ void Fratures3D(simulation_data & sim_data){
     if(1){
         fracture<mesh_type_3d> f;
         f.m_pairs = fracture_pairs;
-        f.m_bl_index = end_point_mortars[0].second;
-        f.m_el_index = end_point_mortars[1].second;
-        f.m_br_index = end_point_mortars[0].second;
-        f.m_er_index = end_point_mortars[1].second;
-        f.build(msh);
+//        f.m_bl_index = end_point_mortars[0].second;
+//        f.m_el_index = end_point_mortars[1].second;
+//        f.m_br_index = end_point_mortars[0].second;
+//        f.m_er_index = end_point_mortars[1].second;
+//        f.build(msh);
 
         fractures.push_back(f);
 
@@ -427,11 +427,11 @@ void Fratures3D(simulation_data & sim_data){
         }
 
         bnd.addDirichletBC(disk::DY, bc_south_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_east_id, u_east_fun);
-        bnd.addDirichletBC(disk::DY, bc_north_id, u_north_fun);
-        bnd.addDirichletBC(disk::DY, bc_west_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_bottom_id, null_v_fun);
-        bnd.addDirichletBC(disk::DY, bc_top_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_east_id, null_v_fun);
+        bnd.addDirichletBC(disk::DY, bc_north_id, null_v_fun);
+        bnd.addDirichletBC(disk::DX, bc_west_id, null_v_fun);
+        bnd.addDirichletBC(disk::DZ, bc_bottom_id, null_v_fun);
+        bnd.addDirichletBC(disk::DZ, bc_top_id, u_top_fun);
     }
 
     tc.tic();
@@ -448,6 +448,7 @@ void Fratures3D(simulation_data & sim_data){
     assembler.apply_bc(msh);
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
+    std::cout << bold << cyan << "ndof : " << assembler.LHS.rows() << reset << std::endl;
 
     bool write_kg_Q = false;
     if(write_kg_Q){
@@ -478,12 +479,12 @@ void Fratures3D(simulation_data & sim_data){
     std::cout << bold << cyan << "Linear Solve in : " << tc.to_double() << " seconds" << reset << std::endl;
     std::cout << bold << cyan << "Number of equations : " << analysis.n_equations() << reset << std::endl;
 
-    assembler.project_over_skin_cells(msh,x_dof);
+//    assembler.project_over_skin_cells(msh,x_dof);
 
     // render silo
     size_t it = 0;
-    std::string silo_file_name = "single_fracture";
-    postprocessor<mesh_type_3d>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
+    std::string silo_file_name = "single_fracture_3d";
+    postprocessor<mesh_type_3d>::write_silo_u_field_3d(silo_file_name, it, msh, hho_di, x_dof);
 
 //    // sigma n and t
 //    size_t f_ind = 0;

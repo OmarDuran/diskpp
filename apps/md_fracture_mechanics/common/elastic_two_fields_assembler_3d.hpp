@@ -309,7 +309,8 @@ public:
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
 
             auto fc_id = msh.lookup(fc);
-            return bnd.is_dirichlet_face(fc_id);
+            bool check_Q = bnd.is_dirichlet_face(fc_id);
+            return check_Q;
         };
 
         m_n_edges = msh.faces_size();
@@ -353,7 +354,7 @@ public:
             frac_c++;
         }
         
-        m_n_mortar_points = 2;
+        m_n_mortar_points = 0;
         m_n_up_mortar_dof = 0;
         m_compress_up_mortar_indexes.resize(m_n_mortar_points);
         for (size_t i = 0; i < m_n_mortar_points; i++) {
@@ -419,6 +420,7 @@ public:
                          for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
                              asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
                              asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
                          }
                         break;
                     }
@@ -426,8 +428,17 @@ public:
                         for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
                             asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
                         }
                         break;
+                    }
+                    case disk::DZ: {
+                     for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
+                         asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                         asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                         asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                     }
+                     break;
                     }
                      default: {
                         throw std::logic_error("Unknown Dirichlet Conditions.");
@@ -1964,7 +1975,7 @@ public:
         Matrix<T, Dynamic, Dynamic> mass_matrix_trace_sigma  = symmetric_tensor_trace_mass_matrix(msh, cell);
         
         // Constitutive relationship inverse
-        mass_matrix_trace_sigma *= (lambda/(2.0*mu+2.0*lambda));
+        mass_matrix_trace_sigma *= (lambda/(2.0*mu+3.0*lambda));
         mass_matrix_sigma -= mass_matrix_trace_sigma;
         mass_matrix_sigma *= (1.0/(2.0*mu));
         mass_matrix.block(0, 0, n_ten_cbs, n_ten_cbs) = mass_matrix_sigma;
@@ -2982,9 +2993,8 @@ public:
         for (auto& qp : qps)
         {
             const auto phi  = cell_basis.eval_functions(qp.point());
-//            const auto qp_f = disk::priv::inner_product(qp.weight(), rhs_fun(qp.point()));
-//            ret_loc += disk::priv::outer_product(phi, qp_f);
-            assert(false);
+            const auto qp_f = disk::priv::inner_product(qp.weight(), rhs_fun(qp.point()));
+            ret_loc += disk::priv::outer_product(phi, qp_f);
         }
         ret.block(ten_bs,0,vec_bs,1) = ret_loc;
         return ret;
