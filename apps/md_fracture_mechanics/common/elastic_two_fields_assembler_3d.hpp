@@ -417,26 +417,26 @@ public:
                         break;
                     }
                     case disk::DX: {
-                         for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                         }
+                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
+                        }
                         break;
                     }
                     case disk::DY: {
-                        for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
-                            asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
                         }
                         break;
                     }
                     case disk::DZ: {
-                     for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
-                         asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                         asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                         asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                     for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                         asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
+                         asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
+                         asm_map.push_back( assembly_index(face_LHS_offset+i+2, false) );
                      }
                      break;
                     }
@@ -522,26 +522,26 @@ public:
                         break;
                     }
                     case disk::DX: {
-                         for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                         }
+                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
+                        }
                         break;
                     }
                     case disk::DY: {
-                        for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
-                            asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
-                            asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
+                        for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+1, false) );
+                            asm_map.push_back( assembly_index(face_LHS_offset+i+2, true) );
                         }
                         break;
                     }
                      case disk::DZ: {
-                         for (size_t i = 0; i < n_fbs/Mesh::dimension; i++){
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, true) );
-                             asm_map.push_back( assembly_index(face_LHS_offset+i, false) );
+                         for (size_t i = 0; i < n_fbs; i += Mesh::dimension){
+                             asm_map.push_back( assembly_index(face_LHS_offset+i+0, true) );
+                             asm_map.push_back( assembly_index(face_LHS_offset+i+1, true) );
+                             asm_map.push_back( assembly_index(face_LHS_offset+i+2, false) );
                          }
                          break;
                      }
