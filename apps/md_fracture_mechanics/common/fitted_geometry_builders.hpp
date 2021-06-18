@@ -1061,6 +1061,9 @@ class gmsh_2d_reader : public fitted_geometry_builder<disk::generic_mesh<T, 2>>
     std::string poly_mesh_file;
     std::set<size_t> bc_points;
     gmsh_data   mesh_data;
+    
+    std::vector<std::pair<size_t,size_t>>                   fbc_mat_id_nodes;
+    std::vector<std::pair<size_t,std::array<size_t, 2>>>    fbc_mat_id_edges;
  
     
     void clear_storage() {
@@ -1533,6 +1536,7 @@ public:
                                 
                                 std::string bc_string = "Gamma";
                                 std::string fracture_string = "Fracture";
+                                std::string fractureBC_string = "fractureBC";
                                 if (entity_name.find(bc_string) != std::string::npos) {
                                     for (int i_node = 0; i_node < n_el_nodes; i_node++) {
                                         bc_points.insert(node_map[node_identifiers[i_node]]);
@@ -1550,6 +1554,23 @@ public:
                                         validate_edge(edge);
                                         facets.push_back( edge );
                                     }
+                                    
+                                }else if(entity_name.find(fractureBC_string) != std::string::npos){ // fracture case
+                                    
+                                    if (entity_dim == 0) { // Point Fracture BC
+                                        size_t node_id = static_cast<unsigned long>(node_map[node_identifiers[0]]);
+                                        fbc_mat_id_nodes.push_back(std::make_pair(physical_identifier,node_id));
+                                    }else if(entity_dim == 1){ // line Fracture BC
+                                        for (int i_node = 0; i_node < n_el_nodes - 1; i_node++) {
+                                            std::array<size_t, 2> edge = {static_cast<unsigned long>(node_map[node_identifiers[i_node]]),static_cast<unsigned long>(node_map[node_identifiers[i_node+1]])};
+                                            validate_edge(edge);
+                                            facets.push_back( edge );
+                                            fbc_mat_id_edges.push_back(std::make_pair(physical_identifier,edge));
+                                        }
+                                    }else{
+                                        assert(false);
+                                    }
+                                    
                                     
                                 }else{ // polygon case
                                     /// Internally the nodes index and element index is converted to zero based indexation
@@ -1712,6 +1733,11 @@ public:
         file << "Number of vertices : " << vertices.size() << std::endl;
         file.close();
     }
+    
+    std::vector<std::pair<size_t,size_t>> & fracture_nodes(){
+        return fbc_mat_id_nodes;
+    }
+    
     
 };
 

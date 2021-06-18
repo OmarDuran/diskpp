@@ -58,8 +58,8 @@ int main(int argc, char **argv)
     simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
     sim_data.print_simulation_data();
     
-//    Fratures2D(sim_data);
-    Fratures3D(sim_data);
+    Fratures2D(sim_data);
+//    Fratures3D(sim_data);
     return 0;
 }
 
@@ -182,10 +182,10 @@ void Fratures3D(simulation_data & sim_data){
     if(1){
         fracture_3d<mesh_type_3d> f;
         f.m_pairs = fracture_pairs;
-        f.m_bl_index = end_point_mortars[0].second;
-        f.m_el_index = end_point_mortars[1].second;
-        f.m_br_index = end_point_mortars[0].second;
-        f.m_er_index = end_point_mortars[1].second;
+//        f.m_bl_index = end_point_mortars[0].second;
+//        f.m_el_index = end_point_mortars[1].second;
+//        f.m_br_index = end_point_mortars[0].second;
+//        f.m_er_index = end_point_mortars[1].second;
         f.build(msh);
 
         fractures.push_back(f);
@@ -895,10 +895,10 @@ void Fratures2D(simulation_data & sim_data){
     if(1){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
-        f.m_bl_index = end_point_mortars[0].second;
-        f.m_el_index = end_point_mortars[1].second;
-        f.m_br_index = end_point_mortars[0].second;
-        f.m_er_index = end_point_mortars[1].second;
+        f.m_bl_index = mesh_builder.fracture_nodes()[0].second;
+        f.m_el_index = mesh_builder.fracture_nodes()[1].second;
+        f.m_br_index = mesh_builder.fracture_nodes()[0].second;
+        f.m_er_index = mesh_builder.fracture_nodes()[1].second;
         f.build(msh);
 
         fractures.push_back(f);
