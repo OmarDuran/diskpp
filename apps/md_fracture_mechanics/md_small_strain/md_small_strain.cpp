@@ -736,7 +736,7 @@ void Fratures2D(simulation_data & sim_data){
     mesh_type msh;
     
     // Reading the polygonal mesh
-//    polygon_2d_mesh_reader<RealType> mesh_builder;
+    polygon_2d_mesh_reader<RealType> mesh_builder;
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
@@ -746,14 +746,14 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
-    
+//
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_22.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_88.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_88.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_fracture_nel_352.txt";
 //    std::string mesh_file = "meshes/base_polymesh_cross_nel_352.txt";
-    
+//
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_111.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_444.txt";
@@ -763,20 +763,20 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_1965.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
-    
-//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
+//
+    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_801.txt";
-//    mesh_builder.set_poly_mesh_file(mesh_file);
-//    mesh_builder.build_mesh();
-//    mesh_builder.move_to_mesh_storage(msh);
-    
-    gmsh_2d_reader<RealType> mesh_builder;
-    std::string mesh_file = "meshes/fractured_reservoir.msh";
-    mesh_builder.set_gmsh_file(mesh_file);
+    mesh_builder.set_poly_mesh_file(mesh_file);
     mesh_builder.build_mesh();
     mesh_builder.move_to_mesh_storage(msh);
-    std::string silo_mesh_file = "mesh";
-    postprocessor<mesh_type>::write_silo_mesh(silo_mesh_file, msh);
+    
+//    gmsh_2d_reader<RealType> mesh_builder;
+//    std::string mesh_file = "meshes/fractured_reservoir.msh";
+//    mesh_builder.set_gmsh_file(mesh_file);
+//    mesh_builder.build_mesh();
+//    mesh_builder.move_to_mesh_storage(msh);
+//    std::string silo_mesh_file = "mesh";
+//    postprocessor<mesh_type>::write_silo_mesh(silo_mesh_file, msh);
     
     tc.toc();
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -892,13 +892,13 @@ void Fratures2D(simulation_data & sim_data){
     // filling up fractures
     std::vector<fracture<mesh_type> > fractures;
     std::vector<restriction > restrictions;
-    if(1){
+    if(0){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
-        f.m_bl_index = mesh_builder.fracture_nodes()[0].second;
-        f.m_el_index = mesh_builder.fracture_nodes()[1].second;
-        f.m_br_index = mesh_builder.fracture_nodes()[0].second;
-        f.m_er_index = mesh_builder.fracture_nodes()[1].second;
+        f.m_bl_index = 0;//mesh_builder.fracture_nodes()[0].second;
+        f.m_el_index = 1;//mesh_builder.fracture_nodes()[1].second;
+        f.m_br_index = 2;//mesh_builder.fracture_nodes()[0].second;
+        f.m_er_index = 3;//mesh_builder.fracture_nodes()[1].second;
         f.build(msh);
 
         fractures.push_back(f);
@@ -916,7 +916,7 @@ void Fratures2D(simulation_data & sim_data){
         restrictions.push_back(r1);
     }
     
-    if(0){
+    if(1){
         fracture<mesh_type> f0;
         f0.m_pairs = f0_pairs;
         f0.m_bl_index = 6;
