@@ -1993,9 +1993,9 @@ public:
                 auto ul_div_phi = skin_coupling_matrix_ul(msh, cell_l, face_l, f, cell_ind);
                 auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, f, cell_ind);
                 
-                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
+//                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
                 scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
-                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
+//                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
                 scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
 
                 bool BC_mortars_Q = true;
@@ -2203,7 +2203,7 @@ public:
                 
                 Matrix<T, Dynamic, Dynamic> stress_spring = Matrix<T, Dynamic, Dynamic>::Zero(2,1);
                 stress_spring(0,0) = +1.0;
-                stress_spring(1,0) = +1.0;
+                stress_spring(1,0) = -1.0;
                 scatter_skin_hybrid_spring_data(msh, f_ind_l, f_l, s.m_l_index.first, side_Q_l, f_ind_r, f_r, s.m_l_index.second, side_Q_r, s_ind, stress_spring);
                 
 //                const Mesh& msh, size_t f_ind_l, fracture<Mesh> & f_l, size_t & node_ind_l, bool side_Q_l, size_t f_ind_r, fracture<Mesh> & f_r, const size_t & node_ind_r, bool side_Q_r, size_t & restrict_node, const Matrix<T, Dynamic, Dynamic>& mat
@@ -2655,7 +2655,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 10000.0;
+        T c_para = 1000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -3015,6 +3015,9 @@ public:
             typename Mesh::point_type point_rr = nodes_r[1];
             typename Mesh::point_type vr = point_rr - point_rl;
             auto nr = inplane_normal(msh,face_r,point,vr);
+//            if(std::fabs(nr-nl) < 1.0e-5){
+//                nr *= -1.0;
+//            }
             {
                 const auto s_phi = sr_basis.eval_flux_functions(point);
                 const auto mu_f_phi = sr_basis.eval_lambda_functions(point);

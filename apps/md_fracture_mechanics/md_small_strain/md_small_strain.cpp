@@ -764,11 +764,11 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
 //
-//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
+    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_801.txt";
     
     // other meshes
-    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_57.txt";
+//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_57.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_364.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_1279.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_2061.txt";
@@ -956,7 +956,7 @@ void Fratures2D(simulation_data & sim_data){
         f0.m_bl_index = 6;
         f0.m_el_index = 7;
         f0.m_br_index = 6;
-        f0.m_er_index = 38;//1062;//667;//199;//38
+        f0.m_er_index = 449;//1062;//667;//199;//38;//449
         f0.build(msh);
         fractures.push_back(f0);
         
@@ -964,8 +964,8 @@ void Fratures2D(simulation_data & sim_data){
         f1.m_pairs = f1_pairs;
         f1.m_bl_index = 4;
         f1.m_el_index = 7;
-        f1.m_br_index = 46;//1138;//719;//219;//46
-        f1.m_er_index = 47;//1131;//716;//222;//47
+        f1.m_br_index = 472;//1138;//719;//219;//46;//472
+        f1.m_er_index = 475;//1131;//716;//222;//47;//475
         f1.build(msh);
         f1.m_bc_type = {1,1};
         f1.m_bc_data = {{-0.05,0},{-0.05,0}};
@@ -974,9 +974,9 @@ void Fratures2D(simulation_data & sim_data){
         fracture<mesh_type> f2;
         f2.m_pairs = f2_pairs;
         f2.m_bl_index = 5;
-        f2.m_el_index = 47;//1131;//716;//222;//47
-        f2.m_br_index = 42;//1078;//684;//214;//42
-        f2.m_er_index = 38;//1062;//667;//199;//38
+        f2.m_el_index = 475;//1131;//716;//222;//47;//475
+        f2.m_br_index = 455;//1078;//684;//214;//42;//455
+        f2.m_er_index = 449;//1062;//667;//199;//38;//449
         f2.build(msh);
         f2.m_bc_type = {1,1};
         f2.m_bc_data = {{0,-0.2},{0,-0.2}};
@@ -1170,7 +1170,7 @@ void Fratures2D(simulation_data & sim_data){
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    bool write_kg_Q = true;
+    bool write_kg_Q = false;
     if(write_kg_Q){
         std::ofstream mat_file;
         mat_file.open ("matrix.txt");
@@ -1209,7 +1209,7 @@ void Fratures2D(simulation_data & sim_data){
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
     
     // sigma n and t
-    size_t f_ind = 2;
+    size_t f_ind = 0;
     {
         fracture<mesh_type> f = fractures[f_ind];
         auto storage = msh.backend_storage();
