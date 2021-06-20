@@ -743,7 +743,7 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
 //
@@ -768,7 +768,8 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_801.txt";
     
     // other meshes
-//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_364.txt";
+//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_57.txt";
+    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_364.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_1279.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_2061.txt";
     
@@ -862,7 +863,7 @@ void Fratures2D(simulation_data & sim_data){
     
 //    end_point_mortars.clear();
     
-    if(0){// find points
+    if(1){// find points
         std::vector<mesh_type::point_type> pts;
         mesh_type::point_type p0;
         p0.x() = +10.0;
@@ -899,6 +900,8 @@ void Fratures2D(simulation_data & sim_data){
             c++;
         }
         
+        int aka = 0;
+        
         // print points
 //        for(auto chunk : f0_pairs){
 //            auto &face_l = storage->edges.at(chunk.first);
@@ -922,7 +925,7 @@ void Fratures2D(simulation_data & sim_data){
     // filling up fractures
     std::vector<fracture<mesh_type> > fractures;
     std::vector<restriction > restrictions;
-    if(1){
+    if(0){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
         f.m_bl_index = end_point_mortars[0].second;//mesh_builder.fracture_nodes()[0].second;
@@ -946,13 +949,13 @@ void Fratures2D(simulation_data & sim_data){
         restrictions.push_back(r1);
     }
     
-    if(0){
+    if(1){
         fracture<mesh_type> f0;
         f0.m_pairs = f0_pairs;
         f0.m_bl_index = 6;
         f0.m_el_index = 7;
         f0.m_br_index = 6;
-        f0.m_er_index = 199;//1062;//667;//199;
+        f0.m_er_index = 199;//1062;//667;//199;//38
         f0.build(msh);
         fractures.push_back(f0);
         
@@ -960,8 +963,8 @@ void Fratures2D(simulation_data & sim_data){
         f1.m_pairs = f1_pairs;
         f1.m_bl_index = 4;
         f1.m_el_index = 7;
-        f1.m_br_index = 219;//1138;//719;//219;
-        f1.m_er_index = 222;//1131;//716;//222;
+        f1.m_br_index = 219;//1138;//719;//219;//46
+        f1.m_er_index = 222;//1131;//716;//222;//47
         f1.build(msh);
         f1.m_bc_type = {1,1};
         f1.m_bc_data = {{-0.05,0},{-0.05,0}};
@@ -970,40 +973,38 @@ void Fratures2D(simulation_data & sim_data){
         fracture<mesh_type> f2;
         f2.m_pairs = f2_pairs;
         f2.m_bl_index = 5;
-        f2.m_el_index = 222;//1131;//716;//222;
-        f2.m_br_index = 214;//1078;//684;//214;
-        f2.m_er_index = 199;//1062;//667;//199;
+        f2.m_el_index = 222;//1131;//716;//222;//47
+        f2.m_br_index = 214;//1078;//684;//214;//42
+        f2.m_er_index = 199;//1062;//667;//199;//38
         f2.build(msh);
         f2.m_bc_type = {1,1};
         f2.m_bc_data = {{0,-0.2},{0,-0.2}};
         fractures.push_back(f2);
         
 
-        
-        
         restriction r0;
         r0.m_f_index = {0,0};
         r0.m_p_index = {0,0};
         r0.m_s_index = {0,1};
         restrictions.push_back(r0);
         
-//        restriction r1;
-//        r1.m_f_index = {0,2};
-//        r1.m_p_index = {1,1};
-//        r1.m_s_index = {1,1};
-//        restrictions.push_back(r1);
-//
-//        restriction r2;
-//        r2.m_f_index = {2,1};
-//        r2.m_p_index = {1,1};
-//        r2.m_s_index = {0,1};
-//        restrictions.push_back(r2);
-//
-//        restriction r3;
-//        r3.m_f_index = {0,1};
-//        r3.m_p_index = {1,1};
-//        r3.m_s_index = {0,0};
-//        restrictions.push_back(r3);
+        restriction r1;
+        r1.m_f_index = {0,2};
+        r1.m_p_index = {1,1};
+        r1.m_s_index = {1,1};
+        restrictions.push_back(r1);
+
+        restriction r2;
+        r2.m_f_index = {2,1};
+        r2.m_p_index = {1,1};
+        r2.m_s_index = {0,1};
+        restrictions.push_back(r2);
+
+        restriction r3;
+        r3.m_f_index = {0,1};
+        r3.m_p_index = {1,1};
+        r3.m_s_index = {0,0};
+        restrictions.push_back(r3);
         
 //        restriction r4;
 //        r4.m_f_index = {1,1};
@@ -1157,7 +1158,7 @@ void Fratures2D(simulation_data & sim_data){
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    bool write_kg_Q = true;
+    bool write_kg_Q = false;
     if(write_kg_Q){
         std::ofstream mat_file;
         mat_file.open ("matrix.txt");
@@ -1196,7 +1197,7 @@ void Fratures2D(simulation_data & sim_data){
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
     
     // sigma n and t
-    size_t f_ind = 0;
+    size_t f_ind = 1;
     {
         fracture<mesh_type> f = fractures[f_ind];
         auto storage = msh.backend_storage();
@@ -1415,25 +1416,19 @@ void Fratures2D(simulation_data & sim_data){
         // skins Lagrange multiplier
         if(1){
             
-//            size_t sig_bs = 3;
-//            size_t n_skin_bs = sig_bs * f.m_pairs.size();
-//            size_t f_offset = assembler.compress_skin_cells_indexes().at(f_ind);
-//            size_t base = n_cells_dof + n_faces_dofs + f_offset;
-            
-            size_t sig_bs = 3;
             size_t n_skin_bs = f.m_pairs.size()-1;
-            size_t uL_bs = cell_ind-1;
             size_t f_offset = assembler.compress_skin_edges_indexes().at(f_ind);
             size_t base = n_cells_dof + n_faces_dofs + f_offset;
-            size_t p_sn_l = base+n_cells*sig_bs+0*n_skin_bs;
-            size_t p_st_l = base+n_cells*sig_bs+1*n_skin_bs;
-            size_t p_sn_r = base+n_cells*sig_bs+2*n_skin_bs;
-            size_t p_st_r = base+n_cells*sig_bs+3*n_skin_bs;
+            base += assembler.get_n_skin_cells_dof();
+            size_t p_sn_l = base+0*n_skin_bs;
+            size_t p_st_l = base+1*n_skin_bs;
+            size_t p_sn_r = base+2*n_skin_bs;
+            size_t p_st_r = base+3*n_skin_bs;
             
-            Matrix<RealType, Dynamic, 1> un_l_dof = x_dof.block(p_sn_l, 0, uL_bs, 1);
-            Matrix<RealType, Dynamic, 1> ut_l_dof = x_dof.block(p_st_l, 0, uL_bs, 1);
-            Matrix<RealType, Dynamic, 1> un_r_dof = x_dof.block(p_sn_r, 0, uL_bs, 1);
-            Matrix<RealType, Dynamic, 1> ut_r_dof = x_dof.block(p_st_r, 0, uL_bs, 1);
+            Matrix<RealType, Dynamic, 1> un_l_dof = x_dof.block(p_sn_l, 0, n_skin_bs, 1);
+            Matrix<RealType, Dynamic, 1> ut_l_dof = x_dof.block(p_st_l, 0, n_skin_bs, 1);
+            Matrix<RealType, Dynamic, 1> un_r_dof = x_dof.block(p_sn_r, 0, n_skin_bs, 1);
+            Matrix<RealType, Dynamic, 1> ut_r_dof = x_dof.block(p_st_r, 0, n_skin_bs, 1);
             
             std::cout << std::setprecision(pre) << "unL_l =  " << un_l_dof << std::endl;
             std::cout << std::setprecision(pre) << "unL_r =  " << un_r_dof << std::endl;
@@ -1442,12 +1437,13 @@ void Fratures2D(simulation_data & sim_data){
         }
         
         // sigma normal and mortar u0 evaluation
-        if(0){
-            size_t n_mortar_displacements = 2*2;
-            size_t n_skin_bs = assembler.get_n_skin_dof();
-            size_t n_f_hybrid_dofs = assembler.get_n_f_hybrid_dofs();
-            size_t f_offset = assembler.compress_fracture_indexes().at(f_ind);
-            size_t points_offset = n_cells_dof + n_faces_dofs + n_skin_bs + n_f_hybrid_dofs + f_ind * n_mortar_displacements;
+        if(1){
+
+            size_t n_mortar_displacements = 2 * restrictions.size() + 8;
+            size_t points_offset = n_cells_dof + n_faces_dofs;
+            points_offset += assembler.get_n_skin_cells_dof();
+            points_offset += assembler.get_n_skin_edges_dof();
+            
             Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
             std::cout << std::setprecision(pre) << "sigma =  " << sigma_dof << std::endl;
         }

@@ -313,6 +313,7 @@ class elastic_two_fields_assembler
     size_t      m_n_skin_dof;
     size_t      m_n_skin_cells_dof;
     size_t      m_n_skin_edges_dof;
+    size_t      m_n_skin_bc_edges_dof;
     size_t      m_sigma_degree;
     size_t      m_n_up_mortar_dof;
     size_t      m_n_mortar_points;
@@ -368,6 +369,7 @@ public:
         m_compress_skin_edges_indexes.resize(m_fractures.size());
         m_n_skin_cells_dof = 0;
         m_n_skin_edges_dof = 0;
+        m_n_skin_bc_edges_dof = 0;
         
         size_t frac_c = 0;
         for (auto f : m_fractures) {
@@ -379,18 +381,25 @@ public:
             
             m_n_f_hybrid_dof += (n_f_sigma_n_bs + n_f_sigma_t_bs) * f.m_pairs.size();
             m_n_hybrid_dof += (n_f_sigma_n_bs + n_f_sigma_t_bs) * f.m_pairs.size();
-//            m_n_hybrid_dof += 2 * 2;
             m_n_skin_dof += 4 * f.m_skin_bs;
             
             m_n_skin_cells_dof +=  3 * 4 * f.m_pairs.size();
             m_n_skin_edges_dof +=  1 * 4 * (f.m_pairs.size()-1);
             
+            if(f.m_bc_type.first == 1){
+                m_n_skin_bc_edges_dof += 2;
+            }
+                
+            if(f.m_bc_type.second == 1){
+                m_n_skin_bc_edges_dof += 2;
+            }
+                    
             frac_c++;
         }
         
-        m_n_mortar_points = 2;
-        m_n_up_mortar_dof = 0;
+        m_n_mortar_points = m_restrictions.size();
         m_compress_up_mortar_indexes.resize(m_n_mortar_points);
+        m_n_up_mortar_dof = 0;
         for (size_t i = 0; i < m_n_mortar_points; i++) {
             m_compress_up_mortar_indexes.at(i) = m_n_up_mortar_dof;
             m_n_up_mortar_dof += 2;
@@ -402,7 +411,7 @@ public:
         m_n_cells_dof = n_cbs * msh.cells_size();
             
         size_t system_size = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof;
-        system_size += m_n_up_mortar_dof;
+        system_size += m_n_up_mortar_dof + m_n_skin_bc_edges_dof;
         
         // skin data
         for (auto f : m_fractures) {
@@ -630,7 +639,7 @@ public:
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
         auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + m_n_skin_dof + cell_ind*n_f_sigma_bs;
         frac_LHS_offset += m_compress_hybrid_indexes.at(fracture_ind);
-        frac_LHS_offset += m_n_up_mortar_dof;
+        frac_LHS_offset += m_n_up_mortar_dof + m_n_skin_bc_edges_dof;
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map_i.push_back( assembly_index(frac_LHS_offset+i, true));
@@ -994,7 +1003,7 @@ public:
     
     }
 
-    void scatter_skins_bc_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, size_t s_ind)
+    void scatter_skins_bc_u_t_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, size_t bc_ind, size_t s_ind)
     {
  
         auto storage = msh.backend_storage();
@@ -1007,6 +1016,7 @@ public:
         if(f.m_bc_type.first == 1){
             cell_ind = 0;
         }else{
+            assert(false);
             cell_ind = f.m_pairs.size() - 1;
         }
         
@@ -1037,7 +1047,6 @@ public:
         
         // rhs value
         T uD_val;
-        size_t shift = 0;
         static_vector<T, 2> uD;
         if(s_ind==0){
             uD = {f.m_bc_data.first[0],f.m_bc_data.first[1]};
@@ -1045,17 +1054,14 @@ public:
         }else{
             uD = {f.m_bc_data.second[0],f.m_bc_data.second[1]};
             uD_val = uD.dot(t_r);
-            shift += 2 * n_skin_bs;
         }
         
         
 
-        
+        size_t n_bc_skin_bs = 4;
         std::vector<assembly_index> asm_map;
-        auto base = m_n_cells_dof + m_n_faces_dof + n_skin_bs;
-        base += m_compress_fracture_indexes.at(fracture_ind) + shift;
-        
-        auto u_LHS_offset = base + n_skin_sigma_bs * n_cells + cell_ind * n_cells;
+        auto base = m_n_cells_dof + m_n_faces_dof + m_n_skin_cells_dof + m_n_skin_edges_dof + m_n_up_mortar_dof;
+        auto u_LHS_offset = base + bc_ind * n_bc_skin_bs;
         
         for (size_t i = 0; i < n_0d_bc_bs; i++)
         asm_map.push_back( assembly_index(u_LHS_offset+i, true));
@@ -1066,9 +1072,11 @@ public:
         {
             for (size_t j = 0; j < mat.cols(); j++)
             {
-                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map[j], +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map[i]+1, asm_map[j]+1, +1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map[i]+3, asm_map[j]+3, +1.0*mat(i,j)) );
             }
-            RHS(asm_map[i]) += uD_val * beta;
+            RHS(asm_map[i]+1) += +1.0*uD_val * beta;
+            RHS(asm_map[i]+3) += -1.0*uD_val * beta;
         }
         
     }
@@ -1198,7 +1206,7 @@ public:
         std::vector<assembly_index> asm_map;
         auto frac_LHS_offset = m_n_cells_dof + m_n_faces_dof + m_n_skin_dof +  cell_ind*n_f_sigma_bs;
         frac_LHS_offset += m_compress_hybrid_indexes.at(fracture_ind);
-        frac_LHS_offset += m_n_up_mortar_dof;
+        frac_LHS_offset += m_n_up_mortar_dof + m_n_skin_bc_edges_dof;
         
         for (size_t i = 0; i < n_f_sigma_bs; i++)
         asm_map.push_back( assembly_index(frac_LHS_offset+i, true));
@@ -1241,7 +1249,7 @@ public:
         size_t n_sigma_skin_l_bs = n_sigma_skin_bs * f.m_pairs.size();
         std::vector<assembly_index> asm_map;
         auto skin_LHS_offset = m_n_cells_dof + m_n_faces_dof + cell_ind * n_sigma_skin_bs;
-        skin_LHS_offset += m_compress_fracture_indexes.at(fracture_ind);
+        skin_LHS_offset += m_compress_skin_cells_indexes.at(fracture_ind);
 
         
         for (size_t i = 0; i < n_sigma_skin_bs; i++)
@@ -1273,7 +1281,7 @@ public:
         size_t n_sigma_skin_l_bs = n_sigma_skin_bs * f.m_pairs.size();
         std::vector<assembly_index> asm_map;
         auto skin_LHS_offset = m_n_cells_dof + m_n_faces_dof + cell_ind * n_sigma_skin_bs;
-        skin_LHS_offset += m_compress_fracture_indexes.at(fracture_ind);
+        skin_LHS_offset += m_compress_skin_cells_indexes.at(fracture_ind);
         skin_LHS_offset += 2.0 * n_sigma_skin_l_bs;
         
         for (size_t i = 0; i < n_sigma_skin_bs; i++)
@@ -1306,7 +1314,7 @@ public:
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto skin_LHS_offset = m_n_cells_dof + m_n_faces_dof + cell_ind * n_sigma_skin_bs;
-        skin_LHS_offset += m_compress_fracture_indexes.at(fracture_ind);
+        skin_LHS_offset += m_compress_skin_cells_indexes.at(fracture_ind);
         
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
         
@@ -1337,7 +1345,7 @@ public:
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto skin_LHS_offset = m_n_cells_dof + m_n_faces_dof + n_sigma_skin_l_bs + cell_ind*n_sigma_skin_bs;
-        skin_LHS_offset += m_compress_fracture_indexes.at(fracture_ind);
+        skin_LHS_offset += m_compress_skin_cells_indexes.at(fracture_ind);
         
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
         
@@ -1368,7 +1376,7 @@ public:
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto skin_LHS_offset = m_n_cells_dof + m_n_faces_dof + 2 * n_sigma_skin_r_bs + cell_ind*n_sigma_skin_bs;
-        skin_LHS_offset += m_compress_fracture_indexes.at(fracture_ind);
+        skin_LHS_offset += m_compress_skin_cells_indexes.at(fracture_ind);
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
         
         for (size_t i = 0; i < n_sigma_skin_bs; i++)
@@ -1398,7 +1406,7 @@ public:
         
         std::vector<assembly_index> asm_map_i, asm_map_j;
         auto skin_LHS_offset = m_n_cells_dof + m_n_faces_dof + 3 * n_sigma_skin_l_bs + cell_ind*n_sigma_skin_bs;
-        skin_LHS_offset += m_compress_fracture_indexes.at(fracture_ind);
+        skin_LHS_offset += m_compress_skin_cells_indexes.at(fracture_ind);
         auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
         
         for (size_t i = 0; i < n_sigma_skin_bs; i++)
@@ -1693,6 +1701,63 @@ public:
     
     }
     
+    void scatter_skin_hybrid_bc_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const size_t & bc_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    {
+        size_t n_sigma_skin_bs = 3;
+        size_t n_bc_skin_bs = 4;
+        
+        size_t n_cells = f.m_pairs.size();
+        size_t n_nodes = f.m_internal_edges.size();
+        size_t n_skin_l_bs = n_sigma_skin_bs * n_cells;
+        std::vector<assembly_index> asm_map_m, asm_map_p, asm_map_e;
+        auto skin_base = m_n_cells_dof + m_n_faces_dof + m_compress_skin_cells_indexes.at(fracture_ind);
+        auto edge_base = m_n_cells_dof + m_n_faces_dof + m_n_skin_cells_dof + m_n_skin_edges_dof + m_n_up_mortar_dof;
+        auto skin_LHS_offset_l = skin_base + (cell_ind) * n_sigma_skin_bs;
+        auto skin_LHS_offset_r = skin_base + (cell_ind) * n_sigma_skin_bs + 2.0 * n_skin_l_bs;
+        auto edge_LHS_offset = edge_base + bc_ind * n_bc_skin_bs;
+        
+        for (size_t i = 0; i < n_sigma_skin_bs; i++)
+        asm_map_m.push_back( assembly_index(skin_LHS_offset_l+i, true));
+
+        for (size_t j = 0; j < n_sigma_skin_bs; j++)
+        asm_map_p.push_back( assembly_index(skin_LHS_offset_r+j, true));
+        
+        for (size_t j = 0; j < 1; j++)
+        asm_map_e.push_back( assembly_index(edge_LHS_offset+j, true));
+        
+        Matrix<T, Dynamic, Dynamic> mat_m = mat.block(0,0,3,1);
+        Matrix<T, Dynamic, Dynamic> mat_p = mat.block(0,1,3,1);
+        assert( asm_map_m.size() == mat_m.rows() && asm_map_e.size() == mat_m.cols() );
+        assert( asm_map_p.size() == mat_p.rows() && asm_map_e.size() == mat_p.cols() );
+
+        for (size_t i = 0; i < mat_m.rows(); i++)
+        {
+            for (size_t j = 0; j < mat_m.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map_m[i], asm_map_e[j],+1.0*mat_m(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_e[j], asm_map_m[i],+1.0*mat_m(i,j)) );
+
+                m_triplets.push_back( Triplet<T>(asm_map_m[i]+n_skin_l_bs, asm_map_e[j]+1,+1.0*mat_m(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_e[j]+1, asm_map_m[i]+n_skin_l_bs,+1.0*mat_m(i,j)) );
+                
+            }
+        }
+        
+        for (size_t i = 0; i < mat_p.rows(); i++)
+        {
+            for (size_t j = 0; j < mat_p.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map_p[i], asm_map_e[j]+2,+1.0*mat_p(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_e[j]+2, asm_map_p[i],+1.0*mat_p(i,j)) );
+
+                m_triplets.push_back( Triplet<T>(asm_map_p[i]+n_skin_l_bs, asm_map_e[j]+3,+1.0*mat_p(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_e[j]+3, asm_map_p[i]+n_skin_l_bs,+1.0*mat_p(i,j)) );
+                
+            }
+        }
+    
+    }
+    
     void scatter_rhs_skin_weighted_u_data(const Mesh& msh, const size_t & face_id, const size_t & fracture_ind, const Matrix<T, Dynamic, 1>& rhs)
     {
         size_t n_sigma_skin_bs = 3;
@@ -1816,6 +1881,7 @@ public:
         auto storage = msh.backend_storage();
         
         size_t f_ind = 0;
+        size_t bc_ind = 0;
         for (auto f : m_fractures) {
             
             // cell wise skin part
@@ -1843,6 +1909,33 @@ public:
 //                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
                 scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
 
+                bool BC_mortars_Q = true;
+                if(BC_mortars_Q){ // apply BC on mortar
+                    if(f.m_bc_type.first == 1 || f.m_bc_type.second == 1){
+                        if (cell_ind == 0){
+                            
+                            size_t cell_ind_l = f.m_elements[cell_ind].first;
+                            size_t cell_ind_r = f.m_elements[cell_ind].second;
+                            auto& face_l = storage->edges[chunk.first];
+                            auto& face_r = storage->edges[chunk.second];
+                            auto& cell_l = storage->surfaces[cell_ind_l];
+                            auto& cell_r = storage->surfaces[cell_ind_r];
+                            
+                            size_t node_ind_l = f.m_bl_index;
+                            size_t node_ind_r = f.m_br_index;
+                            
+                            auto hybrid_matrix_bc = skin_hybrid_matrix_at_bc_node(msh, face_l, face_r, f, cell_ind, cell_ind, node_ind_l, node_ind_r);
+                            
+                            std::cout << hybrid_matrix_bc << std::endl;
+                            scatter_skin_hybrid_bc_data(msh, f_ind, f, cell_ind, bc_ind, hybrid_matrix_bc);
+                            
+                            scatter_skins_bc_u_t_data(msh, f_ind, f , bc_ind, 0);
+//                            scatter_skins_bc_u_t_data(msh, f_ind, f , 1);
+                            bc_ind++;
+                        }
+                    }
+                }
+                
                 cell_ind++;
             }
             
@@ -1864,38 +1957,6 @@ public:
                 scatter_skin_hybrid_r_nodewise_data(msh, f_ind, f, node_ind, hybrid_matrix_r);
                 node_ind++;
             }
-            
-            bool point_mortars_Q = false;
-            if(point_mortars_Q){ // apply mortar
-                
-                Matrix<T, Dynamic, Dynamic> mortar = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
-                mortar(0,0) = 1.0;
-                
-                scatter_skins_point_mortar_u_n_data(msh,f_ind,f,mortar);
-                scatter_skins_point_mortar_u_t_data(msh,f_ind,f,mortar);
-                
-                T alpha = 0.0e+0;
-                if (f_ind == 0) {
-                    alpha = 1.0;
-                }
-                mortar(0,0) = alpha;
-                scatter_skins_point_mortar_mass_n_data(msh,f_ind,f,mortar);
-                mortar(0,0) = alpha;
-                scatter_skins_point_mortar_mass_t_data(msh,f_ind,f,mortar);
-                
-//                Matrix<T, Dynamic, Dynamic> rhs = Matrix<T, Dynamic, Dynamic>::Zero(1,1);
-//                T beta = 0.0;
-//                rhs(0,0) = (+3.0/200.0)*beta;
-//                scatter_skins_point_mortar_rhs_t_data(msh,f_ind,f,rhs);
-                    
-            }
-            
-//            if(f.m_bc_type.first == 1 || f.m_bc_type.second == 1){
-//                if (cell_ind == 0 || cell_ind == f.m_pairs.size()) {
-//                    scatter_skins_bc_u_t_data(msh, f_ind, f , 0);
-//                    scatter_skins_bc_u_t_data(msh, f_ind, f , 1);
-//                }
-//            }
             
             f_ind++;
         }
@@ -1919,22 +1980,25 @@ public:
                     if(r.m_s_index.first == 0){
                         face_ind_l = f_l.m_pairs[0].first;
                         side_Q_l = true;
+                        node_ind_l = f_l.m_bl_index;
                     }else{
                         face_ind_l = f_l.m_pairs[0].second;
                         side_Q_l = false;
+                        node_ind_l = f_l.m_br_index;
                     }
                     node_l = 0;
-                    node_ind_l = f_l.m_bl_index;
+                    
                 }else{
                     if(r.m_s_index.first == 0){
                         face_ind_l = f_l.m_pairs[n_cells_l-1].first;
                         side_Q_l = true;
+                        node_ind_l = f_l.m_el_index;
                     }else{
                         face_ind_l = f_l.m_pairs[n_cells_l-1].second;
                         side_Q_l = false;
+                        node_ind_l = f_l.m_er_index;
                     }
                     node_l = n_cells_l-1;
-                    node_ind_l = f_l.m_el_index;
                 }
                 
                 size_t node_r, face_ind_r, node_ind_r;
@@ -1943,22 +2007,24 @@ public:
                     if(r.m_s_index.second == 0){
                         face_ind_r = f_r.m_pairs[0].first;
                         side_Q_r = true;
+                        node_ind_r = f_r.m_bl_index;
                     }else{
                         face_ind_r = f_r.m_pairs[0].second;
                         side_Q_r = false;
+                        node_ind_r = f_r.m_br_index;
                     }
                     node_r = 0;
-                    node_ind_r = f_r.m_bl_index;
                 }else{
                     if(r.m_s_index.second == 0){
                         face_ind_r = f_r.m_pairs[n_cells_r-1].first;
                         side_Q_r = true;
+                        node_ind_r = f_r.m_el_index;
                     }else{
                         face_ind_r = f_r.m_pairs[n_cells_r-1].second;
                         side_Q_r = false;
+                        node_ind_r = f_r.m_er_index;
                     }
                     node_r = n_cells_r-1;
-                    node_ind_r = f_r.m_el_index;
                 }
                 
                 assert(node_ind_l == node_ind_r);
@@ -1967,7 +2033,7 @@ public:
                 
                 size_t node_ind = node_ind_l;
                 auto hybrid_matrix =  skin_hybrid_matrix_at_mortar_node(msh, face_l, f_l, node_l, side_Q_l, face_r, f_r, node_r, side_Q_r, node_ind);
-                std::cout << hybrid_matrix << std::endl;
+//                std::cout << hybrid_matrix << std::endl;
 //                if(r_ind == 0){
                     scatter_skin_hybrid_nodewise_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, hybrid_matrix);
 //                }
@@ -2419,7 +2485,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 10000.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -2786,6 +2852,61 @@ public:
                 const auto s_opt = disk::priv::outer_product(s_phi, w_mu_f_phi);
                 
                 ret.block(0,1,3,1) += +1.0 * nr * s_opt;
+            }
+        
+            return ret;
+        }
+    
+    auto skin_hybrid_matrix_at_bc_node(const Mesh& msh, const typename Mesh::face_type& face_l, const typename Mesh::face_type& face_r, fracture<Mesh> & f, const size_t & cell_loc_l, const size_t & cell_loc_r, const size_t & node_ind_l, const size_t & node_ind_r)
+        {
+            auto storage = msh.backend_storage();
+            elastic_material_data<T> & material = m_material[0];
+            T rho = material.rho();
+            T mu = material.mu();
+            T lambda = material.l();
+            
+            auto degree = m_hho_di.face_degree();
+            auto sl_basis = disk::make_scalar_monomial_basis(msh, face_l, degree);
+            auto sr_basis = disk::make_scalar_monomial_basis(msh, face_r, degree);
+            if(f.m_flips_l.at(cell_loc_l)){
+                sl_basis.swap_nodes();
+            }
+            if(f.m_flips_r.at(cell_loc_r)){
+                sr_basis.swap_nodes();
+            }
+
+                        
+            Matrix<T, Dynamic, Dynamic> ret = Matrix<T, Dynamic, Dynamic>::Zero(3, 2);
+
+            typename Mesh::point_type point_l = storage->points.at(node_ind_l);
+            typename Mesh::point_type point_r = storage->points.at(node_ind_r);
+            
+            auto nodes_l = sl_basis.nodes();
+            typename Mesh::point_type point_ll = nodes_l[0];
+            typename Mesh::point_type point_lr = nodes_l[1];
+            typename Mesh::point_type vl = point_lr - point_ll;
+            auto nl = inplane_normal(msh,face_l,point_l,vl);
+            {
+                const auto s_phi = sl_basis.eval_flux_functions(point_l);
+                const auto mu_f_phi = sl_basis.eval_lambda_functions(point_l);
+                const auto w_mu_f_phi = disk::priv::inner_product(1.0, mu_f_phi);
+                const auto s_opt = disk::priv::outer_product(s_phi, w_mu_f_phi);
+                
+                ret.block(0,0,3,1) += -1.0 * nl * s_opt;
+            }
+            
+            auto nodes_r = sr_basis.nodes();
+            typename Mesh::point_type point_rl = nodes_r[0];
+            typename Mesh::point_type point_rr = nodes_r[1];
+            typename Mesh::point_type vr = point_rr - point_rl;
+            auto nr = inplane_normal(msh,face_r,point_r,vr);
+            {
+                const auto s_phi = sr_basis.eval_flux_functions(point_r);
+                const auto mu_f_phi = sr_basis.eval_lambda_functions(point_r);
+                const auto w_mu_f_phi = disk::priv::inner_product(1.0, mu_f_phi);
+                const auto s_opt = disk::priv::outer_product(s_phi, w_mu_f_phi);
+                
+                ret.block(0,1,3,1) += -1.0 * nr * s_opt;
             }
         
             return ret;
@@ -3685,6 +3806,14 @@ public:
     
     size_t get_n_up_mortar_dof(){
         return m_n_up_mortar_dof;
+    }
+    
+    size_t get_n_skin_cells_dof(){
+        return m_n_skin_cells_dof;
+    }
+    
+    size_t get_n_skin_edges_dof(){
+        return m_n_skin_edges_dof;
     }
 
     std::vector<size_t> & compress_indexes(){
