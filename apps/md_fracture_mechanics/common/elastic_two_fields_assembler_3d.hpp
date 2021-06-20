@@ -1500,6 +1500,51 @@ public:
     
     }
     
+    void scatter_skin_hybrid_nodewise_l_data(const Mesh& msh, size_t fracture_ind, fracture_3d<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    {
+        size_t n_sigma_skin_bs = 3;
+        size_t n_skin_l_bs = f.m_skin_bs;
+        size_t n_cells = f.m_pairs.size();
+        std::vector<assembly_index> asm_map_i, asm_map_l_j, asm_map_r_j;
+        auto base = m_n_cells_dof + m_n_faces_dof + m_compress_fracture_indexes.at(fracture_ind);
+        auto skin_LHS_offset = base + cell_ind * n_sigma_skin_bs;
+        auto hybrid_l_LHS_offset = base + n_cells * n_sigma_skin_bs + cell_ind;
+        auto hybrid_r_LHS_offset = base + n_cells * n_sigma_skin_bs + cell_ind + 1;
+        
+        for (size_t i = 0; i < n_sigma_skin_bs; i++)
+        asm_map_i.push_back( assembly_index(skin_LHS_offset+i, true));
+
+        for (size_t j = 0; j < 1; j++)
+        asm_map_l_j.push_back( assembly_index(hybrid_l_LHS_offset+j, true));
+        
+        for (size_t j = 0; j < 1; j++)
+        asm_map_r_j.push_back( assembly_index(hybrid_r_LHS_offset+j, true));
+        
+        Matrix<T, Dynamic, Dynamic> mat_l = mat.block(0,0,3,1);
+        Matrix<T, Dynamic, Dynamic> mat_r = mat.block(0,1,3,1);
+        assert( asm_map_i.size() == mat_l.rows() && asm_map_l_j.size() == mat_l.cols() );
+        assert( asm_map_i.size() == mat_r.rows() && asm_map_r_j.size() == mat_r.cols() );
+
+        for (size_t i = 0; i < mat_l.rows(); i++)
+        {
+            for (size_t j = 0; j < mat_l.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_l_j[j],+1.0*mat_l(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j], asm_map_i[i],+1.0*mat_l(i,j)) );
+
+                m_triplets.push_back( Triplet<T>(asm_map_i[i], asm_map_r_j[j],+1.0*mat_r(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j], asm_map_i[i],+1.0*mat_r(i,j)) );
+                
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+n_skin_l_bs, asm_map_l_j[j]+n_skin_l_bs,+1.0*mat_l(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l_j[j]+n_skin_l_bs, asm_map_i[i]+n_skin_l_bs,+1.0*mat_l(i,j)) );
+                
+                m_triplets.push_back( Triplet<T>(asm_map_i[i]+n_skin_l_bs, asm_map_r_j[j]+n_skin_l_bs,+1.0*mat_r(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r_j[j]+n_skin_l_bs, asm_map_i[i]+n_skin_l_bs,+1.0*mat_r(i,j)) );
+            }
+        }
+    
+    }
+    
     void scatter_rhs_skin_weighted_u_data(const Mesh& msh, const size_t & face_id, const size_t & fracture_ind, const Matrix<T, Dynamic, 1>& rhs)
     {
         size_t n_sigma_skin_bs = 3;
