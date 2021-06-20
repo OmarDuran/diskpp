@@ -768,8 +768,8 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_801.txt";
     
     // other meshes
-//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_57.txt";
-    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_364.txt";
+    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_57.txt";
+//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_364.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_1279.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_2061.txt";
     
@@ -925,6 +925,7 @@ void Fratures2D(simulation_data & sim_data){
     // filling up fractures
     std::vector<fracture<mesh_type> > fractures;
     std::vector<restriction > restrictions;
+    std::vector<spring > springs;
     if(0){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
@@ -955,7 +956,7 @@ void Fratures2D(simulation_data & sim_data){
         f0.m_bl_index = 6;
         f0.m_el_index = 7;
         f0.m_br_index = 6;
-        f0.m_er_index = 199;//1062;//667;//199;//38
+        f0.m_er_index = 38;//1062;//667;//199;//38
         f0.build(msh);
         fractures.push_back(f0);
         
@@ -963,8 +964,8 @@ void Fratures2D(simulation_data & sim_data){
         f1.m_pairs = f1_pairs;
         f1.m_bl_index = 4;
         f1.m_el_index = 7;
-        f1.m_br_index = 219;//1138;//719;//219;//46
-        f1.m_er_index = 222;//1131;//716;//222;//47
+        f1.m_br_index = 46;//1138;//719;//219;//46
+        f1.m_er_index = 47;//1131;//716;//222;//47
         f1.build(msh);
         f1.m_bc_type = {1,1};
         f1.m_bc_data = {{-0.05,0},{-0.05,0}};
@@ -973,9 +974,9 @@ void Fratures2D(simulation_data & sim_data){
         fracture<mesh_type> f2;
         f2.m_pairs = f2_pairs;
         f2.m_bl_index = 5;
-        f2.m_el_index = 222;//1131;//716;//222;//47
-        f2.m_br_index = 214;//1078;//684;//214;//42
-        f2.m_er_index = 199;//1062;//667;//199;//38
+        f2.m_el_index = 47;//1131;//716;//222;//47
+        f2.m_br_index = 42;//1078;//684;//214;//42
+        f2.m_er_index = 38;//1062;//667;//199;//38
         f2.build(msh);
         f2.m_bc_type = {1,1};
         f2.m_bc_data = {{0,-0.2},{0,-0.2}};
@@ -989,34 +990,45 @@ void Fratures2D(simulation_data & sim_data){
         restrictions.push_back(r0);
         
         restriction r1;
-        r1.m_f_index = {0,2};
+        r1.m_f_index = {0,1};
         r1.m_p_index = {1,1};
-        r1.m_s_index = {1,1};
+        r1.m_s_index = {0,0};
         restrictions.push_back(r1);
-
+        
         restriction r2;
         r2.m_f_index = {2,1};
         r2.m_p_index = {1,1};
         r2.m_s_index = {0,1};
         restrictions.push_back(r2);
-
+        
         restriction r3;
-        r3.m_f_index = {0,1};
+        r3.m_f_index = {0,2};
         r3.m_p_index = {1,1};
-        r3.m_s_index = {0,0};
+        r3.m_s_index = {1,1};
         restrictions.push_back(r3);
+
+
+        spring s0;
+        s0.m_f_index = {0,0};
+        s0.m_p_index = {1,1};
+        s0.m_s_index = {0,1};
+        s0.m_l_index = {1,3};
+        springs.push_back(s0);
         
-//        restriction r4;
-//        r4.m_f_index = {1,1};
-//        r4.m_p_index = {0,0};
-//        r4.m_s_index = {0,1};
-//        restrictions.push_back(r4);
+        spring s1;
+        s1.m_f_index = {1,1};
+        s1.m_p_index = {1,1};
+        s1.m_s_index = {0,1};
+        s1.m_l_index = {1,2};
+        springs.push_back(s1);
         
-//        restriction r5;
-//        r5.m_f_index = {2,2};
-//        r5.m_p_index = {0,0};
-//        r5.m_s_index = {0,1};
-//        restrictions.push_back(r5);
+        spring s2;
+        s2.m_f_index = {2,2};
+        s2.m_p_index = {1,1};
+        s2.m_s_index = {0,1};
+        s2.m_l_index = {2,3};
+        springs.push_back(s2);
+        
     }
     
     // Constant elastic properties
@@ -1145,7 +1157,7 @@ void Fratures2D(simulation_data & sim_data){
     }
 
     tc.tic();
-    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs, end_point_mortars, fractures,restrictions);
+    auto assembler = elastic_two_fields_assembler<mesh_type>(msh, hho_di, bnd, fracture_pairs, end_point_mortars, fractures,restrictions, springs);
     if(sim_data.m_hdg_stabilization_Q){
         assembler.set_hdg_stabilization();
     }
@@ -1158,7 +1170,7 @@ void Fratures2D(simulation_data & sim_data){
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    bool write_kg_Q = false;
+    bool write_kg_Q = true;
     if(write_kg_Q){
         std::ofstream mat_file;
         mat_file.open ("matrix.txt");
@@ -1197,7 +1209,7 @@ void Fratures2D(simulation_data & sim_data){
     postprocessor<mesh_type>::write_silo_u_field(silo_file_name, it, msh, hho_di, x_dof);
     
     // sigma n and t
-    size_t f_ind = 1;
+    size_t f_ind = 2;
     {
         fracture<mesh_type> f = fractures[f_ind];
         auto storage = msh.backend_storage();

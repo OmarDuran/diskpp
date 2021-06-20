@@ -43,6 +43,34 @@ struct restriction {
     }
 };
 
+struct spring {
+    
+    std::pair<size_t,size_t> m_f_index;
+    std::pair<size_t,size_t> m_p_index;
+    std::pair<size_t,size_t> m_s_index;
+    std::pair<size_t,size_t> m_l_index;
+    
+    spring(){
+        
+    }
+    
+    spring(const spring &other){
+        m_f_index       = other.m_f_index;
+        m_p_index       = other.m_p_index;
+        m_s_index       = other.m_s_index;
+        m_l_index       = other.m_l_index;
+    }
+         
+    spring& operator = (const spring &other){
+    
+        m_f_index       = other.m_f_index;
+        m_p_index       = other.m_p_index;
+        m_s_index       = other.m_s_index;
+        m_l_index       = other.m_l_index;
+        return *this;
+    }
+};
+
 template<typename Mesh>
 struct fracture {
     
@@ -290,6 +318,8 @@ class elastic_two_fields_assembler
     std::vector< size_t >               m_elements_with_bc_eges;
     std::vector<fracture<Mesh> >        m_fractures;
     std::vector<restriction >           m_restrictions;
+    std::vector<spring >                m_springs;
+    
     
     std::vector<size_t>                 m_compress_sigma_indexes;
     std::vector<size_t>                 m_compress_fracture_indexes;
@@ -317,6 +347,8 @@ class elastic_two_fields_assembler
     size_t      m_sigma_degree;
     size_t      m_n_up_mortar_dof;
     size_t      m_n_mortar_points;
+    size_t      m_n_spring_points;
+    size_t      m_n_spring_dof;
     bool        m_hho_stabilization_Q;
     bool        m_scaled_stabilization_Q;
     T           m_l_f = 0.001;
@@ -326,8 +358,8 @@ public:
     SparseMatrix<T>         LHS;
     Matrix<T, Dynamic, 1>   RHS;
 
-    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs, std::vector<std::pair<size_t,size_t>> & end_point_mortars, std::vector<fracture<Mesh> > & fractures, std::vector<restriction > & restrictions)
-        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_end_point_mortars(end_point_mortars), m_fractures(fractures), m_restrictions(restrictions), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
+    elastic_two_fields_assembler(const Mesh& msh, const disk::hho_degree_info& hho_di, const boundary_type& bnd, const std::vector<std::pair<size_t,size_t>> & fracture_pairs, std::vector<std::pair<size_t,size_t>> & end_point_mortars, std::vector<fracture<Mesh> > & fractures, std::vector<restriction > & restrictions, std::vector<spring > & springs)
+        : m_hho_di(hho_di), m_bnd(bnd), m_fracture_pairs(fracture_pairs), m_end_point_mortars(end_point_mortars), m_fractures(fractures), m_restrictions(restrictions), m_springs(springs), m_hho_stabilization_Q(true), m_scaled_stabilization_Q(false)
     {
             
         auto is_dirichlet = [&](const typename Mesh::face& fc) -> bool {
@@ -405,13 +437,19 @@ public:
             m_n_up_mortar_dof += 2;
         }
         
+        m_n_spring_points = m_springs.size();
+        m_n_spring_dof = 0;
+        for (size_t i = 0; i < m_n_spring_points; i++) {
+            m_n_spring_dof += 2;
+        }
+        
         size_t n_ten_cbs = disk::sym_matrix_basis_size(m_hho_di.grad_degree(), Mesh::dimension, Mesh::dimension);
         size_t n_vec_cbs = disk::vector_basis_size(m_hho_di.cell_degree(),Mesh::dimension, Mesh::dimension);
         size_t n_cbs = n_ten_cbs + n_vec_cbs;
         m_n_cells_dof = n_cbs * msh.cells_size();
             
         size_t system_size = m_n_cells_dof + m_n_faces_dof + m_n_hybrid_dof;
-        system_size += m_n_up_mortar_dof + m_n_skin_bc_edges_dof;
+        system_size += m_n_up_mortar_dof + m_n_skin_bc_edges_dof + m_n_spring_dof;
         
         // skin data
         for (auto f : m_fractures) {
@@ -1701,6 +1739,57 @@ public:
     
     }
     
+    void scatter_skin_hybrid_spring_data(const Mesh& msh, size_t f_ind_l, fracture<Mesh> & f_l, size_t & node_ind_l, bool side_Q_l, size_t f_ind_r, fracture<Mesh> & f_r, const size_t & node_ind_r, bool side_Q_r, size_t & spring_ind, const Matrix<T, Dynamic, Dynamic>& mat)
+    {
+        size_t n_sigma_skin_bs = 3;
+        size_t n_nodes_bs = 2;
+        size_t s_nodes = m_springs.size();
+        
+//        size_t n_cells_l = f_l.m_pairs.size();
+//        size_t n_nodes_l = f_l.m_internal_edges.size();
+//        size_t n_skin_bs_l = n_sigma_skin_bs * n_cells_l;
+//
+//        size_t n_cells_r = f_r.m_pairs.size();
+//        size_t n_nodes_r = f_r.m_internal_edges.size();
+//        size_t n_skin_bs_r = n_sigma_skin_bs * n_cells_r;
+        
+        std::vector<assembly_index> asm_map, asm_map_e;
+        auto edge_base_l = m_n_cells_dof + m_n_faces_dof + m_n_skin_cells_dof + m_n_skin_edges_dof;
+        auto edge_base_r = m_n_cells_dof + m_n_faces_dof + m_n_skin_cells_dof + m_n_skin_edges_dof;
+        auto spring_base = m_n_cells_dof + m_n_faces_dof + m_n_skin_cells_dof + m_n_skin_edges_dof;
+        spring_base += m_n_up_mortar_dof + m_n_skin_bc_edges_dof + m_n_f_hybrid_dof;
+        
+        auto edge_LHS_offset_l = edge_base_l + node_ind_l*2+1;
+        auto edge_LHS_offset_r = edge_base_r + node_ind_r*2+1;
+        auto spring_LHS_offset = spring_base + spring_ind*2;
+        
+        for (size_t i = 0; i < 1; i++)
+        asm_map.push_back( assembly_index(edge_LHS_offset_l+i, true));
+
+        for (size_t j = 0; j < 1; j++)
+        asm_map.push_back( assembly_index(edge_LHS_offset_r+j, true));
+        
+        for (size_t j = 0; j < 1; j++)
+        asm_map_e.push_back( assembly_index(spring_LHS_offset+j, true));
+    
+        for (size_t i = 0; i < mat.rows(); i++)
+        {
+            for (size_t j = 0; j < mat.cols(); j++)
+            {
+                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map_e[j]+1,+1.0*mat(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_e[j]+1, asm_map[i],+1.0*mat(i,j)) );
+                
+//                m_triplets.push_back( Triplet<T>(asm_map[i], asm_map_e[j],+1.0*mat(i,j)) );
+//                m_triplets.push_back( Triplet<T>(asm_map_e[j], asm_map[i],+1.0*mat(i,j)) );
+                
+            }
+        }
+        
+        m_triplets.push_back( Triplet<T>(asm_map_e[0], asm_map_e[0],+1.0) );
+        m_triplets.push_back( Triplet<T>(asm_map_e[0]+1, asm_map_e[0]+1,+1.0) );
+    
+    }
+    
     void scatter_skin_hybrid_bc_data(const Mesh& msh, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const size_t & bc_ind, const Matrix<T, Dynamic, Dynamic>& mat)
     {
         size_t n_sigma_skin_bs = 3;
@@ -1904,9 +1993,9 @@ public:
                 auto ul_div_phi = skin_coupling_matrix_ul(msh, cell_l, face_l, f, cell_ind);
                 auto ur_div_phi = skin_coupling_matrix_ur(msh, cell_r, face_r, f, cell_ind);
                 
-//                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
+                scatter_skin_weighted_ul_n_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.first);
                 scatter_skin_weighted_ul_t_data(msh, chunk.first, f_ind, f, cell_ind, ul_div_phi.second);
-//                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
+                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
                 scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
 
                 bool BC_mortars_Q = true;
@@ -2039,6 +2128,87 @@ public:
 //                }
                 
                 r_ind++;
+            }
+        }
+        
+        // local laws for stress points
+        bool point_springs_Q = true;
+        if(point_springs_Q){
+            size_t s_ind = 0;
+            for (auto s : m_springs) {
+                
+                auto f_ind_l = s.m_f_index.first;
+                auto f_ind_r = s.m_f_index.second;
+                auto f_l = m_fractures[f_ind_l];
+                auto f_r = m_fractures[f_ind_r];
+                size_t n_cells_l = f_l.m_pairs.size();
+                size_t n_cells_r = f_r.m_pairs.size();
+                
+                size_t node_l, face_ind_l, node_ind_l;
+                bool side_Q_l;
+                if (s.m_p_index.first == 0) {
+                    if(s.m_s_index.first == 0){
+                        face_ind_l = f_l.m_pairs[0].first;
+                        side_Q_l = true;
+                        node_ind_l = f_l.m_bl_index;
+                    }else{
+                        face_ind_l = f_l.m_pairs[0].second;
+                        side_Q_l = false;
+                        node_ind_l = f_l.m_br_index;
+                    }
+                    node_l = 0;
+                    
+                }else{
+                    if(s.m_s_index.first == 0){
+                        face_ind_l = f_l.m_pairs[n_cells_l-1].first;
+                        side_Q_l = true;
+                        node_ind_l = f_l.m_el_index;
+                    }else{
+                        face_ind_l = f_l.m_pairs[n_cells_l-1].second;
+                        side_Q_l = false;
+                        node_ind_l = f_l.m_er_index;
+                    }
+                    node_l = n_cells_l-1;
+                }
+                
+                size_t node_r, face_ind_r, node_ind_r;
+                bool side_Q_r;
+                if (s.m_p_index.second == 0) {
+                    if(s.m_s_index.second == 0){
+                        face_ind_r = f_r.m_pairs[0].first;
+                        side_Q_r = true;
+                        node_ind_r = f_r.m_bl_index;
+                    }else{
+                        face_ind_r = f_r.m_pairs[0].second;
+                        side_Q_r = false;
+                        node_ind_r = f_r.m_br_index;
+                    }
+                    node_r = 0;
+                }else{
+                    if(s.m_s_index.second == 0){
+                        face_ind_r = f_r.m_pairs[n_cells_r-1].first;
+                        side_Q_r = true;
+                        node_ind_r = f_r.m_el_index;
+                    }else{
+                        face_ind_r = f_r.m_pairs[n_cells_r-1].second;
+                        side_Q_r = false;
+                        node_ind_r = f_r.m_er_index;
+                    }
+                    node_r = n_cells_r-1;
+                }
+                
+//                assert(node_ind_l == node_ind_r);
+                auto& face_l = storage->edges[face_ind_l];
+                auto& face_r = storage->edges[face_ind_r];
+                
+                Matrix<T, Dynamic, Dynamic> stress_spring = Matrix<T, Dynamic, Dynamic>::Zero(2,1);
+                stress_spring(0,0) = +1.0;
+                stress_spring(1,0) = +1.0;
+                scatter_skin_hybrid_spring_data(msh, f_ind_l, f_l, s.m_l_index.first, side_Q_l, f_ind_r, f_r, s.m_l_index.second, side_Q_r, s_ind, stress_spring);
+                
+//                const Mesh& msh, size_t f_ind_l, fracture<Mesh> & f_l, size_t & node_ind_l, bool side_Q_l, size_t f_ind_r, fracture<Mesh> & f_r, const size_t & node_ind_r, bool side_Q_r, size_t & restrict_node, const Matrix<T, Dynamic, Dynamic>& mat
+                
+                s_ind++;
             }
         }
         
