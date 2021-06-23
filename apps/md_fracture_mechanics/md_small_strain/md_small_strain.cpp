@@ -58,8 +58,8 @@ int main(int argc, char **argv)
     simulation_data sim_data = preprocessor::process_convergence_test_args(argc, argv);
     sim_data.print_simulation_data();
     
-    Fratures2D(sim_data);
-//    Fratures3D(sim_data);
+//    Fratures2D(sim_data);
+    Fratures3D(sim_data);
     return 0;
 }
 
@@ -424,123 +424,134 @@ void Fratures3D(simulation_data & sim_data){
     std::string silo_file_name = "single_fracture_3d";
     postprocessor<mesh_type_3d>::write_silo_u_field_3d(silo_file_name, it, msh, hho_di, x_dof);
 
-//    // sigma n and t
-//    size_t f_ind = 0;
-//    {
-//        fracture<mesh_type> f = fractures[f_ind];
-//        auto storage = msh.backend_storage();
-//        size_t n_cells_dof = assembler.get_n_cells_dofs();
-//        size_t n_faces_dofs = assembler.get_n_faces_dofs();
-//        size_t n_hybrid_dofs = assembler.get_n_hybrid_dofs();
-//        size_t n_skins_dofs = assembler.get_n_skin_dof();
-//        size_t cell_ind = 0;
-//        size_t n_cells = f.m_pairs.size();
-//        size_t sigma_degree = hho_di.face_degree()-1;
-//        size_t n_f_sigma_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
-//        size_t n_data = 2*n_cells;
-//
-//        Matrix<RealType, Dynamic, 2> data_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 2);
-//        Matrix<RealType, Dynamic, 2> data_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 2);
-//
-//        Matrix<RealType, Dynamic, 3> data_u_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//        Matrix<RealType, Dynamic, 3> data_u_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//
-//        Matrix<RealType, Dynamic, 3> data_div_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//        Matrix<RealType, Dynamic, 3> data_div_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//
-//        Matrix<RealType, Dynamic, 3> data_sig_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//        Matrix<RealType, Dynamic, 3> data_sig_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//
-//        Matrix<RealType, Dynamic, 3> data_s_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//        Matrix<RealType, Dynamic, 3> data_s_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
-//
-//        mesh_type::point_type p0;
-//        for (auto chunk : f.m_pairs) {
-//
-//            size_t cell_ind_l = f.m_elements[cell_ind].first;
-//            size_t cell_ind_r = f.m_elements[cell_ind].second;
-//            auto& face_l = storage->edges[chunk.first];
-//            auto& face_r = storage->edges[chunk.second];
-//            auto& cell_l = storage->surfaces[cell_ind_l];
-//            auto& cell_r = storage->surfaces[cell_ind_r];
-//
-//            auto points = face_l.point_ids();
-//
-//            for (size_t ip = 0; ip < points.size(); ip++) {
-//
-//                auto pt_id = points[ip];
-//                auto bar = *std::next(msh.points_begin(), pt_id);
-//
-//                if ((ip == 0) && (cell_ind == 0)) {
-//                    p0 = bar;
-//                }
-//
-//                // hybrid sigma evaluation
-//                {
-//
-//                    auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
-//                    size_t offset_n = cell_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_skins_dofs + assembler.compress_hybrid_indexes().at(f_ind);
-//                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(offset_n, 0, n_f_sigma_bs, 1);
-//
-//                    size_t offset_t = cell_ind*2*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs + n_skins_dofs + assembler.compress_hybrid_indexes().at(f_ind);
-//                    Matrix<RealType, Dynamic, 1> sigma_t_x_dof = x_dof.block(offset_t, 0, n_f_sigma_bs, 1);
-//
-//                    auto t_phi = face_basis.eval_functions( bar );
-//                    assert(t_phi.rows() == face_basis.size());
-//
-//                    auto snh = disk::eval(sigma_n_x_dof, t_phi);
-//                    auto sth = disk::eval(sigma_t_x_dof, t_phi);
-//
-//                    RealType dv = (bar-p0).to_vector().norm();
-//                    data_n(cell_ind,0) += 0.5*dv;
-//                    data_n(cell_ind,1) += 0.5*snh;
-//
-//                    data_t(cell_ind,0) += 0.5*dv;
-//                    data_t(cell_ind,1) += 0.5*sth;
-//                }
-//
-//                // u evaluation
-//                {
-//                    size_t face_l_offset = assembler.get_n_cells_dofs() + assembler.compress_indexes().at(chunk.first);
-//
-//                    size_t face_r_offset = assembler.get_n_cells_dofs() + assembler.compress_indexes().at(chunk.second);
-//
-//                    auto face_basis_l = make_vector_monomial_basis(msh, face_l, hho_di.face_degree());
-//                    auto face_basis_r = make_vector_monomial_basis(msh, face_r, hho_di.face_degree());
-//                    size_t n_u_bs = disk::vector_basis_size(hho_di.face_degree(), mesh_type::dimension - 1, mesh_type::dimension);
-//
-//                    Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_u_bs, 1);
-//                    Matrix<RealType, Dynamic, 1> u_r_x_dof = x_dof.block(face_r_offset, 0, n_u_bs, 1);
-//
-//                    auto t_phi_l = face_basis_l.eval_functions( bar );
-//                    auto t_phi_r = face_basis_r.eval_functions( bar );
-//                    assert(t_phi_l.rows() == face_basis_l.size());
-//                    assert(t_phi_r.rows() == face_basis_r.size());
-//
-//                    auto ul = disk::eval(u_l_x_dof, t_phi_l);
-//                    auto ur = disk::eval(u_r_x_dof, t_phi_r);
-//
-//                    RealType dv = (bar-p0).to_vector().norm();
-//                    {
-//                        const auto n = disk::normal(msh, cell_l, face_l);
-//                        const auto t = disk::tanget(msh, cell_l, face_l);
-//                        auto unl = ul.dot(n);
-//                        auto utl = ul.dot(t);
-//                        data_u_l(2*cell_ind+ip,0) = dv;
-//                        data_u_l(2*cell_ind+ip,1) = unl;
-//                        data_u_l(2*cell_ind+ip,2) = utl;
-//                    }
-//                    {
-//                        const auto n = disk::normal(msh, cell_r, face_r);
-//                        const auto t = disk::tanget(msh, cell_r, face_r);
-//                        auto unr = ur.dot(n);
-//                        auto utr = ur.dot(t);
-//                        data_u_r(2*cell_ind+ip,0) = dv;
-//                        data_u_r(2*cell_ind+ip,1) = unr;
-//                        data_u_r(2*cell_ind+ip,2) = utr;
-//                    }
-//                }
-//
+    // sigma n and t
+    size_t f_ind = 0;
+    {
+        fracture_3d<mesh_type_3d> f = fractures[f_ind];
+        auto storage = msh.backend_storage();
+        size_t n_cells_dof = assembler.get_n_cells_dofs();
+        size_t n_faces_dofs = assembler.get_n_faces_dofs();
+        size_t n_hybrid_dofs = assembler.get_n_hybrid_dofs();
+        size_t n_skins_dofs = assembler.get_n_skin_dof();
+        size_t cell_ind = 0;
+        size_t n_cells = f.m_pairs.size();
+        size_t sigma_degree = hho_di.face_degree()-1;
+        size_t n_f_sigma_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
+        size_t n_data = 3*n_cells;
+
+        Matrix<RealType, Dynamic, 3> data_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 3);
+        Matrix<RealType, Dynamic, 3> data_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 3);
+
+        Matrix<RealType, Dynamic, 4> data_u_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 4);
+        Matrix<RealType, Dynamic, 4> data_u_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 4);
+
+        Matrix<RealType, Dynamic, 3> data_div_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        Matrix<RealType, Dynamic, 3> data_div_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+
+        Matrix<RealType, Dynamic, 3> data_sig_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+        Matrix<RealType, Dynamic, 3> data_sig_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
+
+        Matrix<RealType, Dynamic, 4> data_s_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 4);
+        Matrix<RealType, Dynamic, 4> data_s_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 4);
+
+        mesh_type_3d::point_type p0;
+        for (auto chunk : f.m_pairs) {
+
+            size_t cell_ind_l = f.m_elements[cell_ind].first;
+            size_t cell_ind_r = f.m_elements[cell_ind].second;
+            auto& face_l = storage->surfaces[chunk.first];
+            auto& face_r = storage->surfaces[chunk.second];
+            auto& cell_l = storage->volumes[cell_ind_l];
+            auto& cell_r = storage->volumes[cell_ind_r];
+
+            auto points = face_l.point_ids();
+
+            for (size_t ip = 0; ip < points.size(); ip++) {
+
+                auto pt_id = points[ip];
+                auto bar = *std::next(msh.points_begin(), pt_id);
+
+                if ((ip == 0) && (cell_ind == 0)) {
+                    p0 = bar;
+                }
+
+                // hybrid sigma evaluation
+                {
+
+                    auto face_basis = make_scalar_monomial_basis(msh, face_l, sigma_degree);
+                    size_t offset_n = cell_ind*3*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_skins_dofs + assembler.compress_hybrid_indexes().at(f_ind);
+                    Matrix<RealType, Dynamic, 1> sigma_n_x_dof = x_dof.block(offset_n, 0, n_f_sigma_bs, 1);
+
+                    size_t offset_t1 = cell_ind*3*n_f_sigma_bs + n_cells_dof + n_faces_dofs + n_f_sigma_bs + n_skins_dofs + assembler.compress_hybrid_indexes().at(f_ind);
+                    Matrix<RealType, Dynamic, 1> sigma_t1_x_dof = x_dof.block(offset_t1, 0, n_f_sigma_bs, 1);
+                    
+                    size_t offset_t2 = cell_ind*3*n_f_sigma_bs + n_cells_dof + n_faces_dofs + 2.0 * n_f_sigma_bs + n_skins_dofs + assembler.compress_hybrid_indexes().at(f_ind);
+                    Matrix<RealType, Dynamic, 1> sigma_t2_x_dof = x_dof.block(offset_t2, 0, n_f_sigma_bs, 1);
+
+                    auto t_phi = face_basis.eval_functions( bar );
+                    assert(t_phi.rows() == face_basis.size());
+
+                    auto snh = disk::eval(sigma_n_x_dof, t_phi);
+                    auto st1h = disk::eval(sigma_t1_x_dof, t_phi);
+                    auto st2h = disk::eval(sigma_t2_x_dof, t_phi);
+
+                    RealType dv = (bar-p0).to_vector().norm();
+                    data_n(cell_ind,0) += 0.5*dv;
+                    data_n(cell_ind,1) += 0.5*snh;
+
+                    data_t(cell_ind,0) += 0.5*dv;
+                    data_t(cell_ind,1) += 0.5*st1h;
+                    data_t(cell_ind,2) += 0.5*st2h;
+                }
+
+                // u evaluation
+                {
+                    size_t face_l_offset = assembler.get_n_cells_dofs() + assembler.compress_indexes().at(chunk.first);
+
+                    size_t face_r_offset = assembler.get_n_cells_dofs() + assembler.compress_indexes().at(chunk.second);
+
+                    auto face_basis_l = make_vector_monomial_basis(msh, face_l, hho_di.face_degree());
+                    auto face_basis_r = make_vector_monomial_basis(msh, face_r, hho_di.face_degree());
+                    size_t n_u_bs = disk::vector_basis_size(hho_di.face_degree(), mesh_type_3d::dimension - 1, mesh_type_3d::dimension);
+
+                    Matrix<RealType, Dynamic, 1> u_l_x_dof = x_dof.block(face_l_offset, 0, n_u_bs, 1);
+                    Matrix<RealType, Dynamic, 1> u_r_x_dof = x_dof.block(face_r_offset, 0, n_u_bs, 1);
+
+                    auto t_phi_l = face_basis_l.eval_functions( bar );
+                    auto t_phi_r = face_basis_r.eval_functions( bar );
+                    assert(t_phi_l.rows() == face_basis_l.size());
+                    assert(t_phi_r.rows() == face_basis_r.size());
+
+                    auto ul = disk::eval(u_l_x_dof, t_phi_l);
+                    auto ur = disk::eval(u_r_x_dof, t_phi_r);
+
+                    RealType dv = (bar-p0).to_vector().norm();
+                    {
+                        const auto n = disk::normal(msh, cell_l, face_l);
+                        const auto t1 = disk::tanget(msh, cell_l, face_l).first;
+                        const auto t2 = disk::tanget(msh, cell_l, face_l).second;
+                        auto unl = ul.dot(n);
+                        auto ut1l = ul.dot(t1);
+                        auto ut2l = ul.dot(t2);
+                        data_u_l(3*cell_ind+ip,0) = dv;
+                        data_u_l(3*cell_ind+ip,1) = unl;
+                        data_u_l(3*cell_ind+ip,2) = ut1l;
+                        data_u_l(3*cell_ind+ip,3) = ut2l;
+                    }
+                    {
+                        const auto n = disk::normal(msh, cell_r, face_r);
+                        const auto t1 = disk::tanget(msh, cell_r, face_r).first;
+                        const auto t2 = disk::tanget(msh, cell_r, face_r).second;
+                        auto unr = ur.dot(n);
+                        auto ut1r = ur.dot(t1);
+                        auto ut2r = ur.dot(t2);
+                        data_u_r(3*cell_ind+ip,0) = dv;
+                        data_u_r(3*cell_ind+ip,1) = unr;
+                        data_u_r(3*cell_ind+ip,2) = ut1r;
+                        data_u_r(3*cell_ind+ip,3) = ut2r;
+                    }
+                }
+
 //                // skins div
 //                {
 //
@@ -632,14 +643,14 @@ void Fratures3D(simulation_data & sim_data){
 //                    data_sig_r(2*cell_ind+ip,1) = sn_r;
 //                    data_sig_r(2*cell_ind+ip,2) = st_r;
 //                }
-//
-//
-//             }
-//
-//            cell_ind++;
-//        }
-//
-//        size_t pre = 15;
+
+
+             }
+
+            cell_ind++;
+        }
+
+        size_t pre = 15;
 //        // skins Lagrange multiplier
 //        if(1){
 //
@@ -663,7 +674,7 @@ void Fratures3D(simulation_data & sim_data){
 //            std::cout << std::setprecision(pre) << "utL_l =  " << ut_l_dof << std::endl;
 //            std::cout << std::setprecision(pre) << "utL_r =  " << ut_r_dof << std::endl;
 //        }
-//
+
 //        // sigma normal and mortar u0 evaluation
 //        if(1){
 //            size_t n_mortar_displacements = 2*2;
@@ -674,54 +685,54 @@ void Fratures3D(simulation_data & sim_data){
 //            Matrix<RealType, Dynamic, 1> sigma_dof = x_dof.block(points_offset,0,n_mortar_displacements,1);
 //            std::cout << std::setprecision(pre) << "sigma =  " << sigma_dof << std::endl;
 //        }
-//
-//        {
-//            std::ofstream sn_file;
-//            sn_file.open ("sigma_n.txt");
-//            sn_file << std::setprecision(pre) << data_n <<  std::endl;
-//            sn_file.close();
-//
-//            std::ofstream st_file;
-//            st_file.open ("sigma_t.txt");
-//            st_file << std::setprecision(pre) << data_t <<  std::endl;
-//            st_file.close();
-//
-//            std::ofstream ul_file;
-//            ul_file.open ("u_l.txt");
-//            ul_file << std::setprecision(pre) << data_u_l <<  std::endl;
-//            ul_file.close();
-//
-//            std::ofstream ur_file;
-//            ur_file.open ("u_r.txt");
-//            ur_file << std::setprecision(pre) << data_u_r <<  std::endl;
-//            ur_file.close();
-//
-//        }
-//
-//        {
-//            std::ofstream divs_l_file;
-//            divs_l_file.open("divs_l.txt");
-//            divs_l_file << std::setprecision(pre) << data_div_l <<  std::endl;
-//            divs_l_file.close();
-//
-//            std::ofstream divs_r_file;
-//            divs_r_file.open("divs_r.txt");
-//            divs_r_file << std::setprecision(pre) << data_div_r <<  std::endl;
-//            divs_r_file.close();
-//
-//            std::ofstream s_l_file;
-//            s_l_file.open ("s_l.txt");
-//            s_l_file << std::setprecision(pre) << data_sig_l <<  std::endl;
-//            s_l_file.close();
-//
-//            std::ofstream s_r_file;
-//            s_r_file.open ("s_r.txt");
-//            s_r_file << std::setprecision(pre) << data_sig_r <<  std::endl;
-//            s_r_file.close();
-//
-//        }
-//
-//    }
+
+        {
+            std::ofstream sn_file;
+            sn_file.open ("sigma_n.txt");
+            sn_file << std::setprecision(pre) << data_n <<  std::endl;
+            sn_file.close();
+
+            std::ofstream st_file;
+            st_file.open ("sigma_t.txt");
+            st_file << std::setprecision(pre) << data_t <<  std::endl;
+            st_file.close();
+
+            std::ofstream ul_file;
+            ul_file.open ("u_l.txt");
+            ul_file << std::setprecision(pre) << data_u_l <<  std::endl;
+            ul_file.close();
+
+            std::ofstream ur_file;
+            ur_file.open ("u_r.txt");
+            ur_file << std::setprecision(pre) << data_u_r <<  std::endl;
+            ur_file.close();
+
+        }
+
+        {
+            std::ofstream divs_l_file;
+            divs_l_file.open("divs_l.txt");
+            divs_l_file << std::setprecision(pre) << data_div_l <<  std::endl;
+            divs_l_file.close();
+
+            std::ofstream divs_r_file;
+            divs_r_file.open("divs_r.txt");
+            divs_r_file << std::setprecision(pre) << data_div_r <<  std::endl;
+            divs_r_file.close();
+
+            std::ofstream s_l_file;
+            s_l_file.open ("s_l.txt");
+            s_l_file << std::setprecision(pre) << data_sig_l <<  std::endl;
+            s_l_file.close();
+
+            std::ofstream s_r_file;
+            s_r_file.open ("s_r.txt");
+            s_r_file << std::setprecision(pre) << data_sig_r <<  std::endl;
+            s_r_file.close();
+
+        }
+
+    }
     
     return;
     

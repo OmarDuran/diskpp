@@ -2265,7 +2265,11 @@ public:
                                 
                                 std::string bc_string = "Gamma";
                                 std::string fracture_string = "Fracture";
+                                std::string fractureBC_string = "fractureBC";
+                                std::string fracturePointsBC_string = "fracturePointsBC";
                                 if (entity_name.find(bc_string) != std::string::npos) {
+                                    
+                                    assert(entity_dim == 2);
                                     
                                     std::vector<size_t> member_nodes;
                                     for (int i_node = 0; i_node < n_el_nodes; i_node++) {
@@ -2291,7 +2295,42 @@ public:
                                     boundary_polygons.push_back(facet);
                                     
                                     
-                                }else if(entity_name.find(fracture_string) != std::string::npos){ // fracture case
+                                }else if(entity_name.find(fractureBC_string) != std::string::npos){ // fracture case
+                                    
+                                    assert(entity_dim == 1);
+                                    
+                                    std::vector<size_t> member_nodes;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        member_nodes.push_back(node_map[node_identifiers[i_node]]);
+                                    }
+                                    
+                                    std::vector<std::array<size_t, 2>> member_edges;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        std::array<size_t, 2> edge;
+                                        if (i_node == n_el_nodes - 1) {
+                                            edge = {static_cast<unsigned long>(member_nodes[i_node]),static_cast<unsigned long>(member_nodes[0])};
+                                        }else{
+                                            edge = {static_cast<unsigned long>(member_nodes[i_node]),static_cast<unsigned long>(member_nodes[i_node+1])};
+                                        }
+                                        validate_edge(edge);
+                                        skeleton_edges.push_back( edge );
+                                        member_edges.push_back(edge);
+                                    }
+                                    
+                                } else if(entity_name.find(fracturePointsBC_string) != std::string::npos){ // fracture case
+                                    
+                                    assert(entity_dim == 0);
+                                    
+                                    std::vector<size_t> member_nodes;
+                                    for (int i_node = 0; i_node < n_el_nodes; i_node++) {
+                                        member_nodes.push_back(node_map[node_identifiers[i_node]]);
+                                    }
+                                    
+                                    int aka = 0;
+                                    
+                                } else if(entity_name.find(fracture_string) != std::string::npos){ // fracture case
+                                    
+                                    assert(entity_dim == 2);
                                     
                                     std::vector<size_t> member_nodes;
                                     for (int i_node = 0; i_node < n_el_nodes; i_node++) {
@@ -2316,8 +2355,10 @@ public:
                                     facet.m_member_edges = member_edges;
                                     polygons.push_back(facet);
                                     
-                                }else{ // polygon case
-                                                                        
+                                }else{ // polyhedron case
+                                           
+                                    assert(entity_dim == 3);
+                                    
                                     std::vector<size_t> member_nodes;
                                     for (int i_node = 0; i_node < n_el_nodes; i_node++) {
                                         member_nodes.push_back(node_map[node_identifiers[i_node]]);

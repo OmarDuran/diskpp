@@ -1645,8 +1645,8 @@ public:
                 auto& cell_l = storage->volumes[cell_ind_l];
                 auto& cell_r = storage->volumes[cell_ind_r];
                 
-                Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_coupling_matrix(msh,cell_l,face_l);
-                Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,cell_r,face_r);
+                Matrix<T, Dynamic, Dynamic> mortar_l = -1.0*mortar_coupling_matrix(msh,cell_l,face_l,1);
+                Matrix<T, Dynamic, Dynamic> mortar_r = -1.0*mortar_coupling_matrix(msh,cell_r,face_r,-1);
                             
                 scatter_mortar_data(msh,chunk.first,f_ind,f,cell_ind,mortar_l);
                 scatter_mortar_data(msh,chunk.second,f_ind,f,cell_ind,mortar_r);
@@ -2038,7 +2038,7 @@ public:
         return mass_matrix;
     }
     
-    Matrix<T, Dynamic, Dynamic> mortar_coupling_matrix(const Mesh& msh, const typename Mesh::cell_type& cell, const typename Mesh::face_type& face, size_t di = 0)
+    Matrix<T, Dynamic, Dynamic> mortar_coupling_matrix(const Mesh& msh, const typename Mesh::cell_type& cell, const typename Mesh::face_type& face, int sign = 1, size_t di = 0)
     {
         const auto degree     = m_hho_di.face_degree();
         
@@ -2051,7 +2051,7 @@ public:
 
         const auto qps = integrate(msh, face, 2 * (degree+ 1 + di));
         const auto n = disk::normal(msh, cell, face);
-        const auto t1 = disk::tanget(msh, cell, face).first;
+        const auto t1 = disk::tanget(msh, cell, face, sign).first;
         const auto t2 = disk::tanget(msh, cell, face).second;
 
         for (auto& qp : qps)
