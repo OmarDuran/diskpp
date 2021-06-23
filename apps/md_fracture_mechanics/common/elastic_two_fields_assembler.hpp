@@ -2029,6 +2029,25 @@ public:
 //                scatter_skin_weighted_ur_n_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.first);
                 scatter_skin_weighted_ur_t_data(msh, chunk.second, f_ind, f, cell_ind, ur_div_phi.second);
 
+                if(1){
+                    
+                    auto rhs_l_fun = [](const typename Mesh::point_type& pt) -> T {
+                        T rhs = -3.0/4000.0;
+                        return rhs;
+                    };
+                    
+                    auto rhs_r_fun = [](const typename Mesh::point_type& pt) -> T {
+                        T rhs = +3.0/4000.0;
+                        return rhs;
+                    };
+                    
+                    auto rhs_l = skin_coupling_rhs_u(msh, cell_l, face_l, f, cell_ind, rhs_l_fun);
+                    scatter_skin_weighted_rhs_u_data(msh, chunk.first, f_ind, f, cell_ind, rhs_l.second);
+                    
+                    auto rhs_r = skin_coupling_rhs_u(msh, cell_r, face_r, f, cell_ind, rhs_r_fun);
+                    scatter_skin_weighted_rhs_u_data(msh, chunk.second, f_ind, f, cell_ind, rhs_r.second);
+                }
+                
                 bool BC_mortars_Q = true;
                 if(BC_mortars_Q){ // apply BC on mortar
                     if(f.m_bc_type.first == 1 || f.m_bc_type.second == 1){
@@ -2161,15 +2180,15 @@ public:
                 
                 if(r_ind == 0){
                     Matrix<T, Dynamic, 1> bc_data = Matrix<T, Dynamic, 1>::Zero(1,1);
-                    bc_data(0,0) = 0.015;
-                    
+                    bc_data(0,0) = +0.00375*2;
+
                     scatter_skin_hybrid_nodewise_rhs_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, bc_data);
                 }
-                
+
                 if(r_ind == 1){
                     Matrix<T, Dynamic, 1> bc_data = Matrix<T, Dynamic, 1>::Zero(1,1);
-                    bc_data(0,0) = -0.015;
-                    
+                    bc_data(0,0) = -0.01125*2;
+
                     scatter_skin_hybrid_nodewise_rhs_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, bc_data);
                 }
 
@@ -3203,33 +3222,60 @@ public:
             return std::make_pair(ret_n, ret_t);
         }
     
-    auto skin_coupling_rhs_u(const Mesh& msh, const typename Mesh::cell_type& cell, const typename Mesh::face_type& face, size_t di = 0)
+    auto skin_coupling_rhs_u(const Mesh& msh, const typename Mesh::cell_type& cell, const typename Mesh::face_type& face, fracture<Mesh> & f, const size_t & cell_ind, std::function<double(const typename Mesh::point_type& )> rhs_fun, size_t di = 0 )
         {
             const auto degree     = m_hho_di.face_degree();
             auto vec_u_basis = disk::make_vector_monomial_basis(msh, face, degree);
-            Matrix<T, Dynamic, Dynamic> ret_n = Matrix<T, Dynamic, Dynamic>::Zero(vec_u_basis.size(),1);
             
-            Matrix<T, Dynamic, Dynamic> ret_t = Matrix<T, Dynamic, Dynamic>::Zero(vec_u_basis.size(),1);
+            Matrix<T, Dynamic, 1> ret_n = Matrix<T, Dynamic, 1>::Zero(vec_u_basis.size(),1);
+            Matrix<T, Dynamic, 1> ret_t = Matrix<T, Dynamic, 1>::Zero(vec_u_basis.size(),1);
             
-            const auto qps = integrate(msh, face, 2 * (degree+di));
+            const auto qps = integrate(msh, face, 2 * (degree + 2 + di));
             const auto n = disk::normal(msh, cell, face);
             const auto t = disk::tanget(msh, cell, face);
 
-            T c_n = 1.0;
-            T c_t = 1.0;
             for (auto& qp : qps)
             {
                 const auto u_f_phi = vec_u_basis.eval_functions(qp.point());
                             
                 const auto w_n_dot_u_f_phi = disk::priv::inner_product(u_f_phi,disk::priv::inner_product(qp.weight(), n));
                 const auto w_t_dot_u_f_phi = disk::priv::inner_product(u_f_phi,disk::priv::inner_product(qp.weight(), t));
-                                
-                ret_n += c_n*w_n_dot_u_f_phi;
-                ret_t += c_t*w_t_dot_u_f_phi;
+                
+                const auto s_n_opt = rhs_fun(qp.point()) * w_n_dot_u_f_phi;
+                const auto s_t_opt = rhs_fun(qp.point()) * w_t_dot_u_f_phi;
+
+                ret_n += s_n_opt;
+                ret_t += s_t_opt;
             }
+            
+            std::cout << "ret_t =" << std::endl;
+            std::cout << ret_t << std::endl;
+            
 
             return std::make_pair(ret_n, ret_t);
         }
+    
+    void scatter_skin_weighted_rhs_u_data(const Mesh& msh, const size_t & face_id, size_t fracture_ind, fracture<Mesh> & f, const size_t & cell_ind, const Matrix<T, Dynamic, 1>& rhs)
+    {
+        size_t n_sigma_skin_bs = 3;
+        size_t n_sigma_skin_l_bs = f.m_skin_bs;
+        size_t n_fbs = disk::vector_basis_size(m_hho_di.face_degree(), Mesh::dimension - 1, Mesh::dimension);
+
+        std::vector<assembly_index> asm_map_i;
+
+        auto face_LHS_offset = m_n_cells_dof + m_compress_indexes.at(face_id);
+        for (size_t j = 0; j < n_fbs; j++)
+        asm_map_i.push_back( assembly_index(face_LHS_offset+j, true));
+
+        assert( asm_map_i.size() == rhs.rows());
+
+        for (size_t i = 0; i < rhs.rows(); i++)
+        {
+            RHS(asm_map_i[i]) += rhs(i);
+        }
+    
+    }
+    
     
     Matrix<T, Dynamic, Dynamic> point_mortar_coupling_matrix(const Mesh& msh, const typename Mesh::cell_type& cell, const typename Mesh::face_type& face, const typename Mesh::node_type& node, size_t di = 0)
     {

@@ -1077,8 +1077,8 @@ void Fratures2D(simulation_data & sim_data){
         RealType x,y;
         x = pt.x();
         y = pt.y();
-        RealType rx = 0.0;
-        RealType ry = 0.0;
+        RealType rx = -3.0/4000.0;
+        RealType ry = -3.0/2000.0;
         return static_vector<RealType, 2>{rx, ry};
     };
     
