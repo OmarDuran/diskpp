@@ -1695,7 +1695,7 @@ public:
         
         auto skin_LHS_offset_l = skin_l_base + (node_l) * n_sigma_skin_bs;
         auto skin_LHS_offset_r = skin_r_base + (node_r) * n_sigma_skin_bs;
-        auto edge_LHS_offset = edge_base + restrict_node;
+        auto edge_LHS_offset = edge_base + restrict_node * n_nodes_bs;
         
         for (size_t i = 0; i < n_sigma_skin_bs; i++)
         asm_map_l.push_back( assembly_index(skin_LHS_offset_l+i, true));
@@ -1718,8 +1718,8 @@ public:
                 m_triplets.push_back( Triplet<T>(asm_map_l[i], asm_map_e[j],+1.0*mat_l(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_e[j], asm_map_l[i],+1.0*mat_l(i,j)) );
 
-                m_triplets.push_back( Triplet<T>(asm_map_l[i]+n_skin_bs_l, asm_map_e[j]+s_nodes,+1.0*mat_l(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_e[j]+s_nodes, asm_map_l[i]+n_skin_bs_l,+1.0*mat_l(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_l[i]+n_skin_bs_l, asm_map_e[j]+1,+1.0*mat_l(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_e[j]+1, asm_map_l[i]+n_skin_bs_l,+1.0*mat_l(i,j)) );
                 
             }
         }
@@ -1731,10 +1731,41 @@ public:
                 m_triplets.push_back( Triplet<T>(asm_map_r[i], asm_map_e[j],+1.0*mat_r(i,j)) );
                 m_triplets.push_back( Triplet<T>(asm_map_e[j], asm_map_r[i],+1.0*mat_r(i,j)) );
 
-                m_triplets.push_back( Triplet<T>(asm_map_r[i]+n_skin_bs_r, asm_map_e[j]+s_nodes,+1.0*mat_r(i,j)) );
-                m_triplets.push_back( Triplet<T>(asm_map_e[j]+s_nodes, asm_map_r[i]+n_skin_bs_r,+1.0*mat_r(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_r[i]+n_skin_bs_r, asm_map_e[j]+1,+1.0*mat_r(i,j)) );
+                m_triplets.push_back( Triplet<T>(asm_map_e[j]+1, asm_map_r[i]+n_skin_bs_r,+1.0*mat_r(i,j)) );
                 
             }
+        }
+    
+    }
+    
+    void scatter_skin_hybrid_nodewise_rhs_data(const Mesh& msh, size_t f_ind_l, fracture<Mesh> & f_l, size_t & node_l, bool side_Q_l, size_t f_ind_r, fracture<Mesh> & f_r, const size_t & node_r, bool side_Q_r, size_t & restrict_node, const Matrix<T, Dynamic, 1>& rhs)
+    {
+        size_t n_sigma_skin_bs = 3;
+        size_t n_nodes_bs = 2;
+        size_t s_nodes = m_restrictions.size();
+        
+        size_t n_cells_l = f_l.m_pairs.size();
+        size_t n_nodes_l = f_l.m_internal_edges.size();
+        size_t n_skin_bs_l = n_sigma_skin_bs * n_cells_l;
+        
+        size_t n_cells_r = f_r.m_pairs.size();
+        size_t n_nodes_r = f_r.m_internal_edges.size();
+        size_t n_skin_bs_r = n_sigma_skin_bs * n_cells_r;
+        
+        std::vector<assembly_index> asm_map_e;
+
+        auto edge_base = m_n_cells_dof + m_n_faces_dof + m_n_skin_cells_dof + m_n_skin_edges_dof;
+        auto edge_LHS_offset = edge_base + restrict_node * s_nodes;
+        
+        for (size_t j = 0; j < 1; j++)
+        asm_map_e.push_back( assembly_index(edge_LHS_offset+j, true));
+    
+        assert( asm_map_e.size() == rhs.rows());
+
+        for (size_t i = 0; i < rhs.rows(); i++)
+        {
+            RHS(asm_map_e[i]+1) += rhs(i);
         }
     
     }
@@ -2126,6 +2157,22 @@ public:
 //                if(r_ind == 0){
                     scatter_skin_hybrid_nodewise_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, hybrid_matrix);
 //                }
+                
+                
+                if(r_ind == 0){
+                    Matrix<T, Dynamic, 1> bc_data = Matrix<T, Dynamic, 1>::Zero(1,1);
+                    bc_data(0,0) = 0.015;
+                    
+                    scatter_skin_hybrid_nodewise_rhs_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, bc_data);
+                }
+                
+                if(r_ind == 1){
+                    Matrix<T, Dynamic, 1> bc_data = Matrix<T, Dynamic, 1>::Zero(1,1);
+                    bc_data(0,0) = -0.015;
+                    
+                    scatter_skin_hybrid_nodewise_rhs_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, bc_data);
+                }
+
                 
                 r_ind++;
             }
@@ -2655,7 +2702,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 1000.0;
+        T c_para = 0.0;
         const auto qps_r = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r)
         {
@@ -3015,9 +3062,6 @@ public:
             typename Mesh::point_type point_rr = nodes_r[1];
             typename Mesh::point_type vr = point_rr - point_rl;
             auto nr = inplane_normal(msh,face_r,point,vr);
-//            if(std::fabs(nr-nl) < 1.0e-5){
-//                nr *= -1.0;
-//            }
             {
                 const auto s_phi = sr_basis.eval_flux_functions(point);
                 const auto mu_f_phi = sr_basis.eval_lambda_functions(point);

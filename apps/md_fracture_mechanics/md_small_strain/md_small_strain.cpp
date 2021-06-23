@@ -743,7 +743,7 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
-//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
+    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
 //
@@ -764,7 +764,7 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_11588.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_nel_1965.txt";
 //
-    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
+//    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_414.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_nel_801.txt";
     
     // other meshes
@@ -863,7 +863,7 @@ void Fratures2D(simulation_data & sim_data){
     
 //    end_point_mortars.clear();
     
-    if(1){// find points
+    if(0){// find points
         std::vector<mesh_type::point_type> pts;
         mesh_type::point_type p0;
         p0.x() = +10.0;
@@ -926,7 +926,7 @@ void Fratures2D(simulation_data & sim_data){
     std::vector<fracture<mesh_type> > fractures;
     std::vector<restriction > restrictions;
     std::vector<spring > springs;
-    if(0){
+    if(1){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
         f.m_bl_index = end_point_mortars[0].second;//mesh_builder.fracture_nodes()[0].second;
@@ -950,13 +950,13 @@ void Fratures2D(simulation_data & sim_data){
         restrictions.push_back(r1);
     }
     
-    if(1){
+    if(0){
         fracture<mesh_type> f0;
         f0.m_pairs = f0_pairs;
         f0.m_bl_index = 6;
         f0.m_el_index = 7;
         f0.m_br_index = 6;
-        f0.m_er_index = 449;//1062;//667;//199;//38;//449
+        f0.m_er_index = 38;//1062;//667;//199;//38;//449
         f0.build(msh);
         fractures.push_back(f0);
         
@@ -964,8 +964,8 @@ void Fratures2D(simulation_data & sim_data){
         f1.m_pairs = f1_pairs;
         f1.m_bl_index = 4;
         f1.m_el_index = 7;
-        f1.m_br_index = 472;//1138;//719;//219;//46;//472
-        f1.m_er_index = 475;//1131;//716;//222;//47;//475
+        f1.m_br_index = 46;//1138;//719;//219;//46;//472
+        f1.m_er_index = 47;//1131;//716;//222;//47;//475
         f1.build(msh);
         f1.m_bc_type = {1,1};
         f1.m_bc_data = {{-0.05,0},{-0.05,0}};
@@ -974,9 +974,9 @@ void Fratures2D(simulation_data & sim_data){
         fracture<mesh_type> f2;
         f2.m_pairs = f2_pairs;
         f2.m_bl_index = 5;
-        f2.m_el_index = 475;//1131;//716;//222;//47;//475
-        f2.m_br_index = 455;//1078;//684;//214;//42;//455
-        f2.m_er_index = 449;//1062;//667;//199;//38;//449
+        f2.m_el_index = 47;//1131;//716;//222;//47;//475
+        f2.m_br_index = 42;//1078;//684;//214;//42;//455
+        f2.m_er_index = 38;//1062;//667;//199;//38;//449
         f2.build(msh);
         f2.m_bc_type = {1,1};
         f2.m_bc_data = {{0,-0.2},{0,-0.2}};
@@ -1060,7 +1060,7 @@ void Fratures2D(simulation_data & sim_data){
         x = pt.x();
         y = pt.y();
         RealType ux = -0.0;
-        RealType uy = -0.2;
+        RealType uy = -0.1;
         return static_vector<RealType, 2>{ux, uy};
     };
     
@@ -1170,7 +1170,7 @@ void Fratures2D(simulation_data & sim_data){
     tc.toc();
     std::cout << bold << cyan << "Assemble in : " << tc.to_double() << " seconds" << reset << std::endl;
     
-    bool write_kg_Q = false;
+    bool write_kg_Q = true;
     if(write_kg_Q){
         std::ofstream mat_file;
         mat_file.open ("matrix.txt");
@@ -1451,7 +1451,7 @@ void Fratures2D(simulation_data & sim_data){
         // sigma normal and mortar u0 evaluation
         if(1){
 
-            size_t n_mortar_displacements = 2 * restrictions.size() + 8;
+            size_t n_mortar_displacements = 2 * restrictions.size();
             size_t points_offset = n_cells_dof + n_faces_dofs;
             points_offset += assembler.get_n_skin_cells_dof();
             points_offset += assembler.get_n_skin_edges_dof();
