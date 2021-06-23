@@ -736,14 +736,14 @@ void Fratures2D(simulation_data & sim_data){
     mesh_type msh;
     
     // Reading the polygonal mesh
-    polygon_2d_mesh_reader<RealType> mesh_builder;
+//    polygon_2d_mesh_reader<RealType> mesh_builder;
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_2.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_4.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_8.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_42.txt";
 //    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_20.txt";
-    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
+//    std::string mesh_file = "meshes/simple_mesh_single_crack_duplicated_nodes_nel_32.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_40.txt";
 //    std::string mesh_file = "meshes/base_polymesh_internal_fracture_nel_735.txt";
 //
@@ -773,17 +773,17 @@ void Fratures2D(simulation_data & sim_data){
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_1279.txt";
 //    std::string mesh_file = "meshes/base_polymesh_yshape_fracture_t_nel_2061.txt";
     
-    mesh_builder.set_poly_mesh_file(mesh_file);
-    mesh_builder.build_mesh();
-    mesh_builder.move_to_mesh_storage(msh);
-    
-//    gmsh_2d_reader<RealType> mesh_builder;
-//    std::string mesh_file = "meshes/fractured_reservoir.msh";
-//    mesh_builder.set_gmsh_file(mesh_file);
+//    mesh_builder.set_poly_mesh_file(mesh_file);
 //    mesh_builder.build_mesh();
 //    mesh_builder.move_to_mesh_storage(msh);
-//    std::string silo_mesh_file = "mesh";
-//    postprocessor<mesh_type>::write_silo_mesh(silo_mesh_file, msh);
+    
+    gmsh_2d_reader<RealType> mesh_builder;
+    std::string mesh_file = "meshes/fractured_reservoir.msh";
+    mesh_builder.set_gmsh_file(mesh_file);
+    mesh_builder.build_mesh();
+    mesh_builder.move_to_mesh_storage(msh);
+    std::string silo_mesh_file = "mesh";
+    postprocessor<mesh_type>::write_silo_mesh(silo_mesh_file, msh);
     
     tc.toc();
     std::cout << bold << cyan << "Mesh generation: " << tc.to_double() << " seconds" << reset << std::endl;
@@ -929,10 +929,14 @@ void Fratures2D(simulation_data & sim_data){
     if(1){
         fracture<mesh_type> f;
         f.m_pairs = fracture_pairs;
-        f.m_bl_index = end_point_mortars[0].second;//mesh_builder.fracture_nodes()[0].second;
-        f.m_el_index = end_point_mortars[1].second;//mesh_builder.fracture_nodes()[1].second;
-        f.m_br_index = end_point_mortars[0].second;//mesh_builder.fracture_nodes()[0].second;
-        f.m_er_index = end_point_mortars[1].second;//mesh_builder.fracture_nodes()[1].second;
+//        f.m_bl_index = end_point_mortars[0].second;//mesh_builder.fracture_nodes()[0].second;
+//        f.m_el_index = end_point_mortars[1].second;//mesh_builder.fracture_nodes()[1].second;
+//        f.m_br_index = end_point_mortars[0].second;//mesh_builder.fracture_nodes()[0].second;
+//        f.m_er_index = end_point_mortars[1].second;//mesh_builder.fracture_nodes()[1].second;
+        f.m_bl_index = mesh_builder.fracture_nodes()[0].second;
+        f.m_el_index = mesh_builder.fracture_nodes()[1].second;
+        f.m_br_index = mesh_builder.fracture_nodes()[0].second;
+        f.m_er_index = mesh_builder.fracture_nodes()[1].second;
         f.build(msh);
 
         fractures.push_back(f);
@@ -1077,8 +1081,10 @@ void Fratures2D(simulation_data & sim_data){
         RealType x,y;
         x = pt.x();
         y = pt.y();
-        RealType rx = -3.0/4000.0;
-        RealType ry = -3.0/2000.0;
+//        RealType rx = -3.0/4000.0;
+//        RealType ry = -3.0/2000.0;
+        RealType rx = 0.0;
+        RealType ry = 0.0;
         return static_vector<RealType, 2>{rx, ry};
     };
     

@@ -2032,12 +2032,14 @@ public:
                 if(1){
                     
                     auto rhs_l_fun = [](const typename Mesh::point_type& pt) -> T {
-                        T rhs = -3.0/4000.0;
+//                        T rhs = -3.0/4000.0;
+                        T rhs = -0.0/4000.0;
                         return rhs;
                     };
                     
                     auto rhs_r_fun = [](const typename Mesh::point_type& pt) -> T {
-                        T rhs = +3.0/4000.0;
+//                        T rhs = +3.0/4000.0;
+                        T rhs = +0.0/4000.0;
                         return rhs;
                     };
                     
@@ -2180,14 +2182,16 @@ public:
                 
                 if(r_ind == 0){
                     Matrix<T, Dynamic, 1> bc_data = Matrix<T, Dynamic, 1>::Zero(1,1);
-                    bc_data(0,0) = +0.00375*2;
+//                    bc_data(0,0) = +0.00375*2;
+                    bc_data(0,0) = +0.0075*2;
 
                     scatter_skin_hybrid_nodewise_rhs_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, bc_data);
                 }
 
                 if(r_ind == 1){
                     Matrix<T, Dynamic, 1> bc_data = Matrix<T, Dynamic, 1>::Zero(1,1);
-                    bc_data(0,0) = -0.01125*2;
+//                    bc_data(0,0) = -0.01125*2;
+                    bc_data(0,0) = -0.0075*2;
 
                     scatter_skin_hybrid_nodewise_rhs_data(msh, f_ind_l, f_l, node_l, side_Q_l, f_ind_r, f_r, node_r, side_Q_r, r_ind, bc_data);
                 }
@@ -3248,8 +3252,8 @@ public:
                 ret_t += s_t_opt;
             }
             
-            std::cout << "ret_t =" << std::endl;
-            std::cout << ret_t << std::endl;
+//            std::cout << "ret_t =" << std::endl;
+//            std::cout << ret_t << std::endl;
             
 
             return std::make_pair(ret_n, ret_t);
