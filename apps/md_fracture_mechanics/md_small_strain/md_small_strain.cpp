@@ -236,7 +236,7 @@ void Fratures3D(simulation_data & sim_data){
         x = pt.x();
         y = pt.y();
         z = pt.z();
-        RealType ux = -0.1;
+        RealType ux = -0.025;
         RealType uy = -0.0;
         RealType uz = -0.0;
         return static_vector<RealType, 3>{ux, uy, uz};
@@ -248,7 +248,7 @@ void Fratures3D(simulation_data & sim_data){
         y = pt.y();
         z = pt.z();
         RealType ux = -0.0;
-        RealType uy = -0.1;
+        RealType uy = -0.05;
         RealType uz = -0.0;
         return static_vector<RealType, 3>{ux, uy, uz};
     };
@@ -424,6 +424,11 @@ void Fratures3D(simulation_data & sim_data){
     std::string silo_file_name = "single_fracture_3d";
     postprocessor<mesh_type_3d>::write_silo_u_field_3d(silo_file_name, it, msh, hho_di, x_dof);
 
+    std::string vtk_file_name_l = "skin_l.vtk";
+    std::string vtk_file_name_r = "skin_r.vtk";
+    size_t f_index = 0;
+    postprocessor<mesh_type_3d>::write_skin_vtk_files(vtk_file_name_l,vtk_file_name_r, msh, assembler, hho_di, x_dof, f_index);
+    
     // sigma n and t
     size_t f_ind = 0;
     {
@@ -439,11 +444,11 @@ void Fratures3D(simulation_data & sim_data){
         size_t n_f_sigma_bs = disk::scalar_basis_size(sigma_degree, mesh_type::dimension - 1);
         size_t n_data = 3*n_cells;
 
-        Matrix<RealType, Dynamic, 3> data_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 3);
-        Matrix<RealType, Dynamic, 3> data_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 3);
+        Matrix<RealType, Dynamic, 4> data_n = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 4);
+        Matrix<RealType, Dynamic, 5> data_t = Matrix<RealType, Dynamic, Dynamic>::Zero(n_cells, 5);
 
-        Matrix<RealType, Dynamic, 4> data_u_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 4);
-        Matrix<RealType, Dynamic, 4> data_u_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 4);
+        Matrix<RealType, Dynamic, 6> data_u_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 6);
+        Matrix<RealType, Dynamic, 6> data_u_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 6);
 
         Matrix<RealType, Dynamic, 3> data_div_l = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
         Matrix<RealType, Dynamic, 3> data_div_r = Matrix<RealType, Dynamic, Dynamic>::Zero(n_data, 3);
@@ -496,12 +501,17 @@ void Fratures3D(simulation_data & sim_data){
                     auto st2h = disk::eval(sigma_t2_x_dof, t_phi);
 
                     RealType dv = (bar-p0).to_vector().norm();
-                    data_n(cell_ind,0) += 0.5*dv;
-                    data_n(cell_ind,1) += 0.5*snh;
+                    data_n(cell_ind,0) += (1.0/3.0)*bar.x();
+                    data_n(cell_ind,1) += (1.0/3.0)*bar.y();
+                    data_n(cell_ind,2) += (1.0/3.0)*bar.z();
+                    data_n(cell_ind,3) += (1.0/3.0)*snh;
 
-                    data_t(cell_ind,0) += 0.5*dv;
-                    data_t(cell_ind,1) += 0.5*st1h;
-                    data_t(cell_ind,2) += 0.5*st2h;
+                    data_t(cell_ind,0) += (1.0/3.0)*bar.x();
+                    data_t(cell_ind,1) += (1.0/3.0)*bar.y();
+                    data_t(cell_ind,2) += (1.0/3.0)*bar.z();
+                    data_t(cell_ind,3) += (1.0/3.0)*st1h;
+                    data_t(cell_ind,4) += (1.0/3.0)*st2h;
+                
                 }
 
                 // u evaluation
@@ -533,10 +543,12 @@ void Fratures3D(simulation_data & sim_data){
                         auto unl = ul.dot(n);
                         auto ut1l = ul.dot(t1);
                         auto ut2l = ul.dot(t2);
-                        data_u_l(3*cell_ind+ip,0) = dv;
-                        data_u_l(3*cell_ind+ip,1) = unl;
-                        data_u_l(3*cell_ind+ip,2) = ut1l;
-                        data_u_l(3*cell_ind+ip,3) = ut2l;
+                        data_u_l(3*cell_ind+ip,0) = bar.x();
+                        data_u_l(3*cell_ind+ip,1) = bar.y();
+                        data_u_l(3*cell_ind+ip,2) = bar.z();
+                        data_u_l(3*cell_ind+ip,3) = unl;
+                        data_u_l(3*cell_ind+ip,4) = ut1l;
+                        data_u_l(3*cell_ind+ip,5) = ut2l;
                     }
                     {
                         const auto n = disk::normal(msh, cell_r, face_r);
@@ -545,10 +557,12 @@ void Fratures3D(simulation_data & sim_data){
                         auto unr = ur.dot(n);
                         auto ut1r = ur.dot(t1);
                         auto ut2r = ur.dot(t2);
-                        data_u_r(3*cell_ind+ip,0) = dv;
-                        data_u_r(3*cell_ind+ip,1) = unr;
-                        data_u_r(3*cell_ind+ip,2) = ut1r;
-                        data_u_r(3*cell_ind+ip,3) = ut2r;
+                        data_u_r(3*cell_ind+ip,0) = bar.x();
+                        data_u_r(3*cell_ind+ip,1) = bar.y();
+                        data_u_r(3*cell_ind+ip,2) = bar.z();
+                        data_u_r(3*cell_ind+ip,3) = unr;
+                        data_u_r(3*cell_ind+ip,4) = ut1r;
+                        data_u_r(3*cell_ind+ip,5) = ut2r;
                     }
                 }
 

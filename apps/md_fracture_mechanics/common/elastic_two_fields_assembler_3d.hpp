@@ -1652,6 +1652,7 @@ public:
                 scatter_mortar_data(msh,chunk.second,f_ind,f,cell_ind,mortar_r);
                 
                 Matrix<T, Dynamic, Dynamic> mass_matrix = sigma_mass_matrix(msh, face_l, face_r);
+//                std::cout << mass_matrix << std::endl;
                 scatter_mortar_mass_data(msh,f_ind,f,cell_ind,mass_matrix);
                 
 //                Matrix<T, Dynamic, Dynamic> rhs = sigma_rhs(msh, face_l, face_r);
@@ -2189,7 +2190,7 @@ public:
             ret.block(0,0,sn_basis.size(),sn_basis.size()) += c_perp * s_n_opt;
         }
         
-        T c_para = 0.0;
+        T c_para = 10000.0;
         const auto qps_r1 = integrate(msh, face_r, 2 * (degree+di));
         for (auto& qp : qps_r1)
         {
@@ -3266,6 +3267,14 @@ public:
     
     std::vector<std::pair<size_t,size_t>> & fracture_pairs(){
         return m_fracture_pairs;
+    }
+    
+    std::vector<fracture_3d<Mesh> > & fractures(){
+        return m_fractures;
+    }
+    
+    std::vector<restriction_3d > & restrictions(){
+        return m_restrictions;
     }
     
 };
